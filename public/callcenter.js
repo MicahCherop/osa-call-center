@@ -34,24 +34,33 @@ async function fetchAllData() {
     try {
         // Fetch Agents
         const resAgents = await fetch(`${API_BASE}/agents`);
+        if (!resAgents.ok) throw new Error("Agents API returned " + resAgents.status);
         agents = await resAgents.json();
+        if (!Array.isArray(agents)) agents = []; // Defensive check
 
         // Fetch Campaigns
         const resCamps = await fetch(`${API_BASE}/campaigns`);
+        if (!resCamps.ok) throw new Error("Campaigns API returned " + resCamps.status);
         const campaigns = await resCamps.json();
-        campaigns.forEach(c => {
-            campaignConfigs[c.name] = c.type;
-        });
+        if (Array.isArray(campaigns)) {
+            campaigns.forEach(c => {
+                campaignConfigs[c.name] = c.type;
+            });
+        }
 
         // Fetch Customers
         const resCust = await fetch(`${API_BASE}/customers`);
+        if (!resCust.ok) throw new Error("Customers API returned " + resCust.status);
         mockCustomers = await resCust.json();
+        if (!Array.isArray(mockCustomers)) mockCustomers = [];
 
-        // Calculate Global Stats based on backend data
+        // Calculate Global Stats
         recalculateGlobalStats();
     } catch (err) {
         console.error("API Error:", err);
-        showAppAlert("Could not connect to the server. Ensure your FastAPI backend is running.", "Connection Error");
+        agents = []; 
+        mockCustomers = [];
+        showAppAlert("Could not connect to the database. Please check your Vercel logs.", "Connection Error");
     }
 }
 
