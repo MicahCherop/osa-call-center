@@ -1,0 +1,338 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OSA Call Center - Campaigns</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@200;300;400&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Inter', 'sans-serif'] },
+          fontWeight: {
+            black: '400', extrabold: '400', bold: '400', semibold: '400',
+            medium: '300', normal: '300', light: '200',
+          },
+          colors: {
+            brandDark: '#0f172a',
+            brandAmber: '#f59e0b',
+            glass: 'rgba(255, 255, 255, 0.65)',
+            glassDarker: 'rgba(255, 255, 255, 0.8)',
+          },
+          animation: {
+            blob: "blob 10s infinite",
+            pulseSlow: "pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite",
+          },
+          keyframes: {
+            blob: {
+              "0%": { transform: "translate(0px, 0px) scale(1)" },
+              "33%": { transform: "translate(30px, -50px) scale(1.1)" },
+              "66%": { transform: "translate(-20px, 20px) scale(0.9)" },
+              "100%": { transform: "translate(0px, 0px) scale(1)" }
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <link rel="stylesheet" href="callcenter.css">
+</head>
+<body data-page="campaigns" class="text-brandDark font-sans font-normal h-screen overflow-hidden flex relative bg-slate-50">
+  <!-- BACKGROUND -->
+  <div class="absolute inset-0 z-0 overflow-hidden pointer-events-none">
+    <div class="absolute top-[-10%] left-[-10%] w-[40rem] h-[40rem] bg-amber-200 rounded-full mix-blend-multiply filter blur-3xl opacity-60 animate-blob"></div>
+    <div class="absolute top-[20%] right-[-10%] w-[35rem] h-[35rem] bg-blue-200 rounded-full mix-blend-multiply filter blur-3xl opacity-60 animate-blob" style="animation-delay: 2s"></div>
+    <div class="absolute bottom-[-20%] left-[20%] w-[45rem] h-[45rem] bg-indigo-200 rounded-full mix-blend-multiply filter blur-3xl opacity-60 animate-blob" style="animation-delay: 4s"></div>
+  </div>
+
+  <!-- ADD CAMPAIGN MODAL -->
+  <div id="add-campaign-modal-backdrop" class="fixed inset-0 bg-brandDark/40 backdrop-blur-sm z-50 hidden transition-opacity duration-300 opacity-0 flex items-center justify-center" onclick="closeAddCampaignModal(event)">
+    <div id="add-campaign-modal" class="glass-panel w-full max-w-2xl rounded-2xl p-6 transform scale-95 transition-transform duration-300 relative shadow-2xl flex flex-col max-h-[90vh]" onclick="event.stopPropagation()">
+      <div class="flex justify-between items-center mb-6 border-b border-brandDark/10 pb-4">
+        <h2 class="text-xl font-semibold flex items-center gap-2"><i class="fa-solid fa-bullhorn text-brandAmber"></i> Create New Campaign</h2>
+        <button onclick="closeAddCampaignModal()" class="text-brandDark/50 hover:text-red-500 transition"><i class="fa-solid fa-xmark text-2xl"></i></button>
+      </div>
+      <form id="add-campaign-form" onsubmit="submitAddCampaign(event)" class="overflow-y-auto pr-2 space-y-4">
+        <div class="grid grid-cols-2 gap-4">
+          <div class="col-span-2">
+            <label class="block text-[11px] font-bold text-brandDark/70 uppercase mb-1.5">Campaign Details *</label>
+            <input type="text" id="new-campaign-name" required placeholder="e.g. DD1-DD7 Collections Campaign" class="glass-input rounded-lg w-full px-3 py-2 text-sm font-medium">
+          </div>
+          <div>
+            <label class="block text-[11px] font-bold text-brandDark/70 uppercase mb-1.5">Campaign Type *</label>
+            <select required id="new-campaign-type" class="glass-input rounded-lg w-full px-3 py-2 text-sm font-medium">
+              <option value="">Select type...</option>
+              <option value="active_no_loan">Active Customers - No Loan</option>
+              <option value="dormant">Dormant Customers</option>
+              <option value="defaulted">Defaulted Accounts</option>
+              <option value="upcoming_dues">Upcoming Dues</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-[11px] font-bold text-brandDark/70 uppercase mb-1.5">Priority</label>
+            <select class="glass-input rounded-lg w-full px-3 py-2 text-sm font-medium">
+              <option value="high">High</option>
+              <option value="medium" selected>Medium</option>
+              <option value="low">Low</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-[11px] font-bold text-brandDark/70 uppercase mb-1.5">Start Date *</label>
+            <input type="date" required class="glass-input rounded-lg w-full px-3 py-2 text-sm font-medium">
+          </div>
+          <div>
+            <label class="block text-[11px] font-bold text-brandDark/70 uppercase mb-1.5">End Date *</label>
+            <input type="date" required class="glass-input rounded-lg w-full px-3 py-2 text-sm font-medium">
+          </div>
+          <!-- CSV UPLOAD ZONE -->
+          <div class="col-span-2 mt-2">
+            <label class="block text-[11px] font-bold text-brandDark/70 uppercase mb-1.5">Upload Target Audience (CSV) *</label>
+            <div class="border-2 border-dashed border-brandDark/20 rounded-xl p-6 flex flex-col items-center justify-center bg-white/20 hover:bg-white/40 transition cursor-pointer relative">
+              <input type="file" id="csv-file-input" required accept=".csv" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer" onchange="document.getElementById('csv-filename').innerText = this.files[0]?.name || 'No file selected'">
+              <div class="w-12 h-12 bg-white/50 rounded-full flex items-center justify-center mb-3 shadow-sm text-brandAmber">
+                <i class="fa-solid fa-file-csv text-2xl"></i>
+              </div>
+              <span class="text-sm font-medium text-brandDark">Click or drag CSV file to upload customers</span>
+              <span class="text-xs text-brandDark/50 mt-1">Columns must include Name, Phone, and Branch</span>
+              <div id="csv-filename" class="mt-3 px-3 py-1 rounded bg-brandAmber/10 text-brandAmber text-xs font-semibold overflow-hidden text-ellipsis max-w-full">
+                No file selected
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="flex justify-end gap-3 mt-6 pt-4 border-t border-brandDark/10">
+          <button type="button" onclick="closeAddCampaignModal()" class="px-4 py-2 text-sm font-medium text-brandDark/70 hover:text-brandDark transition">Cancel</button>
+          <button type="submit" class="bg-gradient-to-br from-brandDark to-slate-800 hover:from-slate-800 hover:to-black text-white font-medium px-5 py-2 rounded-lg shadow-md transition transform hover:-translate-y-0.5 text-sm flex items-center gap-2">
+            <i class="fa-solid fa-check"></i> Save Campaign
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- SLIDE-OUT CUSTOMER DRAWER -->
+  <div id="customer-drawer-backdrop" class="fixed inset-0 bg-brandDark/20 backdrop-blur-sm z-40 hidden transition-opacity opacity-0" onclick="closeCustomerDrawer()"></div>
+  <div id="customer-drawer" class="fixed top-0 right-0 h-full w-full max-w-md glass-panel z-50 transform translate-x-full transition-transform duration-300 shadow-2xl flex flex-col">
+    <div class="p-6 border-b border-brandDark/10 flex justify-between items-center bg-white/40">
+      <h3 class="text-xl font-semibold flex items-center gap-2"><i class="fa-solid fa-address-card text-brandAmber"></i> Customer Profile</h3>
+      <button onclick="closeCustomerDrawer()" class="text-brandDark/50 hover:text-red-500 transition"><i class="fa-solid fa-xmark text-2xl"></i></button>
+    </div>
+    <div class="p-6 flex-1 overflow-y-auto">
+      <div class="flex items-center gap-4 mb-6">
+        <div class="w-16 h-16 rounded-full bg-brandAmber/20 flex items-center justify-center text-brandAmber text-2xl font-bold" id="drawer-initial">--</div>
+        <div>
+          <h2 class="text-2xl font-semibold leading-tight" id="drawer-name">Unknown</h2>
+          <p class="text-sm font-medium text-brandDark/60" id="drawer-phone">--</p>
+        </div>
+      </div>
+      <div class="flex gap-4 border-b border-brandDark/10 mb-6">
+        <button class="drawer-tab active text-sm font-bold text-brandAmber border-b-2 border-brandAmber pb-2 px-1 transition" onclick="switchDrawerTab('overview', this)">Overview</button>
+        <button class="drawer-tab text-sm font-bold text-brandDark/50 hover:text-brandDark border-b-2 border-transparent pb-2 px-1 transition" onclick="switchDrawerTab('profile', this)">Business Profile</button>
+      </div>
+      <div class="space-y-4">
+        <!-- Overview Tab -->
+        <div id="drawer-overview" class="drawer-content space-y-4">
+          <div class="glass-card p-4 rounded-xl">
+            <h4 class="text-xs font-bold text-brandDark/50 uppercase mb-2">Financial Snapshot</h4>
+            <div class="flex justify-between mb-1"><span class="font-medium text-sm">Campaign</span> <span class="font-bold text-brandDark text-right" id="drawer-campaign">--</span></div>
+            <div class="flex justify-between mb-1"><span class="font-medium text-sm">Outstanding Balance</span> <span class="font-bold text-red-600" id="drawer-balance">0</span></div>
+            <div class="flex justify-between mb-1"><span class="font-medium text-sm">Agent</span> <span class="font-bold text-brandDark" id="drawer-agent">--</span></div>
+            <div class="flex justify-between mb-1"><span class="font-medium text-sm">Outcome</span> <span class="font-bold text-brandDark" id="drawer-outcome">--</span></div>
+            <div class="flex justify-between mb-1"><span class="font-medium text-sm">Status</span> <span class="font-bold text-brandDark text-right" id="drawer-status">--</span></div>
+          </div>
+        </div>
+        <!-- Business Profile Tab -->
+        <div id="drawer-profile" class="drawer-content hidden space-y-4">
+          <div class="glass-card p-4 rounded-xl">
+            <h4 class="text-xs font-bold text-brandDark/50 uppercase mb-2">Business Details</h4>
+            <div class="flex justify-between mb-1"><span class="font-medium text-sm">Sector</span> <span class="font-bold text-brandDark" id="drawer-sector">--</span></div>
+            <div class="flex justify-between mb-1"><span class="font-medium text-sm">Location / Branch</span> <span class="font-bold text-brandDark" id="drawer-branch">--</span></div>
+            <div class="flex justify-between mb-1"><span class="font-medium text-sm">Pair</span> <span class="font-bold text-brandDark" id="drawer-pair">--</span></div>
+            <div class="flex justify-between mb-1"><span class="font-medium text-sm">Business Status</span> <span class="font-bold text-brandDark" id="drawer-business">--</span></div>
+            <div class="mt-3 pt-3 border-t border-brandDark/10">
+              <div class="text-xs font-bold text-brandDark/50 uppercase mb-1">Comments</div>
+              <p class="text-sm text-brandDark/70" id="drawer-comments">--</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SIDEBAR -->
+  <aside class="z-10 w-20 md:w-24 glass-panel border-r flex flex-col items-center py-6">
+    <a href="workspace.html" data-page="workspace" class="nav-btn w-full py-4 flex flex-col items-center gap-1.5 text-[11px] font-semibold text-brandDark/70 hover:text-brandDark transition-colors relative">
+      <i class="fa-solid fa-headset text-[20px]"></i> Workspace
+      <div class="active-indicator absolute left-0 top-0 h-full w-1 bg-brandAmber hidden"></div>
+    </a>
+    <a href="campaigns.html" data-page="campaigns" class="nav-btn w-full py-4 flex flex-col items-center gap-1.5 text-[11px] font-semibold text-brandDark/70 hover:text-brandDark transition-colors relative bg-white/40">
+      <i class="fa-solid fa-bullhorn text-[20px]"></i> Campaigns
+      <div class="active-indicator absolute left-0 top-0 h-full w-1 bg-brandAmber"></div>
+    </a>
+    <a href="teamleader.html" data-page="teamleader" class="nav-btn w-full py-4 flex flex-col items-center gap-1.5 text-[11px] font-semibold text-brandDark/70 hover:text-brandDark transition-colors relative">
+      <i class="fa-solid fa-user-tie text-[20px]"></i> Team Lead
+      <div class="active-indicator absolute left-0 top-0 h-full w-1 bg-brandAmber hidden"></div>
+    </a>
+    <a href="analytics.html" data-page="dashboard" class="nav-btn w-full py-4 flex flex-col items-center gap-1.5 text-[11px] font-semibold text-brandDark/70 hover:text-brandDark transition-colors relative">
+      <i class="fa-solid fa-chart-pie text-[20px]"></i> Analytics
+      <div class="active-indicator absolute left-0 top-0 h-full w-1 bg-brandAmber hidden"></div>
+    </a>
+  </aside>
+
+  <main class="z-10 flex-1 flex flex-col p-6 overflow-hidden">
+    <!-- TOP BAR -->
+    <header class="glass-panel rounded-2xl px-6 py-4 mb-6 flex justify-between items-center shrink-0">
+      <h1 class="text-2xl font-bold tracking-tight flex items-center gap-3">
+        <i class="fa-solid fa-phone-volume text-brandAmber"></i> OSA Call Center
+      </h1>
+      <div class="flex items-center gap-5 text-sm">
+        <button class="text-brandDark/60 hover:text-brandDark transition"><i class="fa-regular fa-bell text-xl"></i></button>
+        <div class="flex items-center gap-3 pl-4 border-l border-brandDark/20">
+          <i class="fa-solid fa-circle-user text-3xl text-brandDark/80"></i>
+          <div class="leading-tight">
+            <!-- Dynamic Agent Selector -->
+            <select id="current-agent-select" onchange="switchActiveAgent()" class="glass-input text-[14px] font-semibold rounded px-2 py-1 bg-transparent border border-brandDark/10 outline-none cursor-pointer">
+               <option value="">No Agents</option>
+            </select>
+            <div id="global-status-text" class="text-[11px] text-gray-500 font-bold flex items-center gap-1 uppercase transition-colors mt-1 pl-1">
+              <span id="global-status-dot" class="w-2 h-2 rounded-full bg-gray-400 transition-colors"></span> OFFLINE
+            </div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <div class="flex-1 overflow-hidden">
+      <!-- ========================================== -->
+      <!-- VIEW 2: CAMPAIGNS & SHIFT MANAGER -->
+      <!-- ========================================== -->
+      <div id="view-campaigns" class="view h-full flex flex-col">
+        <!-- STATE A: CAMPAIGN LIST -->
+        <div id="campaign-list-state" class="glass-panel rounded-2xl p-6 flex-1 flex flex-col h-full">
+          <div class="flex justify-between items-end mb-6">
+            <div>
+              <h2 class="text-xl font-semibold mb-2 inline-block relative">
+                Campaign Management
+                <div class="absolute -bottom-2 left-0 w-1/2 h-1 bg-brandAmber rounded-full"></div>
+              </h2>
+              <p class="text-sm text-brandDark/70 mt-3"><i class="fa-solid fa-circle-info mr-1"></i>Manage customer records, assignment rules, and agent shifts.</p>
+            </div>
+            
+            <div class="flex items-center gap-4">
+              <button onclick="openShiftManager()" class="bg-white/60 border border-brandDark/20 hover:bg-white text-brandDark font-medium px-5 py-2.5 rounded-lg shadow-sm transition text-sm flex items-center gap-2">
+                <i class="fa-solid fa-users-gear"></i> Shift Manager & Allocation
+              </button>
+              <button onclick="openAddCampaignModal()" class="bg-gradient-to-br from-brandDark to-slate-800 hover:from-slate-800 hover:to-black text-white font-medium px-5 py-2.5 rounded-lg shadow-md transition transform hover:-translate-y-0.5 text-sm flex items-center gap-2">
+                <i class="fa-solid fa-plus"></i> Add Campaign
+              </button>
+            </div>
+          </div>
+          
+          <div class="flex-1 overflow-auto border border-brandDark/10 rounded-xl bg-white/20 backdrop-blur-sm">
+            <table class="w-full text-left border-collapse">
+              <thead class="bg-white/50 sticky top-0 z-10">
+                <tr class="text-[12px] font-semibold uppercase tracking-wider text-brandDark/60 border-b border-brandDark/20">
+                  <th class="px-4 py-4 w-10"></th>
+                  <th class="px-4 py-4">Campaign Name</th>
+                  <th class="px-4 py-4">Total Customers</th>
+                  <th class="px-4 py-4">Contacted</th>
+                  <th class="px-4 py-4 w-48">Completion Target</th>
+                </tr>
+              </thead>
+              <tbody class="text-sm font-medium" id="campaign-list-tbody">
+              <!-- Dynamically populated -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- STATE B: CAMPAIGN DETAILS (HIDDEN) -->
+        <div id="campaign-details-state" class="glass-panel rounded-2xl p-6 flex-1 flex flex-col hidden overflow-hidden relative">
+          <button onclick="closeSecondaryState()" class="self-start text-[14px] font-medium text-brandDark/70 hover:text-brandAmber transition flex items-center gap-2 mb-2">
+            <i class="fa-solid fa-arrow-left"></i> Back to Campaigns
+          </button>
+          <h2 id="campaign-detail-title" class="text-xl font-semibold mb-4">Campaign Customers</h2>
+          <div class="flex-1 overflow-auto rounded-xl border border-brandDark/10 bg-white/30 backdrop-blur-sm shadow-inner relative">
+            <table class="w-full text-left border-collapse whitespace-nowrap">
+                <thead class="sticky top-0 bg-white/90 backdrop-blur-md z-10 shadow-sm">
+                <tr class="text-[11px] font-semibold uppercase tracking-wider text-brandDark/70 border-b border-brandDark/20">
+                    <th class="px-4 py-3">Name</th>
+                    <th class="px-4 py-3">Phone</th>
+                    <th class="px-4 py-3">Sector</th>
+                    <th class="px-4 py-3 text-amber-700">Assigned To</th>
+                    <th class="px-4 py-3 text-amber-700">Outcome</th>
+                </tr>
+                </thead>             
+              <tbody id="campaign-customers-tbody" class="text-[13px] font-medium"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- STATE C: SHIFT & ALLOCATION MANAGER -->
+        <div id="shift-manager-state" class="glass-panel rounded-2xl p-6 flex-1 flex flex-col hidden overflow-hidden relative">
+          <div class="flex justify-between items-start mb-6">
+            <div>
+              <button onclick="closeSecondaryState()" class="text-[14px] font-medium text-brandDark/70 hover:text-brandAmber transition flex items-center gap-2 mb-2">
+                <i class="fa-solid fa-arrow-left"></i> Back to Campaigns
+              </button>
+              <h2 class="text-xl font-semibold">Agent Shift Manager & Allocation</h2>
+            </div>
+          </div>
+          
+          <div class="flex-1 flex gap-6 overflow-hidden">
+            <!-- Left: Roster Table -->
+            <div class="flex-[2] overflow-auto rounded-xl border border-brandDark/10 bg-white/30 backdrop-blur-sm shadow-inner relative">
+              <table class="w-full text-left border-collapse whitespace-nowrap">
+                <thead class="sticky top-0 bg-white/90 backdrop-blur-md z-10 shadow-sm">
+                  <tr class="text-[11px] font-semibold uppercase tracking-wider text-brandDark/70 border-b border-brandDark/20">
+                    <th class="px-4 py-3">Agent Name</th>
+                    <th class="px-4 py-3">Team</th>
+                    <th class="px-4 py-3">Shift Status</th>
+                    <th class="px-4 py-3">Current Campaign</th>
+                    <th class="px-4 py-3">Assigned Leads (Queue)</th>
+                  </tr>
+                </thead>
+                <tbody class="text-[13px] font-medium" id="shift-manager-tbody">
+                  <!-- Populated dynamically -->
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Right: Allocation Engine -->
+            <div class="flex-1 flex flex-col gap-6">
+                <!-- Allocation Engine Box -->
+                <div class="glass-card rounded-xl p-5 border border-brandAmber/20 bg-brandAmber/5 flex-1 flex flex-col">
+                    <h3 class="font-bold text-[15px] uppercase text-brandDark/70 mb-4 border-b border-brandAmber/20 pb-2">Allocate Customers</h3>
+                    
+                    <label class="block text-[11px] font-bold text-brandDark/70 uppercase mb-1.5">Target Campaign</label>
+                    <select id="alloc-campaign" onchange="renderCampaignAgentSelector()" class="glass-input rounded-lg w-full px-3 py-2 text-sm font-medium bg-white/50 mb-4">
+                        <option value="">No campaigns available</option>
+                    </select>
+
+                    <label class="block text-[11px] font-bold text-brandDark/70 uppercase mb-1.5">Select Agents</label>
+                    <div id="alloc-agent-selector" class="rounded-xl border border-brandDark/10 bg-white/30 p-3 space-y-2 max-h-48 overflow-y-auto text-sm">
+                        <p class="text-brandDark/50 italic text-xs">Select a campaign to view available agents.</p>
+                    </div>
+                    <p class="text-xs text-brandDark/50 mt-2 mb-4">Agents already working on another campaign are excluded automatically.</p>
+
+                    <div class="mt-auto">
+                        <button onclick="distributeCustomers()" class="w-full bg-gradient-to-br from-brandDark to-slate-800 hover:from-slate-800 hover:to-black text-white font-bold px-4 py-3 rounded-xl shadow-md transition transform hover:-translate-y-0.5 flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-arrows-rotate"></i> Distribute Evenly
+                        </button>
+                        <p class="text-xs text-brandDark/50 text-center mt-3">Customers will be split equally among the selected available agents.</p>
+                    </div>
+                </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+  <script src="callcenter.js"></script>
+</body>
+</html>
