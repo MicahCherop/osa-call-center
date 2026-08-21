@@ -26,7 +26,12 @@ let globalStats = {
 window.onload = async () => {
     // 1. Fetch data from backend on load
     await fetchAllData();
-    // 2. Initialize UI
+    
+    // 2. Fallback safeguards to prevent JS crashes
+    if (!Array.isArray(agents)) agents = [];
+    if (!Array.isArray(mockCustomers)) mockCustomers = [];
+    
+    // 3. Initialize UI
     initCurrentPage();
 };
 
@@ -34,13 +39,13 @@ async function fetchAllData() {
     try {
         // Fetch Agents
         const resAgents = await fetch(`${API_BASE}/agents`);
-        if (!resAgents.ok) throw new Error("Agents API returned " + resAgents.status);
+        if (!resAgents.ok) throw new Error(`Agents API: ${resAgents.status}`);
         agents = await resAgents.json();
-        if (!Array.isArray(agents)) agents = []; // Defensive check
+        if (!Array.isArray(agents)) agents = [];
 
         // Fetch Campaigns
         const resCamps = await fetch(`${API_BASE}/campaigns`);
-        if (!resCamps.ok) throw new Error("Campaigns API returned " + resCamps.status);
+        if (!resCamps.ok) throw new Error(`Campaigns API: ${resCamps.status}`);
         const campaigns = await resCamps.json();
         if (Array.isArray(campaigns)) {
             campaigns.forEach(c => {
@@ -50,7 +55,7 @@ async function fetchAllData() {
 
         // Fetch Customers
         const resCust = await fetch(`${API_BASE}/customers`);
-        if (!resCust.ok) throw new Error("Customers API returned " + resCust.status);
+        if (!resCust.ok) throw new Error(`Customers API: ${resCust.status}`);
         mockCustomers = await resCust.json();
         if (!Array.isArray(mockCustomers)) mockCustomers = [];
 
@@ -60,7 +65,7 @@ async function fetchAllData() {
         console.error("API Error:", err);
         agents = []; 
         mockCustomers = [];
-        showAppAlert("Could not connect to the database. Please check your Vercel logs.", "Connection Error");
+        showAppAlert("Could not connect to the database. Ensure your Google credentials are added to Vercel.", "Connection Error");
     }
 }
 
