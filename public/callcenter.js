@@ -1,7 +1,23 @@
-﻿// --- RBAC: SECURITY & ENFORCEMENT ---
+﻿// --- FRONTEND API INTEGRATION ---
+const API_BASE = '/api';
+
+// Persistent Local UI States
+let activeCustomerId = null;
+let activeWorkspaceQueueTab = 'active';
+let activeAppModal = null;
+let isClockedIn = false;
+
+// Dynamic Data States
+let mockCustomers = [];
+let campaignConfigs = {};
+let agents = [];
+let globalStats = { totalCalls: 0, connected: 0, recovered: 0, outcomes: {} };
+
+// --- RBAC: SECURITY & ENFORCEMENT ---
 const CURRENT_USER_EMAIL = localStorage.getItem('USER_EMAIL');
 const CURRENT_USER_ROLE = localStorage.getItem('USER_ROLE');
 const CURRENT_USER_NAME = localStorage.getItem('LOGGED_IN_AGENT');
+let LOGGED_IN_AGENT = CURRENT_USER_NAME || null; 
 const currentPage = document.body.dataset.page;
 
 function enforceSecurity() {
@@ -31,7 +47,8 @@ function enforceSecurity() {
 const isAuthorized = enforceSecurity();
 
 window.onload = async () => {
-    if (!isAuthorized || currentPage === 'login') return; // Stop if not authorized or on login page
+    // Stop execution if they are unauthorized or on the login page
+    if (!isAuthorized || currentPage === 'login') return; 
     
     await fetchAllData();
     if (!Array.isArray(agents)) agents = [];
@@ -44,76 +61,6 @@ window.logout = function() {
     localStorage.clear();
     window.location.replace('/login.html');
 };
-
-// --- STEP 4: FRONTEND API INTEGRATION ---
-const API_BASE = '/api';
-
-// Persistent Local UI States
-let LOGGED_IN_AGENT = localStorage.getItem('LOGGED_IN_AGENT') || null;
-let isClockedIn = false;
-let activeCustomerId = null;
-let activeWorkspaceQueueTab = 'active';
-let activeAppModal = null;
-
-// Dynamic Data States (Populated from Google Sheets via FastAPI)
-let mockCustomers = [];
-let campaignConfigs = {};
-let agents = [];
-let globalStats = {
-  totalCalls: 0,
-  connected: 0,
-  recovered: 0,
-  outcomes: {}
-};
-
-// --- RBAC: AUTHENTICATION & UI ENFORCEMENT ---
-
-async function authenticateUser() {
-    // 1. If no email is saved, ask for it (A basic login simulation)
-    if (!CURRENT_USER_EMAIL) {
-        const email = prompt("Please enter your email to log in:");
-        if (!email) {
-            document.body.innerHTML = "<h2 class='p-10 text-center text-red-600'>Access Denied. Reload to log in.</h2>";
-            return false;
-        }
-        CURRENT_USER_EMAIL = email.toLowerCase().trim();
-    }
-
-    // 2. Find the user in the downloaded agents list
-    const userAccount = agents.find(a => a.email && a.email.toLowerCase() === CURRENT_USER_EMAIL);
-    
-    if (!userAccount) {
-        alert("Email not found in the system. Contact your Team Leader.");
-        localStorage.removeItem('USER_EMAIL');
-        document.body.innerHTML = "<h2 class='p-10 text-center text-red-600'>Unauthorized.</h2>";
-        return false;
-    }
-
-    // 3. Save session
-    CURRENT_USER_ROLE = userAccount.role || 'Agent';
-    LOGGED_IN_AGENT = userAccount.name;
-    localStorage.setItem('USER_EMAIL', CURRENT_USER_EMAIL);
-    localStorage.setItem('USER_ROLE', CURRENT_USER_ROLE);
-    localStorage.setItem('LOGGED_IN_AGENT', LOGGED_IN_AGENT);
-
-    return true;
-}
-
-function enforceRolePermissions() {
-    const currentPage = document.body.dataset.page; // e.g., 'workspace', 'campaigns'
-    
-    // Hide restricted sidebar links for Agents
-    if (CURRENT_USER_ROLE === 'Agent') {
-        const restrictedLinks = document.querySelectorAll('a[data-page="campaigns"], a[data-page="teamleader"], a[data-page="dashboard"]');
-        restrictedLinks.forEach(link => link.classList.add('hidden'));
-
-        // If an Agent tries to access a page other than the workspace, boot them out
-        if (currentPage !== 'workspace') {
-            window.location.replace('/workspace.html');
-        }
-    }
-}
-
 // ----------------------------------------------------------------------
 // RENDER FUNCTIONS (Restored to fix Shift Manager and Campaigns)
 // ----------------------------------------------------------------------
