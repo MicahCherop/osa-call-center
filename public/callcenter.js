@@ -482,24 +482,50 @@ window.switchDrawerTab = function(tabName, element) {
 };
 
 window.switchTeamLeaderTab = function(tabName, element) {
+  // Hide all tab contents
   const tabs = document.querySelectorAll('.teamleader-tab-content');
   tabs.forEach(tab => tab.classList.add('hidden'));
 
+  // Show selected tab content
   const selectedTab = document.getElementById(`tl-tab-${tabName}`);
   if (selectedTab) selectedTab.classList.remove('hidden');
 
+  // Reset all buttons to inactive (white with border)
   const buttons = document.querySelectorAll('.teamleader-tab-btn');
   buttons.forEach(btn => {
-    btn.classList.remove('border-brandAmber', 'text-brandAmber');
-    btn.classList.add('border-transparent', 'text-brandDark/50');
+    btn.className = "teamleader-tab-btn bg-white border border-brandDark/20 text-brandDark/70 hover:text-brandDark hover:border-brandDark/40 px-4 py-2 rounded-lg text-sm font-bold transition flex items-center gap-2";
   });
 
+  // Set the clicked button to active (dark background)
   if (element) {
-    element.classList.remove('border-transparent', 'text-brandDark/50');
-    element.classList.add('border-brandAmber', 'text-brandAmber');
+    element.className = "teamleader-tab-btn bg-brandDark text-white border border-transparent px-4 py-2 rounded-lg text-sm font-bold transition flex items-center gap-2";
   }
 };
+window.renderTLPending = function() {
+    const tbody = document.getElementById('tl-pending-tbody');
+    if (!tbody) return;
+    tbody.innerHTML = '';
 
+    // Filter for outcomes that exist but are NOT 'Answered'
+    const pendingCustomers = mockCustomers.filter(c => c.outcome && c.outcome !== 'Answered');
+
+    if (pendingCustomers.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5" class="px-4 py-8 text-center text-brandDark/50 italic font-medium">No pending callbacks found.</td></tr>`;
+        return;
+    }
+
+    pendingCustomers.forEach(c => {
+        tbody.innerHTML += `
+            <tr class="border-b border-brandDark/5 hover:bg-white/40 transition">
+                <td class="px-4 py-3 font-bold cursor-pointer hover:text-brandAmber" onclick="openCustomerDrawer(${c.id})">${escapeHtml(c.name)}</td>
+                <td class="px-4 py-3">${escapeHtml(c.phone)}</td>
+                <td class="px-4 py-3 text-brandDark/70">${escapeHtml(c.campaign)}</td>
+                <td class="px-4 py-3 font-bold text-red-600">${escapeHtml(c.outcome)}</td>
+                <td class="px-4 py-3 text-amber-700 font-bold">${escapeHtml(c.agentId || 'Unassigned')}</td>
+            </tr>
+        `;
+    });
+};
 window.parseCSV = function(text) {
   const lines = text.split(/\r\n|\n/);
   if (lines.length === 0) return [];
@@ -1108,4 +1134,68 @@ window.renderTLCustomers = function() {
             </tr>
         `;
     });
+};
+window.renderAnalyticsResponses = function() {
+    const container = document.getElementById('analytics-responses-container');
+    const filterSelect = document.getElementById('dash-response-campaign-filter');
+    const countSpan = document.getElementById('dash-response-count');
+    if (!container) return;
+
+    // Populate filter dropdown if empty
+    if (filterSelect && filterSelect.options.length <= 1) {
+        const campaigns = Object.keys(campaignConfigs);
+        campaigns.forEach(c => {
+            filterSelect.innerHTML += `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`;
+        });
+    }
+
+    const selectedCampaign = filterSelect ? filterSelect.value : "";
+    
+    // Filter customers: Must have an outcome, and match the selected campaign (if any)
+    const workedCustomers = mockCustomers.filter(c => {
+        if (!c.outcome) return false;
+        if (selectedCampaign && selectedCampaign !== "" && c.campaign !== selectedCampaign) return false;
+        return true;
+    });
+
+    if (countSpan) {
+        countSpan.innerText = `${workedCustomers.length} updates`;
+    }
+    
+    if (workedCustomers.length === 0) {
+        container.innerHTML = '<p class="p-6 text-center text-brandDark/50 italic font-medium">No customer responses match this criteria.</p>';
+        return;
+    }
+
+    // 1. Get ALL unique CSV column keys dynamically
+    let allKeys = new Set();
+    workedCustomers.forEach(c => Object.keys(c).forEach(k => allKeys.add(k)));
+    
+    // Hide internal system keys
+    const excludeKeys = ['id', 'pendingReschedule', 'worked'];
+    const columns = Array.from(allKeys).filter(k => !excludeKeys.includes(k));
+
+    // 2. Build the HTML Table
+    let tableHTML = `
+        <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse whitespace-nowrap">
+                <thead class="bg-white/90 sticky top-0 z-10 shadow-sm border-b border-brandDark/20">
+                    <tr class="text-[11px] font-semibold uppercase text-brandDark/70">`;
+    
+    columns.forEach(col => {
+        tableHTML += `<th class="px-4 py-3">${escapeHtml(col)}</th>`;
+    });
+    
+    tableHTML += `</tr></thead><tbody class="text-[13px] font-medium">`;
+
+    workedCustomers.forEach(c => {
+        tableHTML += `<tr class="border-b border-brandDark/5 hover:bg-white/40 transition">`;
+        columns.forEach(col => {
+            tableHTML += `<td class="px-4 py-3">${escapeHtml(c[col] || '--')}</td>`;
+        });
+        tableHTML += `</tr>`;
+    });
+
+    tableHTML += `</tbody></table></div>`;
+    container.innerHTML = tableHTML;
 };

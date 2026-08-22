@@ -217,10 +217,16 @@ tailwind.config = {
             <h2 class="text-xl font-semibold">Team Leader Workspace</h2>
             <p class="text-sm text-brandDark/60 mt-1">Manage agent shifts and redistribute pending callbacks.</p>
           </div>
-          <div class="flex gap-2">
-            <button id="tl-tab-agents" onclick="switchTeamLeaderTab('agents')" class="tl-tab rounded-lg bg-brandDark text-white text-sm font-bold px-4 py-2 transition"><i class="fa-solid fa-users-gear mr-2"></i> Agents</button>
-            <button class="teamleader-tab-btn text-sm font-bold text-brandDark/50 hover:text-brandDark border-b-2 border-transparent pb-2 px-1 transition" onclick="switchTeamLeaderTab('customers', this); renderTLCustomers()">All Customers</button>
-            <button id="tl-tab-pending" onclick="switchTeamLeaderTab('pending')" class="tl-tab rounded-lg bg-white/50 border border-brandDark/10 text-brandDark/70 text-sm font-bold px-4 py-2 transition"><i class="fa-solid fa-clock-rotate-left mr-2"></i> Pending Callbacks</button>
+          <div class="flex gap-3 mb-6">
+            <button class="teamleader-tab-btn bg-brandDark text-white border border-transparent px-4 py-2 rounded-lg text-sm font-bold transition flex items-center gap-2" onclick="switchTeamLeaderTab('agents', this)">
+              <i class="fa-solid fa-users-cog"></i> Agents
+            </button>
+            <button class="teamleader-tab-btn bg-white border border-brandDark/20 text-brandDark/70 hover:text-brandDark hover:border-brandDark/40 px-4 py-2 rounded-lg text-sm font-bold transition flex items-center gap-2" onclick="switchTeamLeaderTab('customers', this); renderTLCustomers()">
+              All Customers
+            </button>
+            <button class="teamleader-tab-btn bg-white border border-brandDark/20 text-brandDark/70 hover:text-brandDark hover:border-brandDark/40 px-4 py-2 rounded-lg text-sm font-bold transition flex items-center gap-2" onclick="switchTeamLeaderTab('pending', this); renderTLPending()">
+              <i class="fa-solid fa-clock-rotate-left"></i> Pending Callbacks
+            </button>
           </div>
         </div>
 
@@ -278,6 +284,27 @@ tailwind.config = {
                   </tr>
                 </thead>
                 <tbody id="tl-customers-tbody" class="text-[13px] font-medium"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- PENDING CALLBACKS TAB -->
+        <div id="tl-tab-pending" class="teamleader-tab-content hidden space-y-4">
+          <div class="glass-card p-6 rounded-xl flex flex-col h-[70vh]">
+            <h3 class="font-bold text-lg mb-4 text-brandDark">Pending Callbacks (Unanswered)</h3>
+            <div class="flex-1 overflow-auto rounded-xl border border-brandDark/10 bg-white/30 backdrop-blur-sm">
+              <table class="w-full text-left border-collapse whitespace-nowrap">
+                <thead class="sticky top-0 bg-white/90 backdrop-blur-md z-10 shadow-sm">
+                  <tr class="text-[11px] font-semibold uppercase tracking-wider text-brandDark/70 border-b border-brandDark/20">
+                    <th class="px-4 py-3">Customer Name</th>
+                    <th class="px-4 py-3">Phone</th>
+                    <th class="px-4 py-3">Campaign</th>
+                    <th class="px-4 py-3">Outcome</th>
+                    <th class="px-4 py-3 text-amber-700">Agent Assigned</th>
+                  </tr>
+                </thead>
+                <tbody id="tl-pending-tbody" class="text-[13px] font-medium"></tbody>
               </table>
             </div>
           </div>
