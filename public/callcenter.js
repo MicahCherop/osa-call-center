@@ -21,26 +21,56 @@ let LOGGED_IN_AGENT = CURRENT_USER_NAME || null;
 const currentPage = document.body.dataset.page;
 
 function enforceSecurity() {
+    // 1. Unauthenticated users get booted to login
     if (!CURRENT_USER_EMAIL && currentPage !== 'login') {
         window.location.replace('/login.html');
         return false;
     }
+    
+    // 2. Logged-in users on the login page get routed to their specific home pages
     if (CURRENT_USER_EMAIL && currentPage === 'login') {
-        window.location.replace('/workspace.html');
+        const dest = CURRENT_USER_ROLE === 'Agent' ? '/workspace.html' : '/teamleader.html';
+        window.location.replace(dest);
         return false;
     }
+
+    // 3. Restrict Agents to Workspace only
     if (CURRENT_USER_ROLE === 'Agent' && currentPage !== 'workspace' && currentPage !== 'login') {
         window.location.replace('/workspace.html');
         return false;
     }
-    if (CURRENT_USER_ROLE === 'Agent') {
-        document.addEventListener("DOMContentLoaded", () => {
+
+    // 4. Restrict Team Leaders from the Workspace
+    if (CURRENT_USER_ROLE === 'Team Leader' && currentPage === 'workspace') {
+        window.location.replace('/teamleader.html');
+        return false;
+    }
+
+    // 5. Update UI elements based on role
+    document.addEventListener("DOMContentLoaded", () => {
+        // Hide sidebar links
+        if (CURRENT_USER_ROLE === 'Agent') {
             const restricted = document.querySelectorAll('a[data-page="campaigns"], a[data-page="teamleader"], a[data-page="dashboard"], a[data-page="admin"]');
             restricted.forEach(link => link.style.display = 'none');
-            const agentSelector = document.getElementById('current-agent-select');
-            if (agentSelector) agentSelector.parentElement.innerHTML = `<span class="font-bold text-lg">${CURRENT_USER_NAME}</span>`;
-        });
-    }
+        } else if (CURRENT_USER_ROLE === 'Team Leader') {
+            const restricted = document.querySelectorAll('a[data-page="workspace"]');
+            restricted.forEach(link => link.style.display = 'none');
+        }
+
+        // Convert the top-right area into a Logout Button for ALL users
+        const agentSelector = document.getElementById('current-agent-select');
+        if (agentSelector) {
+            agentSelector.parentElement.innerHTML = `
+                <button onclick="promptLogout()" class="font-bold text-lg text-brandDark hover:text-brandAmber transition flex items-center gap-2 cursor-pointer">
+                    ${CURRENT_USER_NAME} <i class="fa-solid fa-right-from-bracket text-sm"></i>
+                </button>
+                <div class="text-[11px] text-brandAmber font-bold uppercase mt-1 pl-1">
+                    ${CURRENT_USER_ROLE}
+                </div>
+            `;
+        }
+    });
+    
     return true;
 }
 
@@ -55,6 +85,34 @@ window.onload = async () => {
     if (!Array.isArray(mockCustomers)) mockCustomers = [];
     
     initCurrentPage();
+};
+
+window.promptLogout = function() {
+    let modal = document.getElementById('logout-modal-backdrop');
+    
+    // Inject the modal into the HTML if it doesn't exist yet
+    if (!modal) {
+        document.body.insertAdjacentHTML('beforeend', `
+            <div id="logout-modal-backdrop" class="fixed inset-0 bg-brandDark/40 backdrop-blur-sm z-[100] flex items-center justify-center">
+                <div class="glass-panel bg-white/90 p-6 rounded-2xl shadow-2xl max-w-sm w-full text-center border border-brandDark/10">
+                    <i class="fa-solid fa-right-from-bracket text-4xl text-brandAmber mb-4"></i>
+                    <h2 class="text-xl font-bold text-brandDark mb-2">Confirm Logout</h2>
+                    <p class="text-brandDark/70 text-sm mb-6">Are you sure you want to log out of your session?</p>
+                    <div class="flex justify-center gap-3">
+                        <button onclick="closeLogoutModal()" class="px-5 py-2 rounded-lg text-sm font-bold text-brandDark/70 hover:bg-brandDark/10 transition border border-transparent">Cancel</button>
+                        <button onclick="logout()" class="px-5 py-2 rounded-lg text-sm font-bold bg-brandAmber hover:bg-amber-600 text-white shadow-md transition">Yes, Log Out</button>
+                    </div>
+                </div>
+            </div>
+        `);
+    } else {
+        modal.classList.remove('hidden');
+    }
+};
+
+window.closeLogoutModal = function() {
+    const modal = document.getElementById('logout-modal-backdrop');
+    if (modal) modal.classList.add('hidden');
 };
 
 window.logout = function() {
