@@ -42,9 +42,9 @@ def get_google_sheet():
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to open sheet: {str(e)}")
 
+# Simplified Schema
 class AgentModel(BaseModel):
     name: str
-    team: str
     email: str
     role: str
     password: str
@@ -79,10 +79,17 @@ def login(creds: LoginModel):
 @app.post("/api/agents")
 @app.post("/agents")
 def add_agent(agent: AgentModel):
+    # (Keep your domain check here if you are using one)
+    # if not agent.email.lower().endswith(COMPANY_DOMAIN):
+    #     raise HTTPException(status_code=400, detail="Invalid domain.")
+        
     sheet = get_google_sheet().worksheet("Agents")
-    # Appending the new columns (Email and Role)
-    sheet.append_row([agent.name, agent.team, agent.status, 0, 0, 0, 0, agent.email, agent.role])
-    return {"status": "success", "message": f"Agent {agent.name} added"}
+    
+    # Strictly appending only the 5 requested columns in order
+    row_data = [agent.status, agent.name, agent.email, agent.role, agent.password]
+    sheet.append_row(row_data)
+    
+    return {"status": "success", "message": f"Agent {agent.name} added successfully"}
 
 class DispositionModel(BaseModel):
     customerId: int

@@ -527,7 +527,7 @@ window.parseCSV = function(text) {
 // ----------------------------------------------------------------------
 async function addAgent(e) {
     e.preventDefault();
-    const COMPANY_DOMAIN = "4g-capital.com"; // UPDATE THIS TO YOUR DOMAIN
+    const COMPANY_DOMAIN = "@yourcompany.com"; // UPDATE THIS TO YOUR DOMAIN
 
     const nameInput = document.getElementById('new-agent-name');
     const emailInput = document.getElementById('new-agent-email');
@@ -542,7 +542,7 @@ async function addAgent(e) {
         return;
     }
     
-    // FIX: Added 'a.name &&' to prevent crashes if a Google Sheet row is blank
+    // Safety check to prevent crashes if a Google Sheet row is blank
     const exists = agents.find(a => 
         (a.name && a.name.toLowerCase() === name.toLowerCase()) || 
         (a.email && a.email.toLowerCase() === email.toLowerCase())
@@ -558,8 +558,7 @@ async function addAgent(e) {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ 
-                name: name, 
-                team: "General", // Hardcoded since we removed the split
+                name: name,
                 email: email,
                 role: roleInput.value,
                 password: passwordInput.value,
