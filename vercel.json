@@ -2,6 +2,6 @@
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api/index.py" },
     { "source": "/", "destination": "/public/workspace.html" },
-    { "source": "/(?!(api))(.*)", "destination": "/public/$2" }
+    { "source": "/((?!api).*)", "destination": "/public/$1" }
   ]
 }
