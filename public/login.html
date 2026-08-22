@@ -5,24 +5,37 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Login - OSA Call Center</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: { brandDark: '#0f172a', brandAmber: '#f59e0b' }
+        }
+      }
+    }
+  </script>
   <link rel="stylesheet" href="/callcenter.css">
 </head>
 <body data-page="login" class="h-screen bg-slate-50 flex items-center justify-center relative overflow-hidden">
+  <div class="absolute inset-0 z-0 overflow-hidden pointer-events-none">
+    <div class="absolute top-[-10%] left-[-10%] w-[40rem] h-[40rem] bg-amber-200 rounded-full mix-blend-multiply filter blur-3xl opacity-60"></div>
+  </div>
   
-  <div class="glass-panel p-8 rounded-2xl w-full max-w-md relative z-10 shadow-2xl bg-white/80 backdrop-blur-md">
+  <div class="glass-panel p-8 rounded-2xl w-full max-w-md relative z-10 shadow-2xl bg-white/90 backdrop-blur-md border border-brandDark/10">
     <h1 class="text-3xl font-bold text-center text-brandDark mb-2">OSA Call Center</h1>
     <p class="text-center text-brandDark/60 text-sm mb-8">Sign in to access your workspace</p>
     
     <form id="login-form" class="space-y-5">
       <div>
         <label class="block text-xs font-bold text-brandDark/70 uppercase mb-1">Email Address</label>
-        <input type="email" id="login-email" required class="glass-input rounded-lg w-full px-4 py-3 text-sm">
+        <input type="email" id="login-email" required class="glass-input rounded-lg w-full px-4 py-3 text-sm border border-brandDark/20">
       </div>
       <div>
         <label class="block text-xs font-bold text-brandDark/70 uppercase mb-1">Password</label>
-        <input type="password" id="login-password" required class="glass-input rounded-lg w-full px-4 py-3 text-sm">
+        <input type="password" id="login-password" required class="glass-input rounded-lg w-full px-4 py-3 text-sm border border-brandDark/20">
       </div>
-      <button type="submit" id="login-btn" class="w-full bg-brandDark hover:bg-slate-800 text-white font-bold py-3 rounded-lg shadow-md transition mt-4">
+      <!-- Updated Amber Button -->
+      <button type="submit" id="login-btn" class="w-full bg-brandAmber hover:bg-amber-600 text-white font-bold py-3 rounded-lg shadow-md transition mt-4">
         Log In
       </button>
       <div id="login-error" class="text-red-500 text-sm font-semibold text-center mt-3 hidden"></div>
@@ -47,17 +60,13 @@
             password: document.getElementById('login-password').value
           })
         });
-
         const data = await res.json();
-        
         if (!res.ok) throw new Error(data.detail || "Login failed");
 
-        // Save session and redirect
         localStorage.setItem('USER_EMAIL', data.user.email);
         localStorage.setItem('USER_ROLE', data.user.role);
         localStorage.setItem('LOGGED_IN_AGENT', data.user.name);
         window.location.replace('/workspace.html');
-
       } catch (err) {
         btn.innerHTML = 'Log In';
         errorDiv.innerText = err.message;

@@ -2,52 +2,48 @@
 const CURRENT_USER_EMAIL = localStorage.getItem('USER_EMAIL');
 const CURRENT_USER_ROLE = localStorage.getItem('USER_ROLE');
 const CURRENT_USER_NAME = localStorage.getItem('LOGGED_IN_AGENT');
-const currentPage = document.body.dataset.page; // 'login', 'workspace', 'campaigns', 'admin', etc.
+const currentPage = document.body.dataset.page;
 
 function enforceSecurity() {
-    // 1. If not logged in and not on login page, kick to login
     if (!CURRENT_USER_EMAIL && currentPage !== 'login') {
         window.location.replace('/login.html');
         return false;
     }
-
-    // 2. If logged in but on login page, redirect to workspace
     if (CURRENT_USER_EMAIL && currentPage === 'login') {
         window.location.replace('/workspace.html');
         return false;
     }
-
-    // 3. Enforce Agent Restrictions (Agents can only see Workspace)
     if (CURRENT_USER_ROLE === 'Agent' && currentPage !== 'workspace' && currentPage !== 'login') {
         window.location.replace('/workspace.html');
         return false;
     }
-
-    // 4. Hide restricted links in the sidebar for Agents
     if (CURRENT_USER_ROLE === 'Agent') {
         document.addEventListener("DOMContentLoaded", () => {
-            const restrictedLinks = document.querySelectorAll('a[data-page="campaigns"], a[data-page="teamleader"], a[data-page="dashboard"], a[data-page="admin"]');
-            restrictedLinks.forEach(link => link.style.display = 'none');
-            
-            // Remove the agent selector dropdown, just show their name
+            const restricted = document.querySelectorAll('a[data-page="campaigns"], a[data-page="teamleader"], a[data-page="dashboard"], a[data-page="admin"]');
+            restricted.forEach(link => link.style.display = 'none');
             const agentSelector = document.getElementById('current-agent-select');
-            if (agentSelector) {
-                agentSelector.parentElement.innerHTML = `<span class="font-bold text-lg">${CURRENT_USER_NAME}</span>`;
-            }
+            if (agentSelector) agentSelector.parentElement.innerHTML = `<span class="font-bold text-lg">${CURRENT_USER_NAME}</span>`;
         });
     }
-    
     return true;
 }
 
-// Run immediately
 const isAuthorized = enforceSecurity();
+
+window.onload = async () => {
+    if (!isAuthorized || currentPage === 'login') return; // Stop if not authorized or on login page
+    
+    await fetchAllData();
+    if (!Array.isArray(agents)) agents = [];
+    if (!Array.isArray(mockCustomers)) mockCustomers = [];
+    
+    initCurrentPage();
+};
 
 window.logout = function() {
     localStorage.clear();
     window.location.replace('/login.html');
 };
-
 
 // --- STEP 4: FRONTEND API INTEGRATION ---
 const API_BASE = '/api';

@@ -4,50 +4,59 @@
   <meta charset="UTF-8">
   <title>Admin - User Management</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: { brandDark: '#0f172a', brandAmber: '#f59e0b' }
+        }
+      }
+    }
+  </script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <link rel="stylesheet" href="/callcenter.css">
 </head>
 <body data-page="admin" class="flex h-screen bg-slate-50 text-brandDark">
   
-  <!-- Sidebar Template Goes Here (Ensure you add an Admin link to your other sidebars too) -->
-
   <main class="flex-1 p-6 overflow-y-auto">
-    <header class="glass-panel rounded-2xl px-6 py-4 mb-6 flex justify-between items-center">
+    <header class="glass-panel rounded-2xl px-6 py-4 mb-6 flex justify-between items-center shadow-sm bg-white/80">
       <h1 class="text-2xl font-bold tracking-tight"><i class="fa-solid fa-users-gear mr-2 text-brandAmber"></i> User Management</h1>
-      <button onclick="logout()" class="text-sm font-bold text-red-500 hover:text-red-700 transition"><i class="fa-solid fa-right-from-bracket mr-1"></i> Logout</button>
+      <!-- Updated Amber Logout Button -->
+      <button onclick="logout()" class="text-sm font-bold bg-brandAmber hover:bg-amber-600 text-white px-4 py-2 rounded-lg transition shadow-sm"><i class="fa-solid fa-right-from-bracket mr-1"></i> Logout</button>
     </header>
 
-    <div class="glass-panel p-6 rounded-2xl max-w-2xl bg-white/60">
+    <div class="glass-panel p-6 rounded-2xl max-w-2xl bg-white/80 shadow-md border border-brandDark/10">
       <h2 class="text-lg font-bold mb-4 border-b border-brandDark/10 pb-2">Add New User</h2>
       <form onsubmit="addAgent(event)" class="grid grid-cols-2 gap-4">
         <div>
-          <label class="block text-xs font-bold mb-1">Full Name</label>
-          <input type="text" id="new-agent-name" required class="glass-input rounded-lg w-full px-3 py-2">
+          <label class="block text-xs font-bold mb-1 uppercase text-brandDark/70">Full Name</label>
+          <input type="text" id="new-agent-name" required class="glass-input rounded-lg w-full px-3 py-2 border border-brandDark/20">
         </div>
         <div>
-          <label class="block text-xs font-bold mb-1">Email Address</label>
-          <input type="email" id="new-agent-email" required class="glass-input rounded-lg w-full px-3 py-2">
+          <label class="block text-xs font-bold mb-1 uppercase text-brandDark/70">Email Address</label>
+          <input type="email" id="new-agent-email" required class="glass-input rounded-lg w-full px-3 py-2 border border-brandDark/20">
         </div>
         <div>
-          <label class="block text-xs font-bold mb-1">Role</label>
-          <select id="new-agent-role" required class="glass-input rounded-lg w-full px-3 py-2">
+          <label class="block text-xs font-bold mb-1 uppercase text-brandDark/70">Role</label>
+          <select id="new-agent-role" required class="glass-input rounded-lg w-full px-3 py-2 border border-brandDark/20">
             <option value="Agent">Agent</option>
             <option value="Team Leader">Team Leader</option>
           </select>
         </div>
         <div>
-          <label class="block text-xs font-bold mb-1">Temporary Password</label>
-          <input type="text" id="new-agent-password" required class="glass-input rounded-lg w-full px-3 py-2">
+          <label class="block text-xs font-bold mb-1 uppercase text-brandDark/70">Temporary Password</label>
+          <input type="text" id="new-agent-password" required class="glass-input rounded-lg w-full px-3 py-2 border border-brandDark/20">
         </div>
         <div class="col-span-2">
-          <label class="block text-xs font-bold mb-1">Team Assignment</label>
-          <select id="new-agent-team" class="glass-input rounded-lg w-full px-3 py-2">
+          <label class="block text-xs font-bold mb-1 uppercase text-brandDark/70">Team Assignment</label>
+          <select id="new-agent-team" class="glass-input rounded-lg w-full px-3 py-2 border border-brandDark/20">
             <option value="Collections">Collections</option>
             <option value="Sales">Sales</option>
           </select>
         </div>
-        <div class="col-span-2 flex justify-end mt-2">
-          <button type="submit" class="bg-brandDark text-white px-6 py-2 rounded-lg font-bold hover:bg-slate-800 transition">Create User</button>
+        <div class="col-span-2 flex justify-end mt-4">
+          <!-- Updated Amber Button -->
+          <button type="submit" class="bg-brandAmber text-white px-6 py-2 rounded-lg font-bold hover:bg-amber-600 transition shadow-md">Create User</button>
         </div>
       </form>
     </div>
