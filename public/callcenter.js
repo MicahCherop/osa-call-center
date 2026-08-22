@@ -527,7 +527,7 @@ window.parseCSV = function(text) {
 // ----------------------------------------------------------------------
 async function addAgent(e) {
     e.preventDefault();
-    const COMPANY_DOMAIN = "@yourcompany.com"; // UPDATE THIS TO YOUR DOMAIN
+    const COMPANY_DOMAIN = "@4g-capital.com"; // UPDATE THIS TO YOUR DOMAIN
 
     const nameInput = document.getElementById('new-agent-name');
     const emailInput = document.getElementById('new-agent-email');
