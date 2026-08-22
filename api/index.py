@@ -26,15 +26,31 @@ SCOPE = [
 
 def get_google_sheet():
     creds_json = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")
+    sheet_id = os.getenv("1VmLCg_6iY0QsjPbDjgDRNugFyyNRWABtPIASGDepZeU")
     sheet_name = os.getenv("GOOGLE_SHEET_NAME", "OSA_Call_Center_DB")
     
     if not creds_json:
         raise HTTPException(status_code=500, detail="Google credentials environment variable missing.")
     
-    creds_dict = json.loads(creds_json)
-    creds = Credentials.from_service_account_info(creds_dict, scopes=SCOPE)
-    client = gspread.authorize(creds)
-    return client.open(sheet_name)
+    try:
+        creds_dict = json.loads(creds_json)
+        creds = Credentials.from_service_account_info(creds_dict, scopes=SCOPE)
+        client = gspread.authorize(creds)
+        
+        # 1. Prefer opening directly by ID if GOOGLE_SHEET_ID is set in Vercel
+        if sheet_id:
+            return client.open_by_key(sheet_id)
+        
+        # 2. Fall back to opening by sheet name
+        return client.open(sheet_name)
+
+    except gspread.exceptions.SpreadsheetNotFound:
+        raise HTTPException(
+            status_code=500, 
+            detail="Spreadsheet not found. Ensure the Google Sheet is shared as 'Editor' with the 'client_email' in your service account JSON."
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Google Sheets Auth Error: {str(e)}")
 
 # Pydantic Schemas
 class AgentModel(BaseModel):
