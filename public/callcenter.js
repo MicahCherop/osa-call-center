@@ -203,7 +203,7 @@ function showAppAlert(message, title) {
 
 function initCurrentPage() {
     renderAgentDropdown();
-    renderShiftManager();
+    //renderShiftManager();
     renderTeamLeaderWorkspace();
     updateCampaignDropdowns();
     updateAnalyticsUI();
@@ -221,7 +221,77 @@ function setActiveNavLink() {
     if (indicator) indicator.classList.toggle('hidden', !isActive);
   });
 }
+// --- GLOBAL MODAL CONTROLLERS ---
 
+// 1. Add Campaign Modal
+window.openAddCampaignModal = function(e) {
+  if (e) e.stopPropagation();
+  const backdrop = document.getElementById('add-campaign-modal-backdrop');
+  const modal = document.getElementById('add-campaign-modal');
+  if (backdrop && modal) {
+    backdrop.classList.remove('hidden');
+    setTimeout(() => {
+      backdrop.classList.remove('opacity-0');
+      modal.classList.remove('scale-95');
+    }, 10);
+  }
+};
+
+window.closeAddCampaignModal = function(e) {
+  if (e) e.stopPropagation();
+  const backdrop = document.getElementById('add-campaign-modal-backdrop');
+  const modal = document.getElementById('add-campaign-modal');
+  if (backdrop && modal) {
+    backdrop.classList.add('opacity-0');
+    modal.classList.add('scale-95');
+    setTimeout(() => backdrop.classList.add('hidden'), 300);
+  }
+};
+
+// 2. Customer Profile Drawer
+window.openCustomerDrawer = function(e) {
+  if (e) e.stopPropagation();
+  const backdrop = document.getElementById('customer-drawer-backdrop');
+  const drawer = document.getElementById('customer-drawer');
+  if (backdrop && drawer) {
+    backdrop.classList.remove('hidden');
+    setTimeout(() => {
+      backdrop.classList.remove('opacity-0');
+      drawer.classList.remove('translate-x-full');
+    }, 10);
+  }
+};
+
+window.closeCustomerDrawer = function(e) {
+  if (e) e.stopPropagation();
+  const backdrop = document.getElementById('customer-drawer-backdrop');
+  const drawer = document.getElementById('customer-drawer');
+  if (backdrop && drawer) {
+    backdrop.classList.add('opacity-0');
+    drawer.classList.add('translate-x-full');
+    setTimeout(() => backdrop.classList.add('hidden'), 300);
+  }
+};
+
+// 3. Customer Drawer Tab Switching
+window.switchDrawerTab = function(tabName, element) {
+  const tabs = document.querySelectorAll('.drawer-content');
+  tabs.forEach(tab => tab.classList.add('hidden'));
+  
+  const target = document.getElementById(`drawer-${tabName}`);
+  if (target) target.classList.remove('hidden');
+
+  const btns = document.querySelectorAll('.drawer-tab');
+  btns.forEach(btn => {
+    btn.classList.remove('text-brandAmber', 'border-brandAmber');
+    btn.classList.add('text-brandDark/50', 'border-transparent');
+  });
+
+  if (element) {
+    element.classList.remove('text-brandDark/50', 'border-transparent');
+    element.classList.add('text-brandAmber', 'border-brandAmber');
+  }
+};
 // ----------------------------------------------------------------------
 // AGENT MANAGEMENT (POST / PUT to API)
 // ----------------------------------------------------------------------
@@ -256,7 +326,29 @@ async function addAgent(e) {
         showAppAlert("Failed to save agent to the database.", "Network Error");
     }
 }
+window.switchTeamLeaderTab = function(tabName, element) {
+  // Hide all tab contents
+  const tabs = document.querySelectorAll('.teamleader-tab-content');
+  tabs.forEach(tab => tab.classList.add('hidden'));
 
+  // Show selected tab content
+  const selectedTab = document.getElementById(`tl-tab-${tabName}`);
+  if (selectedTab) {
+    selectedTab.classList.remove('hidden');
+  }
+
+  // Update active UI styles on buttons
+  const buttons = document.querySelectorAll('.teamleader-tab-btn');
+  buttons.forEach(btn => {
+    btn.classList.remove('border-brandAmber', 'text-brandAmber');
+    btn.classList.add('border-transparent', 'text-brandDark/50');
+  });
+
+  if (element) {
+    element.classList.remove('border-transparent', 'text-brandDark/50');
+    element.classList.add('border-brandAmber', 'text-brandAmber');
+  }
+};
 async function updateAgentStatus(index, status) {
   const agent = agents[index];
   if (!agent) return;
