@@ -219,6 +219,7 @@ tailwind.config = {
           </div>
           <div class="flex gap-2">
             <button id="tl-tab-agents" onclick="switchTeamLeaderTab('agents')" class="tl-tab rounded-lg bg-brandDark text-white text-sm font-bold px-4 py-2 transition"><i class="fa-solid fa-users-gear mr-2"></i> Agents</button>
+            <button class="teamleader-tab-btn text-sm font-bold text-brandDark/50 hover:text-brandDark border-b-2 border-transparent pb-2 px-1 transition" onclick="switchTeamLeaderTab('customers', this); renderTLCustomers()">All Customers</button>
             <button id="tl-tab-pending" onclick="switchTeamLeaderTab('pending')" class="tl-tab rounded-lg bg-white/50 border border-brandDark/10 text-brandDark/70 text-sm font-bold px-4 py-2 transition"><i class="fa-solid fa-clock-rotate-left mr-2"></i> Pending Callbacks</button>
           </div>
         </div>
@@ -255,7 +256,32 @@ tailwind.config = {
             </form>
           </div>
         </div>
-
+        <!-- ALL CUSTOMERS TAB -->
+        <div id="tl-tab-customers" class="teamleader-tab-content hidden space-y-4">
+          <div class="glass-card p-6 rounded-xl flex flex-col h-[70vh]">
+            <div class="flex justify-between items-center mb-4">
+              <h3 class="font-bold text-lg">Customer Database Overview</h3>
+              <select id="tl-campaign-filter" onchange="renderTLCustomers()" class="glass-input rounded-lg px-3 py-2 text-sm font-medium border border-brandDark/20">
+                <option value="ALL">All Campaigns</option>
+                <!-- Populated dynamically -->
+              </select>
+            </div>
+            <div class="flex-1 overflow-auto rounded-xl border border-brandDark/10 bg-white/30 backdrop-blur-sm">
+              <table class="w-full text-left border-collapse whitespace-nowrap">
+                <thead class="sticky top-0 bg-white/90 backdrop-blur-md z-10 shadow-sm">
+                  <tr class="text-[11px] font-semibold uppercase tracking-wider text-brandDark/70 border-b border-brandDark/20">
+                    <th class="px-4 py-3">Customer Name</th>
+                    <th class="px-4 py-3">Phone</th>
+                    <th class="px-4 py-3">Campaign</th>
+                    <th class="px-4 py-3 text-amber-700">Assigned Agent</th>
+                    <th class="px-4 py-3">Outcome</th>
+                  </tr>
+                </thead>
+                <tbody id="tl-customers-tbody" class="text-[13px] font-medium"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
         <div id="tl-panel-pending" class="tl-panel hidden flex flex-1 glass-panel rounded-2xl p-5 overflow-hidden flex-col">
           <div class="flex items-center justify-between gap-4 mb-4">
             <div>

@@ -733,16 +733,21 @@ async function submitAddCampaign(e) {
       return;
     }
 
-    // FIX FOR 422 ERROR: Strictly map CSV rows to match the FastAPI Pydantic schema
-    const formattedCustomers = rawCustomers.map((row, index) => ({
-        id: parseInt(row.id) || (index + 1),
-        name: row.name || row.Name || "Unknown",
-        phone: String(row.phone || row.Phone || ""),
-        branch: row.branch || row.Branch || "Not Specified",
-        sector: row.sector || row.Sector || "Not Specified",
-        balance: String(row.balance || row.Balance || "0"),
-        campaign: campaignName // Required by backend API
-    }));
+    // FIX: Dynamically capture ALL CSV columns while ensuring required backend fields exist
+    const formattedCustomers = rawCustomers.map((row, index) => {
+        const customer = { ...row }; // Captures every column dynamically
+        
+        // Enforce required fields
+        customer.id = parseInt(row.id) || (index + 1);
+        customer.name = row.name || row.Name || row.NAME || "Unknown";
+        customer.phone = String(row.phone || row.Phone || row.PHONE || "");
+        customer.branch = row.branch || row.Branch || row.BRANCH || "Not Specified";
+        customer.sector = row.sector || row.Sector || row.SECTOR || "Not Specified";
+        customer.balance = String(row.balance || row.Balance || row.BALANCE || "0");
+        customer.campaign = campaignName;
+        
+        return customer;
+    });
 
     const payload = {
         name: campaignName,
@@ -1065,3 +1070,42 @@ function updateAnalyticsUI() {
       }
     }
 }
+window.renderTLCustomers = function() {
+    const tbody = document.getElementById('tl-customers-tbody');
+    const filterSelect = document.getElementById('tl-campaign-filter');
+    if (!tbody || !filterSelect) return;
+
+    // Populate filter dropdown if empty
+    if (filterSelect.options.length <= 1) {
+        const campaigns = Object.keys(campaignConfigs);
+        campaigns.forEach(c => {
+            filterSelect.innerHTML += `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`;
+        });
+    }
+
+    const selectedCampaign = filterSelect.value;
+    tbody.innerHTML = '';
+
+    // Filter customers
+    const filtered = mockCustomers.filter(c => selectedCampaign === 'ALL' || c.campaign === selectedCampaign);
+
+    if (filtered.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5" class="px-4 py-8 text-center text-brandDark/50 italic">No customers found for this criteria.</td></tr>`;
+        return;
+    }
+
+    // Render table
+    filtered.forEach(c => {
+        tbody.innerHTML += `
+            <tr class="border-b border-brandDark/5 hover:bg-white/40 transition">
+                <td class="px-4 py-3 font-bold cursor-pointer hover:text-brandAmber" onclick="openCustomerDrawer(${c.id})">${escapeHtml(c.name)}</td>
+                <td class="px-4 py-3">${escapeHtml(c.phone)}</td>
+                <td class="px-4 py-3 text-brandDark/70">${escapeHtml(c.campaign)}</td>
+                <td class="px-4 py-3 font-bold text-amber-700">${escapeHtml(c.agentId || 'Unassigned')}</td>
+                <td class="px-4 py-3">
+                    <span class="px-2 py-1 bg-brandDark/5 rounded text-xs font-bold">${escapeHtml(c.outcome || 'Pending')}</span>
+                </td>
+            </tr>
+        `;
+    });
+};
