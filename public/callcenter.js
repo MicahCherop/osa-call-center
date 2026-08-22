@@ -90,7 +90,29 @@ function renderAgentDropdown() {
   if(isClockedIn) renderAgentQueue();
   updateWorkspaceStats();
 }
+window.openAddCampaignModal = function() {
+  const modal = document.getElementById('add-campaign-modal');
+  const backdrop = document.getElementById('add-campaign-modal-backdrop');
+  if (modal && backdrop) {
+    backdrop.classList.remove('hidden');
+    setTimeout(() => {
+      backdrop.classList.remove('opacity-0');
+      modal.classList.remove('scale-95');
+    }, 10);
+  }
+};
 
+window.closeAddCampaignModal = function() {
+  const modal = document.getElementById('add-campaign-modal');
+  const backdrop = document.getElementById('add-campaign-modal-backdrop');
+  if (modal && backdrop) {
+    backdrop.classList.add('opacity-0');
+    modal.classList.add('scale-95');
+    setTimeout(() => {
+      backdrop.classList.add('hidden');
+    }, 300);
+  }
+};
 function recalculateGlobalStats() {
     globalStats = { totalCalls: 0, connected: 0, recovered: 0, outcomes: {} };
     
