@@ -20,6 +20,15 @@ let globalStats = {
 };
 
 // ----------------------------------------------------------------------
+// RENDER FUNCTION STUBS & SAFEGUARDS (Prevents ReferenceErrors)
+// ----------------------------------------------------------------------
+window.renderShiftManager = window.renderShiftManager || function() {};
+window.renderTeamLeaderWorkspace = window.renderTeamLeaderWorkspace || function() {};
+window.renderCampaignAgentSelector = window.renderCampaignAgentSelector || function() {};
+window.renderCampaignList = window.renderCampaignList || function() {};
+window.updateCampaignDropdowns = window.updateCampaignDropdowns || function() {};
+
+// ----------------------------------------------------------------------
 // DATA FETCHING & SYNCHRONIZATION
 // ----------------------------------------------------------------------
 
@@ -68,51 +77,6 @@ async function fetchAllData() {
     }
 }
 
-function renderAgentDropdown() {
-  const sel = document.getElementById('current-agent-select');
-  if (!sel) return;
-  
-  // Failsafe: Ensure agents is always an array
-  if (!Array.isArray(agents)) agents = [];
-
-  if (agents.length === 0) {
-    sel.innerHTML = '<option value="">No Agents Available</option>';
-    LOGGED_IN_AGENT = null;
-  } else {
-    sel.innerHTML = agents.map(a => `<option value="${escapeHtml(a.name)}" ${a.name === LOGGED_IN_AGENT ? 'selected' : ''}>${escapeHtml(a.name)}</option>`).join('');
-    if (!LOGGED_IN_AGENT || !agents.find(a => a.name === LOGGED_IN_AGENT)) {
-        LOGGED_IN_AGENT = agents[0].name;
-        sel.value = LOGGED_IN_AGENT;
-    }
-  }
-  
-  saveAppState();
-  if(isClockedIn) renderAgentQueue();
-  updateWorkspaceStats();
-}
-window.openAddCampaignModal = function() {
-  const modal = document.getElementById('add-campaign-modal');
-  const backdrop = document.getElementById('add-campaign-modal-backdrop');
-  if (modal && backdrop) {
-    backdrop.classList.remove('hidden');
-    setTimeout(() => {
-      backdrop.classList.remove('opacity-0');
-      modal.classList.remove('scale-95');
-    }, 10);
-  }
-};
-
-window.closeAddCampaignModal = function() {
-  const modal = document.getElementById('add-campaign-modal');
-  const backdrop = document.getElementById('add-campaign-modal-backdrop');
-  if (modal && backdrop) {
-    backdrop.classList.add('opacity-0');
-    modal.classList.add('scale-95');
-    setTimeout(() => {
-      backdrop.classList.add('hidden');
-    }, 300);
-  }
-};
 function recalculateGlobalStats() {
     globalStats = { totalCalls: 0, connected: 0, recovered: 0, outcomes: {} };
     
@@ -131,9 +95,27 @@ function recalculateGlobalStats() {
     });
 }
 
-// Keep the UI state saving strictly to UI preferences (not database data)
 function saveAppState() {
     localStorage.setItem('LOGGED_IN_AGENT', LOGGED_IN_AGENT);
+}
+
+function initCurrentPage() {
+    renderAgentDropdown();
+    if (typeof updateCampaignDropdowns === 'function') updateCampaignDropdowns();
+    if (typeof updateAnalyticsUI === 'function') updateAnalyticsUI();
+    if (typeof renderCampaignList === 'function') renderCampaignList();
+    renderAgentQueue();
+    setActiveNavLink();
+}
+
+function setActiveNavLink() {
+  const page = document.body.dataset.page || 'workspace';
+  document.querySelectorAll('.nav-btn').forEach(btn => {
+    const isActive = btn.dataset.page === page;
+    btn.classList.toggle('bg-white/40', isActive);
+    const indicator = btn.querySelector('.active-indicator');
+    if (indicator) indicator.classList.toggle('hidden', !isActive);
+  });
 }
 
 // ----------------------------------------------------------------------
@@ -201,29 +183,24 @@ function showAppAlert(message, title) {
   return showAppModal(message, { title });
 }
 
-function initCurrentPage() {
-    renderAgentDropdown();
-    //renderShiftManager();
-    renderTeamLeaderWorkspace();
-    updateCampaignDropdowns();
-    updateAnalyticsUI();
-    renderCampaignList();
-    renderAgentQueue();
-    setActiveNavLink();
-}
+window.addCustomOption = async function(selectId) {
+  const val = await showAppModal("Enter custom option:", { title: "Add Custom Option", input: true });
+  if (val && typeof val === 'string' && val.trim()) {
+    const sel = document.getElementById(selectId);
+    if (sel) {
+      const opt = document.createElement('option');
+      opt.value = val.trim();
+      opt.textContent = val.trim();
+      opt.selected = true;
+      sel.appendChild(opt);
+    }
+  }
+};
 
-function setActiveNavLink() {
-  const page = document.body.dataset.page || 'workspace';
-  document.querySelectorAll('.nav-btn').forEach(btn => {
-    const isActive = btn.dataset.page === page;
-    btn.classList.toggle('bg-white/40', isActive);
-    const indicator = btn.querySelector('.active-indicator');
-    if (indicator) indicator.classList.toggle('hidden', !isActive);
-  });
-}
-// --- GLOBAL MODAL CONTROLLERS ---
+// ----------------------------------------------------------------------
+// GLOBAL MODAL & DRAWER CONTROLLERS (For inline HTML events)
+// ----------------------------------------------------------------------
 
-// 1. Add Campaign Modal
 window.openAddCampaignModal = function(e) {
   if (e) e.stopPropagation();
   const backdrop = document.getElementById('add-campaign-modal-backdrop');
@@ -248,9 +225,49 @@ window.closeAddCampaignModal = function(e) {
   }
 };
 
-// 2. Customer Profile Drawer
-window.openCustomerDrawer = function(e) {
+window.openShiftManager = function(e) {
   if (e) e.stopPropagation();
+  const backdrop = document.getElementById('shift-manager-modal-backdrop');
+  const modal = document.getElementById('shift-manager-modal');
+  if (backdrop && modal) {
+    backdrop.classList.remove('hidden');
+    setTimeout(() => {
+      backdrop.classList.remove('opacity-0');
+      modal.classList.remove('scale-95');
+    }, 10);
+  }
+};
+
+window.closeShiftManager = function(e) {
+  if (e) e.stopPropagation();
+  const backdrop = document.getElementById('shift-manager-modal-backdrop');
+  const modal = document.getElementById('shift-manager-modal');
+  if (backdrop && modal) {
+    backdrop.classList.add('opacity-0');
+    modal.classList.add('scale-95');
+    setTimeout(() => backdrop.classList.add('hidden'), 300);
+  }
+};
+
+window.openCustomerDrawer = function(eOrId) {
+  if (typeof eOrId === 'object' && eOrId !== null && eOrId.stopPropagation) {
+    eOrId.stopPropagation();
+  } else if (typeof eOrId === 'number' || typeof eOrId === 'string') {
+    const c = mockCustomers.find(x => x.id === Number(eOrId));
+    if (c) {
+      document.getElementById('drawer-initial').innerText = c.name ? c.name.charAt(0).toUpperCase() : '-';
+      document.getElementById('drawer-name').innerText = c.name || 'Unknown';
+      document.getElementById('drawer-phone').innerText = c.phone || '--';
+      document.getElementById('drawer-campaign').innerText = c.campaign || '--';
+      document.getElementById('drawer-balance').innerText = c.balance || '0';
+      document.getElementById('drawer-agent').innerText = c.agentId || '--';
+      document.getElementById('drawer-outcome').innerText = c.outcome || '--';
+      document.getElementById('drawer-status').innerText = c.status || '--';
+      document.getElementById('drawer-sector').innerText = c.sector || '--';
+      document.getElementById('drawer-branch').innerText = c.branch || '--';
+    }
+  }
+
   const backdrop = document.getElementById('customer-drawer-backdrop');
   const drawer = document.getElementById('customer-drawer');
   if (backdrop && drawer) {
@@ -273,7 +290,6 @@ window.closeCustomerDrawer = function(e) {
   }
 };
 
-// 3. Customer Drawer Tab Switching
 window.switchDrawerTab = function(tabName, element) {
   const tabs = document.querySelectorAll('.drawer-content');
   tabs.forEach(tab => tab.classList.add('hidden'));
@@ -292,52 +308,14 @@ window.switchDrawerTab = function(tabName, element) {
     element.classList.add('text-brandAmber', 'border-brandAmber');
   }
 };
-// ----------------------------------------------------------------------
-// AGENT MANAGEMENT (POST / PUT to API)
-// ----------------------------------------------------------------------
 
-async function addAgent(e) {
-    e.preventDefault();
-    const nameInput = e.target.querySelector('input[type="text"]') || document.getElementById('new-agent-name');
-    const teamInput = e.target.querySelector('select') || document.getElementById('new-agent-team');
-    const name = nameInput.value.trim();
-    
-    if(agents.find(a => a.name.toLowerCase() === name.toLowerCase())) {
-        showAppAlert("An agent with this name already exists.", "Agent already exists");
-        return;
-    }
-
-    try {
-        await fetch(`${API_BASE}/agents`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name, team: teamInput.value, status: 'Active' })
-        });
-        
-        nameInput.value = '';
-        await fetchAllData(); // Refresh UI with DB Data
-        
-        renderShiftManager();
-        renderTeamLeaderWorkspace();
-        renderCampaignAgentSelector();
-        renderAgentDropdown();
-        updateAnalyticsUI();
-    } catch (err) {
-        showAppAlert("Failed to save agent to the database.", "Network Error");
-    }
-}
 window.switchTeamLeaderTab = function(tabName, element) {
-  // Hide all tab contents
   const tabs = document.querySelectorAll('.teamleader-tab-content');
   tabs.forEach(tab => tab.classList.add('hidden'));
 
-  // Show selected tab content
   const selectedTab = document.getElementById(`tl-tab-${tabName}`);
-  if (selectedTab) {
-    selectedTab.classList.remove('hidden');
-  }
+  if (selectedTab) selectedTab.classList.remove('hidden');
 
-  // Update active UI styles on buttons
   const buttons = document.querySelectorAll('.teamleader-tab-btn');
   buttons.forEach(btn => {
     btn.classList.remove('border-brandAmber', 'text-brandAmber');
@@ -349,18 +327,86 @@ window.switchTeamLeaderTab = function(tabName, element) {
     element.classList.add('border-brandAmber', 'text-brandAmber');
   }
 };
+
+window.parseCSV = function(text) {
+  const lines = text.split(/\r\n|\n/);
+  if (lines.length === 0) return [];
+
+  const headers = lines[0].split(',').map(h => h.trim().replace(/^["']|["']$/g, ''));
+  const results = [];
+
+  for (let i = 1; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (!line) continue;
+
+    const values = line.split(',').map(v => v.trim().replace(/^["']|["']$/g, ''));
+    const row = {};
+
+    headers.forEach((header, index) => {
+      row[header.toLowerCase()] = values[index] || '';
+      row[header] = values[index] || '';
+    });
+
+    if (!row.id) row.id = i;
+    results.push(row);
+  }
+
+  return results;
+};
+
+// ----------------------------------------------------------------------
+// AGENT MANAGEMENT
+// ----------------------------------------------------------------------
+
+async function addAgent(e) {
+    e.preventDefault();
+    const nameInput = e.target.querySelector('input[type="text"]') || document.getElementById('new-agent-name');
+    const teamInput = e.target.querySelector('select') || document.getElementById('new-agent-team');
+    const name = nameInput.value.trim();
+    
+    if (agents.find(a => a.name.toLowerCase() === name.toLowerCase())) {
+        showAppAlert("An agent with this name already exists.", "Agent already exists");
+        return;
+    }
+
+    try {
+        const res = await fetch(`${API_BASE}/agents`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name, team: teamInput.value, status: 'Active' })
+        });
+
+        if (!res.ok) throw new Error(`Server returned HTTP ${res.status}`);
+        
+        nameInput.value = '';
+        await fetchAllData(); 
+        
+        renderAgentDropdown();
+        renderShiftManager();
+        renderTeamLeaderWorkspace();
+        renderCampaignAgentSelector();
+        updateAnalyticsUI();
+
+    } catch (err) {
+        console.error("Add Agent error:", err);
+        showAppAlert("Failed to save agent to the database.", "Network Error");
+    }
+}
+
 async function updateAgentStatus(index, status) {
   const agent = agents[index];
   if (!agent) return;
 
   try {
-      await fetch(`${API_BASE}/agents/status`, {
+      const res = await fetch(`${API_BASE}/agents/status`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ name: agent.name, status: status })
       });
+
+      if (!res.ok) throw new Error(`Status ${res.status}`);
       
-      await fetchAllData(); // Refresh UI with DB Data
+      await fetchAllData(); 
       
       renderShiftManager();
       renderTeamLeaderWorkspace();
@@ -376,7 +422,6 @@ function renderAgentDropdown() {
   const sel = document.getElementById('current-agent-select');
   if (!sel) return;
   
-  // Failsafe: Ensure agents is always an array
   if (!Array.isArray(agents)) agents = [];
 
   if (agents.length === 0) {
@@ -391,28 +436,32 @@ function renderAgentDropdown() {
   }
   
   saveAppState();
-  if(isClockedIn) renderAgentQueue();
+  if (isClockedIn) renderAgentQueue();
   updateWorkspaceStats();
 }
 
 function switchActiveAgent() {
-  LOGGED_IN_AGENT = document.getElementById('current-agent-select').value;
+  const sel = document.getElementById('current-agent-select');
+  if (sel) LOGGED_IN_AGENT = sel.value;
   saveAppState();
-  if(isClockedIn) renderAgentQueue();
+  if (isClockedIn) renderAgentQueue();
   updateWorkspaceStats();
   
-  document.getElementById('active-call-panel').classList.add('hidden');
-  if (isClockedIn) document.getElementById('empty-call-state').classList.remove('hidden');
+  const activeCall = document.getElementById('active-call-panel');
+  if (activeCall) activeCall.classList.add('hidden');
+  if (isClockedIn && document.getElementById('empty-call-state')) {
+    document.getElementById('empty-call-state').classList.remove('hidden');
+  }
   activeCustomerId = null;
 }
 
 // ----------------------------------------------------------------------
-// WORKSPACE & DISPOSITIONS (POST to API)
+// WORKSPACE & DISPOSITIONS
 // ----------------------------------------------------------------------
 
 async function submitDisposition(e) {
   e.preventDefault();
-  if(!activeCustomerId) return;
+  if (!activeCustomerId) return;
 
   const submitBtn = e.target.querySelector('button[type="submit"]');
   const originalText = submitBtn.innerHTML;
@@ -428,11 +477,11 @@ async function submitDisposition(e) {
   let businessStatus = document.getElementById('disp-business')?.value || '';
   
   if (campType === 'active_no_loan' || campType === 'dormant') {
-      dispositionSaved = document.getElementById('disp-response').value || (outcome === 'Answered' ? '' : 'Pending Callback');
+      dispositionSaved = document.getElementById('disp-response')?.value || (outcome === 'Answered' ? '' : 'Pending Callback');
   } else {
-      dispositionSaved = document.getElementById('disp-status').value || (outcome === 'Answered' ? '' : 'Pending Callback');
+      dispositionSaved = document.getElementById('disp-status')?.value || (outcome === 'Answered' ? '' : 'Pending Callback');
       if (dispositionSaved === 'Promise to Pay (PTP)' || dispositionSaved === 'Settled') {
-          amountRec = parseFloat(document.getElementById('input-amount').value) || 0;
+          amountRec = parseFloat(document.getElementById('input-amount')?.value) || 0;
       }
   }
 
@@ -447,18 +496,20 @@ async function submitDisposition(e) {
   };
 
   try {
-      await fetch(`${API_BASE}/disposition`, {
+      const res = await fetch(`${API_BASE}/disposition`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
       });
+
+      if (!res.ok) throw new Error(`Status ${res.status}`);
       
-      await fetchAllData(); // Refresh UI with DB Data
+      await fetchAllData();
 
       activeCustomerId = null;
       updateWorkspaceStats();
-      document.getElementById('active-call-panel').classList.add('hidden');
-      document.getElementById('empty-call-state').classList.remove('hidden');
+      if (document.getElementById('active-call-panel')) document.getElementById('active-call-panel').classList.add('hidden');
+      if (document.getElementById('empty-call-state')) document.getElementById('empty-call-state').classList.remove('hidden');
       renderAgentQueue();
       
       updateAnalyticsUI();
@@ -466,7 +517,7 @@ async function submitDisposition(e) {
       renderTeamLeaderWorkspace();
       
       const campaignsView = document.getElementById('view-campaigns');
-      if (campaignsView && !campaignsView.classList.contains('hidden')){
+      if (campaignsView && !campaignsView.classList.contains('hidden')) {
           renderCampaignList();
       }
 
@@ -479,7 +530,7 @@ async function submitDisposition(e) {
 }
 
 // ----------------------------------------------------------------------
-// CAMPAIGNS & ALLOCATION (POST to API)
+// CAMPAIGNS & ALLOCATION
 // ----------------------------------------------------------------------
 
 async function submitAddCampaign(e) {
@@ -493,9 +544,9 @@ async function submitAddCampaign(e) {
   const startDate = document.getElementById('new-campaign-start')?.value || ''; 
   const endDate = document.getElementById('new-campaign-end')?.value || ''; 
   const fileInput = document.getElementById('csv-file-input');
-  const file = fileInput.files[0];
+  const file = fileInput ? fileInput.files[0] : null;
 
-  if(!file) { showAppAlert("Please attach a CSV file.", "CSV file required"); return; }
+  if (!file) { showAppAlert("Please attach a CSV file.", "CSV file required"); return; }
   
   submitBtn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Processing CSV...';
   const reader = new FileReader();
@@ -504,7 +555,7 @@ async function submitAddCampaign(e) {
     const csvText = event.target.result;
     const newCustomers = parseCSV(csvText);
     
-    if(newCustomers.length === 0) {
+    if (newCustomers.length === 0) {
       showAppAlert("CSV seems empty or invalid. Ensure it has a header row.", "Invalid CSV");
       submitBtn.innerHTML = originalText;
       return;
@@ -520,13 +571,15 @@ async function submitAddCampaign(e) {
     };
 
     try {
-        await fetch(`${API_BASE}/campaigns`, {
+        const res = await fetch(`${API_BASE}/campaigns`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
         });
+
+        if (!res.ok) throw new Error(`Status ${res.status}`);
         
-        await fetchAllData(); // Refresh UI with DB Data
+        await fetchAllData();
         
         updateCampaignDropdowns();
         renderCampaignList(); 
@@ -534,9 +587,11 @@ async function submitAddCampaign(e) {
         submitBtn.innerHTML = originalText;
         closeAddCampaignModal();
         e.target.reset();
-        document.getElementById('csv-filename').innerText = "No file selected";
+        if (document.getElementById('csv-filename')) {
+          document.getElementById('csv-filename').innerText = "No file selected";
+        }
         
-        showAppAlert(`Success! Created campaign "${campaignName}" with ${newCustomers.length} imported customers.\n\nNow, go to the Shift Manager to allocate them!`, "Campaign created");
+        showAppAlert(`Success! Created campaign "${campaignName}" with ${newCustomers.length} imported customers.`, "Campaign created");
     } catch (err) {
         submitBtn.innerHTML = originalText;
         showAppAlert("Failed to create campaign in Google Sheets.", "Error");
@@ -546,7 +601,8 @@ async function submitAddCampaign(e) {
 }
 
 async function distributeCustomers() {
-  const campaign = document.getElementById('alloc-campaign').value;
+  const campEl = document.getElementById('alloc-campaign');
+  const campaign = campEl ? campEl.value : '';
   if (!campaign) {
     showAppAlert("Please select a campaign from the dropdown first.", "Campaign required");
     return;
@@ -560,11 +616,11 @@ async function distributeCustomers() {
       });
       const data = await res.json();
       
-      await fetchAllData(); // Refresh UI with DB Data
+      await fetchAllData();
       
       renderShiftManager();
       renderCampaignAgentSelector();
-      if(isClockedIn) renderAgentQueue(); 
+      if (isClockedIn) renderAgentQueue(); 
       
       showAppAlert(data.message || `Success: Distributed ${data.assignedCount} customers.`, "Distribution Complete");
   } catch (err) {
@@ -573,8 +629,7 @@ async function distributeCustomers() {
 }
 
 // ----------------------------------------------------------------------
-// REMAINING UI/DOM HELPER FUNCTIONS
-// (These keep your modal and queue toggling functional without changes)
+// DOM & WORKSPACE UI HELPERS
 // ----------------------------------------------------------------------
 
 function escapeHtml(value) {
@@ -617,31 +672,33 @@ function toggleAgentStatus(checkbox) {
   const activeCall = document.getElementById('active-call-panel');
 
   if (!LOGGED_IN_AGENT) {
-      showAppAlert("Please create an agent in the Shift Manager first.", "Agent required");
+      showAppAlert("Please create or select an active agent first.", "Agent required");
       checkbox.checked = false;
       isClockedIn = false;
       return;
   }
 
   if (isClockedIn) {
-    label.innerText = "Clocked In";
-    label.classList.add('text-green-600');
-    globalText.classList.replace('text-gray-500', 'text-green-700');
-    globalText.innerHTML = `<span class="w-2 h-2 rounded-full bg-green-500"></span> ONLINE`;
-    idleMsg.classList.add('hidden');
-    queuePanel.classList.remove('hidden');
+    if (label) { label.innerText = "Clocked In"; label.classList.add('text-green-600'); }
+    if (globalText) {
+      globalText.classList.replace('text-gray-500', 'text-green-700');
+      globalText.innerHTML = `<span class="w-2 h-2 rounded-full bg-green-500"></span> ONLINE`;
+    }
+    if (idleMsg) idleMsg.classList.add('hidden');
+    if (queuePanel) queuePanel.classList.remove('hidden');
     
-    if(!activeCustomerId) emptyState.classList.remove('hidden');
+    if (!activeCustomerId && emptyState) emptyState.classList.remove('hidden');
     renderAgentQueue();
   } else {
-    label.innerText = "Clocked Out";
-    label.classList.remove('text-green-600');
-    globalText.classList.replace('text-green-700', 'text-gray-500');
-    globalText.innerHTML = `<span class="w-2 h-2 rounded-full bg-gray-400"></span> OFFLINE`;
-    idleMsg.classList.remove('hidden');
-    queuePanel.classList.add('hidden');
-    emptyState.classList.add('hidden');
-    activeCall.classList.add('hidden');
+    if (label) { label.innerText = "Clocked Out"; label.classList.remove('text-green-600'); }
+    if (globalText) {
+      globalText.classList.replace('text-green-700', 'text-gray-500');
+      globalText.innerHTML = `<span class="w-2 h-2 rounded-full bg-gray-400"></span> OFFLINE`;
+    }
+    if (idleMsg) idleMsg.classList.remove('hidden');
+    if (queuePanel) queuePanel.classList.add('hidden');
+    if (emptyState) emptyState.classList.add('hidden');
+    if (activeCall) activeCall.classList.add('hidden');
   }
 }
 
@@ -657,11 +714,14 @@ function renderAgentQueue() {
       }
       return c.agentId === LOGGED_IN_AGENT && String(c.worked).toUpperCase() !== 'TRUE' && !c.pendingReschedule;
     });
-    countSpan.innerText = activeWorkspaceQueueTab === 'pending'
-      ? `${myCustomers.length} Pending`
-      : `${myCustomers.length} Remaining`;
 
-    if(myCustomers.length === 0) {
+    if (countSpan) {
+      countSpan.innerText = activeWorkspaceQueueTab === 'pending'
+        ? `${myCustomers.length} Pending`
+        : `${myCustomers.length} Remaining`;
+    }
+
+    if (myCustomers.length === 0) {
         queueDiv.innerHTML = `<div class="p-4 text-center text-brandDark/50 text-sm font-medium">${activeWorkspaceQueueTab === 'pending' ? 'No pending callbacks.' : 'Your queue is empty.'}</div>`;
         return;
     }
@@ -673,7 +733,7 @@ function renderAgentQueue() {
                 <button type="button" onclick="event.stopPropagation(); openCustomerDrawer(${c.id})" class="font-bold text-sm text-brandDark text-left hover:text-brandAmber transition">${escapeHtml(c.name)}</button>
                 <i class="fa-solid fa-phone text-brandAmber text-xs"></i>
             </div>
-            <div class="text-xs text-brandDark/60">${c.campaign}</div>
+            <div class="text-xs text-brandDark/60">${escapeHtml(c.campaign || '')}</div>
             ${c.pendingReschedule ? '<div class="text-[11px] font-bold text-amber-700">Pending callback</div>' : ''}
         </div>`;
     });
@@ -682,73 +742,80 @@ function renderAgentQueue() {
 function startCall(id) {
   activeCustomerId = id;
   const c = mockCustomers.find(x => x.id === id);
-  if(!c) return;
+  if (!c) return;
 
-  document.getElementById('empty-call-state').classList.add('hidden');
-  document.getElementById('active-call-panel').classList.remove('hidden');
+  if (document.getElementById('empty-call-state')) document.getElementById('empty-call-state').classList.add('hidden');
+  if (document.getElementById('active-call-panel')) document.getElementById('active-call-panel').classList.remove('hidden');
 
-  document.getElementById('active-name').innerText = c.name;
-  document.getElementById('active-phone').innerText = c.phone;
-  document.getElementById('active-campaign').innerText = c.campaign;
-  document.getElementById('active-debt').innerText = c.balance;
-  document.getElementById('active-branch').innerText = `${c.branch} / ${c.sector}`;
+  if (document.getElementById('active-name')) document.getElementById('active-name').innerText = c.name || 'Unknown';
+  if (document.getElementById('active-phone')) document.getElementById('active-phone').innerText = c.phone || '--';
+  if (document.getElementById('active-campaign')) document.getElementById('active-campaign').innerText = c.campaign || '--';
+  if (document.getElementById('active-debt')) document.getElementById('active-debt').innerText = c.balance || '0';
+  if (document.getElementById('active-branch')) document.getElementById('active-branch').innerText = `${c.branch || '--'} / ${c.sector || '--'}`;
   
   if (!c.agentId) c.agentId = LOGGED_IN_AGENT;
   c.pendingReschedule = false;
   
-  document.getElementById('disposition-form').reset();
+  const form = document.getElementById('disposition-form');
+  if (form) form.reset();
   
   const campType = campaignConfigs[c.campaign] || 'defaulted'; 
   const resContainer = document.getElementById('container-customer-response');
   const statContainer = document.getElementById('container-account-status');
   
-  if (campType === 'active_no_loan' || campType === 'dormant') {
-     resContainer.classList.remove('hidden');
-     document.getElementById('disp-response').required = true;
-     statContainer.classList.add('hidden');
-     document.getElementById('disp-status').required = false;
-  } else {
-     statContainer.classList.remove('hidden');
-     document.getElementById('disp-status').required = true;
-     resContainer.classList.add('hidden');
-     document.getElementById('disp-response').required = false;
+  if (resContainer && statContainer) {
+    if (campType === 'active_no_loan' || campType === 'dormant') {
+       resContainer.classList.remove('hidden');
+       if (document.getElementById('disp-response')) document.getElementById('disp-response').required = true;
+       statContainer.classList.add('hidden');
+       if (document.getElementById('disp-status')) document.getElementById('disp-status').required = false;
+    } else {
+       statContainer.classList.remove('hidden');
+       if (document.getElementById('disp-status')) document.getElementById('disp-status').required = true;
+       resContainer.classList.add('hidden');
+       if (document.getElementById('disp-response')) document.getElementById('disp-response').required = false;
+    }
   }
 
   handleOutcomeChangeGlass(); 
 }
 
 function handleOutcomeChangeGlass() {
-  const status = document.getElementById('disp-status').value;
-  const outcome = document.getElementById('disp-outcome').value;
+  const statusEl = document.getElementById('disp-status');
+  const outcomeEl = document.getElementById('disp-outcome');
   const amtContainer = document.getElementById('dynamic-amount');
   const amtInput = document.getElementById('input-amount');
   const responseInput = document.getElementById('disp-response');
-  const statusInput = document.getElementById('disp-status');
   const activeCustomer = mockCustomers.find(x => x.id === activeCustomerId);
   const campType = campaignConfigs[activeCustomer?.campaign] || 'defaulted';
 
+  const status = statusEl ? statusEl.value : '';
+  const outcome = outcomeEl ? outcomeEl.value : '';
+
   const needsAnsweredDisposition = !outcome || outcome === 'Answered';
-  if (campType === 'active_no_loan' || campType === 'dormant') {
+  if (responseInput && (campType === 'active_no_loan' || campType === 'dormant')) {
     responseInput.required = needsAnsweredDisposition;
-  } else {
-    statusInput.required = needsAnsweredDisposition;
+  } else if (statusEl) {
+    statusEl.required = needsAnsweredDisposition;
   }
   
-  if (needsAnsweredDisposition && (status === 'Promise to Pay (PTP)' || status === 'Settled')) {
-    amtContainer.classList.remove('hidden');
-    amtInput.required = true;
-  } else {
-    amtContainer.classList.add('hidden');
-    amtInput.required = false;
+  if (amtContainer && amtInput) {
+    if (needsAnsweredDisposition && (status === 'Promise to Pay (PTP)' || status === 'Settled')) {
+      amtContainer.classList.remove('hidden');
+      amtInput.required = true;
+    } else {
+      amtContainer.classList.add('hidden');
+      amtInput.required = false;
+    }
   }
 }
 
 function updateWorkspaceStats() {
    if (!document.getElementById('ws-stats-calls')) return;
    const agent = agents.find(a => a.name === LOGGED_IN_AGENT);
-   if(agent) {
-      document.getElementById('ws-stats-calls').innerText = agent.callsMade;
-      document.getElementById('ws-stats-conv').innerText = `Sh ${agent.conversion.toLocaleString()}`;
+   if (agent) {
+      document.getElementById('ws-stats-calls').innerText = agent.callsMade || 0;
+      document.getElementById('ws-stats-conv').innerText = `Sh ${(agent.conversion || 0).toLocaleString()}`;
    } else {
       document.getElementById('ws-stats-calls').innerText = '0';
       document.getElementById('ws-stats-conv').innerText = 'Sh 0';
@@ -758,51 +825,60 @@ function updateWorkspaceStats() {
 function updateAnalyticsUI() {
     if (!document.getElementById('dash-total-calls')) return;
     document.getElementById('dash-total-calls').innerText = globalStats.totalCalls;
-    document.getElementById('dash-recovered').innerText = `Sh ${globalStats.recovered.toLocaleString()}`;
+    if (document.getElementById('dash-recovered')) {
+      document.getElementById('dash-recovered').innerText = `Sh ${globalStats.recovered.toLocaleString()}`;
+    }
     
     let connRate = globalStats.totalCalls === 0 ? 0 : Math.round((globalStats.connected / globalStats.totalCalls) * 100);
-    document.getElementById('dash-connection').innerText = `${connRate}%`;
+    if (document.getElementById('dash-connection')) {
+      document.getElementById('dash-connection').innerText = `${connRate}%`;
+    }
     
     let activeAgt = agents.filter(a => a.status === 'Active').length;
-    document.getElementById('dash-active-agents').innerText = `${activeAgt} / ${agents.length}`;
+    if (document.getElementById('dash-active-agents')) {
+      document.getElementById('dash-active-agents').innerText = `${activeAgt} / ${agents.length}`;
+    }
 
     const lbBody = document.getElementById('dash-leaderboard');
-    lbBody.innerHTML = '';
-    
-    let sortedAgents = [...agents].sort((a,b) => b.callsMade - a.callsMade);
-    sortedAgents.forEach(a => {
-        if(a.callsMade > 0) {
-            lbBody.innerHTML += `
-            <tr class="border-b border-brandDark/5">
-                <td class="py-2 font-bold">${a.name}</td>
-                <td class="py-2 text-right">${a.callsMade}</td>
-                <td class="py-2 text-right font-bold text-green-700">${a.connected}</td>
-                <td class="py-2 text-right font-bold">Sh ${a.conversion.toLocaleString()}</td>
-            </tr>`;
-        }
-    });
-    if(globalStats.totalCalls === 0) lbBody.innerHTML = `<tr><td colspan="4" class="py-6 text-center text-brandDark/50 italic">No calls made yet</td></tr>`;
+    if (lbBody) {
+      lbBody.innerHTML = '';
+      let sortedAgents = [...agents].sort((a,b) => (b.callsMade || 0) - (a.callsMade || 0));
+      sortedAgents.forEach(a => {
+          if ((a.callsMade || 0) > 0) {
+              lbBody.innerHTML += `
+              <tr class="border-b border-brandDark/5">
+                  <td class="py-2 font-bold">${escapeHtml(a.name)}</td>
+                  <td class="py-2 text-right">${a.callsMade || 0}</td>
+                  <td class="py-2 text-right font-bold text-green-700">${a.connected || 0}</td>
+                  <td class="py-2 text-right font-bold">Sh ${(a.conversion || 0).toLocaleString()}</td>
+              </tr>`;
+          }
+      });
+      if (globalStats.totalCalls === 0) {
+        lbBody.innerHTML = `<tr><td colspan="4" class="py-6 text-center text-brandDark/50 italic">No calls made yet</td></tr>`;
+      }
+    }
 
     const outcomesDiv = document.getElementById('dash-outcomes');
-    outcomesDiv.innerHTML = '';
-    if(globalStats.totalCalls > 0) {
-        const colorMap = { "Answered": "bg-green-500", "Unanswered": "bg-yellow-500", "Offline": "bg-gray-500", "Third party": "bg-blue-500", "Voicemail": "bg-amber-700" };
-        for(let key in globalStats.outcomes) {
-            let count = globalStats.outcomes[key];
-            if (count === 0) continue; 
-            let perc = Math.round((count / globalStats.totalCalls) * 100);
-            let colorClass = colorMap[key] || "bg-brandDark";
-            outcomesDiv.innerHTML += `
-            <div>
-                <div class="flex justify-between mb-1"><span>${key}</span> <span>${perc}%</span></div>
-                <div class="w-full bg-brandDark/10 rounded-full h-2">
-                    <div class="${colorClass} h-2 rounded-full" style="width: ${perc}%"></div>
-                </div>
-            </div>`;
-        }
-    } else {
-         outcomesDiv.innerHTML = `<p class="text-brandDark/50 italic font-medium">No outcomes logged.</p>`;
+    if (outcomesDiv) {
+      outcomesDiv.innerHTML = '';
+      if (globalStats.totalCalls > 0) {
+          const colorMap = { "Answered": "bg-green-500", "Unanswered": "bg-yellow-500", "Offline": "bg-gray-500", "Third party": "bg-blue-500", "Voicemail": "bg-amber-700" };
+          for (let key in globalStats.outcomes) {
+              let count = globalStats.outcomes[key];
+              if (count === 0) continue; 
+              let perc = Math.round((count / globalStats.totalCalls) * 100);
+              let colorClass = colorMap[key] || "bg-brandDark";
+              outcomesDiv.innerHTML += `
+              <div>
+                  <div class="flex justify-between mb-1"><span>${key}</span> <span>${perc}%</span></div>
+                  <div class="w-full bg-brandDark/10 rounded-full h-2">
+                      <div class="${colorClass} h-2 rounded-full" style="width: ${perc}%"></div>
+                  </div>
+              </div>`;
+          }
+      } else {
+           outcomesDiv.innerHTML = `<p class="text-brandDark/50 italic font-medium">No outcomes logged.</p>`;
+      }
     }
 }
-
-// ... Additional helper functions (openCustomerDrawer, parseCSV, renderCampaignList, updateCampaignDropdowns) remain the same UI implementations as previously ...
