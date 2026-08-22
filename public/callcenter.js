@@ -21,35 +21,27 @@ let LOGGED_IN_AGENT = CURRENT_USER_NAME || null;
 const currentPage = document.body.dataset.page;
 
 function enforceSecurity() {
-    // 1. Unauthenticated users get booted to login
     if (!CURRENT_USER_EMAIL && currentPage !== 'login') {
         window.location.replace('/login.html');
         return false;
     }
-    
-    // 2. Logged-in users on the login page get routed to their specific home pages
     if (CURRENT_USER_EMAIL && currentPage === 'login') {
-        const dest = CURRENT_USER_ROLE === 'Agent' ? '/workspace.html' : '/teamleader.html';
+        const dest = CURRENT_USER_ROLE === 'Control Agent' ? '/workspace.html' : '/teamleader.html';
         window.location.replace(dest);
         return false;
     }
-
-    // 3. Restrict Agents to Workspace only
-    if (CURRENT_USER_ROLE === 'Agent' && currentPage !== 'workspace' && currentPage !== 'login') {
+    // Update to 'Control Agent'
+    if (CURRENT_USER_ROLE === 'Control Agent' && currentPage !== 'workspace' && currentPage !== 'login') {
         window.location.replace('/workspace.html');
         return false;
     }
-
-    // 4. Restrict Team Leaders from the Workspace
     if (CURRENT_USER_ROLE === 'Team Leader' && currentPage === 'workspace') {
         window.location.replace('/teamleader.html');
         return false;
     }
-
-    // 5. Update UI elements based on role
     document.addEventListener("DOMContentLoaded", () => {
-        // Hide sidebar links
-        if (CURRENT_USER_ROLE === 'Agent') {
+        // Update to 'Control Agent'
+        if (CURRENT_USER_ROLE === 'Control Agent') {
             const restricted = document.querySelectorAll('a[data-page="campaigns"], a[data-page="teamleader"], a[data-page="dashboard"], a[data-page="admin"]');
             restricted.forEach(link => link.style.display = 'none');
         } else if (CURRENT_USER_ROLE === 'Team Leader') {
@@ -57,7 +49,6 @@ function enforceSecurity() {
             restricted.forEach(link => link.style.display = 'none');
         }
 
-        // Convert the top-right area into a Logout Button for ALL users
         const agentSelector = document.getElementById('current-agent-select');
         if (agentSelector) {
             agentSelector.parentElement.innerHTML = `
@@ -70,7 +61,6 @@ function enforceSecurity() {
             `;
         }
     });
-    
     return true;
 }
 
@@ -170,26 +160,6 @@ window.renderTeamLeaderWorkspace = function() {
 
 window.renderCampaignAgentSelector = function() {
     // Optional: Add specific Agent Selector UI updates here if needed
-};
-
-// ----------------------------------------------------------------------
-// DATA FETCHING & SYNCHRONIZATION
-// ----------------------------------------------------------------------
-
-window.onload = async () => {
-    await fetchAllData();
-    
-    if (!Array.isArray(agents)) agents = [];
-    if (!Array.isArray(mockCustomers)) mockCustomers = [];
-    
-    // Run authentication
-    const isAuthenticated = await authenticateUser();
-    if (!isAuthenticated) return; // Stop execution if auth fails
-
-    // Enforce UI restrictions
-    enforceRolePermissions();
-    
-    initCurrentPage();
 };
 
 async function fetchAllData() {
@@ -555,15 +525,31 @@ window.parseCSV = function(text) {
 // ----------------------------------------------------------------------
 // AGENT MANAGEMENT
 // ----------------------------------------------------------------------
-
 async function addAgent(e) {
     e.preventDefault();
-    const nameInput = e.target.querySelector('input[type="text"]') || document.getElementById('new-agent-name');
-    const teamInput = e.target.querySelector('select') || document.getElementById('new-agent-team');
-    const name = nameInput.value.trim();
+    const COMPANY_DOMAIN = "4g-capital.com"; // UPDATE THIS TO YOUR DOMAIN
+
+    const nameInput = document.getElementById('new-agent-name');
+    const emailInput = document.getElementById('new-agent-email');
+    const roleInput = document.getElementById('new-agent-role');
+    const passwordInput = document.getElementById('new-agent-password');
     
-    if (agents.find(a => a.name.toLowerCase() === name.toLowerCase())) {
-        showAppAlert("An agent with this name already exists.", "Agent already exists");
+    const name = nameInput.value.trim();
+    const email = emailInput.value.trim();
+    
+    if (!email.toLowerCase().endsWith(COMPANY_DOMAIN)) {
+        showAppAlert(`Users must have a ${COMPANY_DOMAIN} email address.`, "Invalid Email Domain");
+        return;
+    }
+    
+    // FIX: Added 'a.name &&' to prevent crashes if a Google Sheet row is blank
+    const exists = agents.find(a => 
+        (a.name && a.name.toLowerCase() === name.toLowerCase()) || 
+        (a.email && a.email.toLowerCase() === email.toLowerCase())
+    );
+
+    if (exists) {
+        showAppAlert("A user with this name or email already exists.", "User already exists");
         return;
     }
 
@@ -571,19 +557,22 @@ async function addAgent(e) {
         const res = await fetch(`${API_BASE}/agents`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name, team: teamInput.value, status: 'Active' })
+            body: JSON.stringify({ 
+                name: name, 
+                team: "General", // Hardcoded since we removed the split
+                email: email,
+                role: roleInput.value,
+                password: passwordInput.value,
+                status: 'Active' 
+            })
         });
 
         if (!res.ok) throw new Error(`Server returned HTTP ${res.status}`);
         
-        nameInput.value = '';
+        e.target.reset();
         await fetchAllData(); 
         
-        renderAgentDropdown();
-        renderShiftManager();
-        renderTeamLeaderWorkspace();
-        renderCampaignAgentSelector();
-        updateAnalyticsUI();
+        showAppAlert("User created successfully!", "Success");
 
     } catch (err) {
         console.error("Add Agent error:", err);
