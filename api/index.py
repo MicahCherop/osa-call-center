@@ -60,24 +60,34 @@ class CustomerUploadModel(BaseModel):
 
 # Endpoints
 
+# Add root routes so the browser doesn't show "Not Found"
+@app.get("/")
+@app.get("/api")
+def read_root():
+    return {"message": "FastAPI Server is running successfully on Vercel!"}
+
 @app.get("/api/health")
+@app.get("/health")
 def health_check():
     return {"status": "ok", "message": "Call Center API is running"}
 
 # --- AGENTS ---
 @app.get("/api/agents")
+@app.get("/agents")
 def get_agents():
     sheet = get_google_sheet().worksheet("Agents")
     records = sheet.get_all_records()
     return records
 
 @app.post("/api/agents")
+@app.post("/agents")
 def add_agent(agent: AgentModel):
     sheet = get_google_sheet().worksheet("Agents")
     sheet.append_row([agent.name, agent.team, agent.status, 0, 0, 0, 0])
     return {"status": "success", "message": f"Agent {agent.name} added"}
 
 @app.put("/api/agents/status")
+@app.put("/agents/status")
 def update_agent_status(name: str = Body(...), status: str = Body(...)):
     sheet = get_google_sheet().worksheet("Agents")
     cell = sheet.find(name)
@@ -88,11 +98,13 @@ def update_agent_status(name: str = Body(...), status: str = Body(...)):
 
 # --- CAMPAIGNS & CUSTOMERS ---
 @app.get("/api/campaigns")
+@app.get("/campaigns")
 def get_campaigns():
     sheet = get_google_sheet().worksheet("Campaigns")
     return sheet.get_all_records()
 
 @app.post("/api/campaigns")
+@app.post("/campaigns")
 def create_campaign(name: str = Body(...), type: str = Body(...), priority: str = Body(...), startDate: str = Body(...), endDate: str = Body(...), customers: List[CustomerUploadModel] = Body(...)):
     sh = get_google_sheet()
     
@@ -110,6 +122,7 @@ def create_campaign(name: str = Body(...), type: str = Body(...), priority: str 
     return {"status": "success", "imported": len(customers)}
 
 @app.get("/api/customers")
+@app.get("/customers")
 def get_customers(agentName: Optional[str] = None):
     sheet = get_google_sheet().worksheet("Customers")
     records = sheet.get_all_records()
@@ -119,6 +132,7 @@ def get_customers(agentName: Optional[str] = None):
 
 # --- ALLOCATION ENGINE ---
 @app.post("/api/distribute")
+@app.post("/distribute")
 def distribute_customers(campaign: str = Body(...)):
     sh = get_google_sheet()
     cust_sheet = sh.worksheet("Customers")
@@ -136,17 +150,19 @@ def distribute_customers(campaign: str = Body(...)):
         return {"status": "info", "message": "No unassigned customers remaining"}
     
     agent_idx = 0
-    assigned_count = 0
+    assigned_count = 0  # Declared as assigned_count
     for row_idx in unassigned:
         assigned_agent = agents[agent_idx]["name"]
         cust_sheet.update_cell(row_idx, 8, assigned_agent) # Col 8 = agentId
         assigned_count += 1
         agent_idx = (agent_idx + 1) % len(agents)
         
-    return {"status": "success", "assignedCount": assignedCount} # type: ignore
+    # Returned using the correct variable name
+    return {"status": "success", "assignedCount": assigned_count}
 
 # --- DISPOSITION ---
 @app.post("/api/disposition")
+@app.post("/disposition")
 def submit_disposition(disp: DispositionModel):
     sh = get_google_sheet()
     cust_sheet = sh.worksheet("Customers")
