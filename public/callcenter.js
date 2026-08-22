@@ -20,13 +20,57 @@ let globalStats = {
 };
 
 // ----------------------------------------------------------------------
-// RENDER FUNCTION STUBS & SAFEGUARDS (Prevents ReferenceErrors)
+// RENDER FUNCTIONS (Restored to fix Shift Manager and Campaigns)
 // ----------------------------------------------------------------------
-window.renderShiftManager = window.renderShiftManager || function() {};
-window.renderTeamLeaderWorkspace = window.renderTeamLeaderWorkspace || function() {};
-window.renderCampaignAgentSelector = window.renderCampaignAgentSelector || function() {};
-window.renderCampaignList = window.renderCampaignList || function() {};
-window.updateCampaignDropdowns = window.updateCampaignDropdowns || function() {};
+
+window.updateCampaignDropdowns = function() {
+    const allocSelect = document.getElementById('alloc-campaign');
+    if (allocSelect) {
+        const camps = Object.keys(campaignConfigs);
+        allocSelect.innerHTML = '<option value="">Select a campaign to allocate...</option>' + 
+            camps.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+    }
+};
+
+window.renderShiftManager = function() {
+    // Refresh the dropdown when the Shift Manager opens
+    if (typeof updateCampaignDropdowns === 'function') {
+        updateCampaignDropdowns();
+    }
+};
+
+window.renderCampaignList = function() {
+    const listDiv = document.getElementById('campaign-list-container');
+    if (!listDiv) return;
+    
+    const camps = Object.keys(campaignConfigs);
+    if (camps.length === 0) {
+        listDiv.innerHTML = '<p class="text-brandDark/50 italic p-4">No campaigns found. Create one to get started.</p>';
+        return;
+    }
+    
+    // Renders the list of campaigns dynamically
+    listDiv.innerHTML = camps.map(c => `
+        <div class="glass-card p-4 rounded-xl mb-3 border border-brandDark/10 hover:border-brandAmber/50 transition">
+            <div class="flex justify-between items-center">
+                <div>
+                    <h3 class="font-bold text-lg text-brandDark">${escapeHtml(c)}</h3>
+                    <span class="text-xs font-bold text-brandDark/50 uppercase">${escapeHtml(campaignConfigs[c])}</span>
+                </div>
+                <i class="fa-solid fa-bullhorn text-brandAmber text-xl opacity-50"></i>
+            </div>
+        </div>
+    `).join('');
+};
+
+window.renderTeamLeaderWorkspace = function() {
+    // Optional: Add specific Team Leader UI updates here if needed
+    console.log("Team Leader UI updated.");
+};
+
+window.renderCampaignAgentSelector = function() {
+    // Optional: Add specific Agent Selector UI updates here if needed
+};
 
 // ----------------------------------------------------------------------
 // DATA FETCHING & SYNCHRONIZATION
@@ -553,13 +597,24 @@ async function submitAddCampaign(e) {
   
   reader.onload = async function(event) {
     const csvText = event.target.result;
-    const newCustomers = parseCSV(csvText);
+    const rawCustomers = parseCSV(csvText);
     
-    if (newCustomers.length === 0) {
+    if (rawCustomers.length === 0) {
       showAppAlert("CSV seems empty or invalid. Ensure it has a header row.", "Invalid CSV");
       submitBtn.innerHTML = originalText;
       return;
     }
+
+    // FIX FOR 422 ERROR: Strictly map CSV rows to match the FastAPI Pydantic schema
+    const formattedCustomers = rawCustomers.map((row, index) => ({
+        id: parseInt(row.id) || (index + 1),
+        name: row.name || row.Name || "Unknown",
+        phone: String(row.phone || row.Phone || ""),
+        branch: row.branch || row.Branch || "Not Specified",
+        sector: row.sector || row.Sector || "Not Specified",
+        balance: String(row.balance || row.Balance || "0"),
+        campaign: campaignName // Required by backend API
+    }));
 
     const payload = {
         name: campaignName,
@@ -567,7 +622,7 @@ async function submitAddCampaign(e) {
         priority: priority,
         startDate: startDate,
         endDate: endDate,
-        customers: newCustomers
+        customers: formattedCustomers
     };
 
     try {
@@ -591,15 +646,15 @@ async function submitAddCampaign(e) {
           document.getElementById('csv-filename').innerText = "No file selected";
         }
         
-        showAppAlert(`Success! Created campaign "${campaignName}" with ${newCustomers.length} imported customers.`, "Campaign created");
+        showAppAlert(`Success! Created campaign "${campaignName}" with ${formattedCustomers.length} imported customers.`, "Campaign created");
     } catch (err) {
         submitBtn.innerHTML = originalText;
+        console.error("Campaign Creation Error:", err);
         showAppAlert("Failed to create campaign in Google Sheets.", "Error");
     }
   };
   reader.readAsText(file);
 }
-
 async function distributeCustomers() {
   const campEl = document.getElementById('alloc-campaign');
   const campaign = campEl ? campEl.value : '';
