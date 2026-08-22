@@ -1,4 +1,55 @@
-﻿// --- STEP 4: FRONTEND API INTEGRATION ---
+﻿// --- RBAC: SECURITY & ENFORCEMENT ---
+const CURRENT_USER_EMAIL = localStorage.getItem('USER_EMAIL');
+const CURRENT_USER_ROLE = localStorage.getItem('USER_ROLE');
+const CURRENT_USER_NAME = localStorage.getItem('LOGGED_IN_AGENT');
+const currentPage = document.body.dataset.page; // 'login', 'workspace', 'campaigns', 'admin', etc.
+
+function enforceSecurity() {
+    // 1. If not logged in and not on login page, kick to login
+    if (!CURRENT_USER_EMAIL && currentPage !== 'login') {
+        window.location.replace('/login.html');
+        return false;
+    }
+
+    // 2. If logged in but on login page, redirect to workspace
+    if (CURRENT_USER_EMAIL && currentPage === 'login') {
+        window.location.replace('/workspace.html');
+        return false;
+    }
+
+    // 3. Enforce Agent Restrictions (Agents can only see Workspace)
+    if (CURRENT_USER_ROLE === 'Agent' && currentPage !== 'workspace' && currentPage !== 'login') {
+        window.location.replace('/workspace.html');
+        return false;
+    }
+
+    // 4. Hide restricted links in the sidebar for Agents
+    if (CURRENT_USER_ROLE === 'Agent') {
+        document.addEventListener("DOMContentLoaded", () => {
+            const restrictedLinks = document.querySelectorAll('a[data-page="campaigns"], a[data-page="teamleader"], a[data-page="dashboard"], a[data-page="admin"]');
+            restrictedLinks.forEach(link => link.style.display = 'none');
+            
+            // Remove the agent selector dropdown, just show their name
+            const agentSelector = document.getElementById('current-agent-select');
+            if (agentSelector) {
+                agentSelector.parentElement.innerHTML = `<span class="font-bold text-lg">${CURRENT_USER_NAME}</span>`;
+            }
+        });
+    }
+    
+    return true;
+}
+
+// Run immediately
+const isAuthorized = enforceSecurity();
+
+window.logout = function() {
+    localStorage.clear();
+    window.location.replace('/login.html');
+};
+
+
+// --- STEP 4: FRONTEND API INTEGRATION ---
 const API_BASE = '/api';
 
 // Persistent Local UI States
@@ -18,6 +69,54 @@ let globalStats = {
   recovered: 0,
   outcomes: {}
 };
+
+// --- RBAC: AUTHENTICATION & UI ENFORCEMENT ---
+
+async function authenticateUser() {
+    // 1. If no email is saved, ask for it (A basic login simulation)
+    if (!CURRENT_USER_EMAIL) {
+        const email = prompt("Please enter your email to log in:");
+        if (!email) {
+            document.body.innerHTML = "<h2 class='p-10 text-center text-red-600'>Access Denied. Reload to log in.</h2>";
+            return false;
+        }
+        CURRENT_USER_EMAIL = email.toLowerCase().trim();
+    }
+
+    // 2. Find the user in the downloaded agents list
+    const userAccount = agents.find(a => a.email && a.email.toLowerCase() === CURRENT_USER_EMAIL);
+    
+    if (!userAccount) {
+        alert("Email not found in the system. Contact your Team Leader.");
+        localStorage.removeItem('USER_EMAIL');
+        document.body.innerHTML = "<h2 class='p-10 text-center text-red-600'>Unauthorized.</h2>";
+        return false;
+    }
+
+    // 3. Save session
+    CURRENT_USER_ROLE = userAccount.role || 'Agent';
+    LOGGED_IN_AGENT = userAccount.name;
+    localStorage.setItem('USER_EMAIL', CURRENT_USER_EMAIL);
+    localStorage.setItem('USER_ROLE', CURRENT_USER_ROLE);
+    localStorage.setItem('LOGGED_IN_AGENT', LOGGED_IN_AGENT);
+
+    return true;
+}
+
+function enforceRolePermissions() {
+    const currentPage = document.body.dataset.page; // e.g., 'workspace', 'campaigns'
+    
+    // Hide restricted sidebar links for Agents
+    if (CURRENT_USER_ROLE === 'Agent') {
+        const restrictedLinks = document.querySelectorAll('a[data-page="campaigns"], a[data-page="teamleader"], a[data-page="dashboard"]');
+        restrictedLinks.forEach(link => link.classList.add('hidden'));
+
+        // If an Agent tries to access a page other than the workspace, boot them out
+        if (currentPage !== 'workspace') {
+            window.location.replace('/workspace.html');
+        }
+    }
+}
 
 // ----------------------------------------------------------------------
 // RENDER FUNCTIONS (Restored to fix Shift Manager and Campaigns)
@@ -77,14 +176,18 @@ window.renderCampaignAgentSelector = function() {
 // ----------------------------------------------------------------------
 
 window.onload = async () => {
-    // 1. Fetch data from backend on load
     await fetchAllData();
     
-    // 2. Fallback safeguards to prevent JS crashes
     if (!Array.isArray(agents)) agents = [];
     if (!Array.isArray(mockCustomers)) mockCustomers = [];
     
-    // 3. Initialize UI
+    // Run authentication
+    const isAuthenticated = await authenticateUser();
+    if (!isAuthenticated) return; // Stop execution if auth fails
+
+    // Enforce UI restrictions
+    enforceRolePermissions();
+    
     initCurrentPage();
 };
 
@@ -269,17 +372,40 @@ window.closeAddCampaignModal = function(e) {
   }
 };
 
+// --- CAMPAIGNS PAGE VIEW CONTROLLERS ---
+
 window.openShiftManager = function(e) {
   if (e) e.stopPropagation();
-  const backdrop = document.getElementById('shift-manager-modal-backdrop');
-  const modal = document.getElementById('shift-manager-modal');
-  if (backdrop && modal) {
-    backdrop.classList.remove('hidden');
-    setTimeout(() => {
-      backdrop.classList.remove('opacity-0');
-      modal.classList.remove('scale-95');
-    }, 10);
+  
+  const listState = document.getElementById('campaign-list-state');
+  const shiftState = document.getElementById('shift-manager-state');
+  
+  if (listState && shiftState) {
+    // Hide the campaign list table
+    listState.classList.add('hidden');
+    // Show the shift manager allocation screen
+    shiftState.classList.remove('hidden');
+    
+    // Refresh the dropdowns when the screen opens
+    if (typeof renderShiftManager === 'function') {
+      renderShiftManager();
+    }
   }
+};
+
+window.closeSecondaryState = function(e) {
+  if (e) e.stopPropagation();
+  
+  const listState = document.getElementById('campaign-list-state');
+  const shiftState = document.getElementById('shift-manager-state');
+  const detailsState = document.getElementById('campaign-details-state');
+  
+  // Hide all secondary screens
+  if (shiftState) shiftState.classList.add('hidden');
+  if (detailsState) detailsState.classList.add('hidden');
+  
+  // Bring back the main campaign list
+  if (listState) listState.classList.remove('hidden');
 };
 
 window.closeShiftManager = function(e) {
@@ -322,6 +448,7 @@ window.openCustomerDrawer = function(eOrId) {
     }, 10);
   }
 };
+
 
 window.closeCustomerDrawer = function(e) {
   if (e) e.stopPropagation();

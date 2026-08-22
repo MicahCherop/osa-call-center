@@ -42,11 +42,47 @@ def get_google_sheet():
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to open sheet: {str(e)}")
 
-# Pydantic Schemas
 class AgentModel(BaseModel):
     name: str
     team: str
+    email: str
+    role: str
+    password: str
     status: str = "Active"
+
+class LoginModel(BaseModel):
+    email: str
+    password: str
+
+@app.post("/api/login")
+def login(creds: LoginModel):
+    sheet = get_google_sheet().worksheet("Agents")
+    agents = sheet.get_all_records()
+    
+    for a in agents:
+        if str(a.get("Email", "")).lower() == creds.email.lower() and str(a.get("Password", "")) == creds.password:
+            if str(a.get("Status", "")) != "Active":
+                raise HTTPException(status_code=403, detail="Account is disabled.")
+            
+            return {
+                "status": "success", 
+                "user": {
+                    "name": a.get("Name"), 
+                    "email": a.get("Email"), 
+                    "role": a.get("Role")
+                }
+            }
+            
+    raise HTTPException(status_code=401, detail="Invalid email or password")
+
+# Update the Add Agent Endpoint
+@app.post("/api/agents")
+@app.post("/agents")
+def add_agent(agent: AgentModel):
+    sheet = get_google_sheet().worksheet("Agents")
+    # Appending the new columns (Email and Role)
+    sheet.append_row([agent.name, agent.team, agent.status, 0, 0, 0, 0, agent.email, agent.role])
+    return {"status": "success", "message": f"Agent {agent.name} added"}
 
 class DispositionModel(BaseModel):
     customerId: int

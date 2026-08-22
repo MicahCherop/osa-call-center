@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login - OSA Call Center</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="/callcenter.css">
+</head>
+<body data-page="login" class="h-screen bg-slate-50 flex items-center justify-center relative overflow-hidden">
+  
+  <div class="glass-panel p-8 rounded-2xl w-full max-w-md relative z-10 shadow-2xl bg-white/80 backdrop-blur-md">
+    <h1 class="text-3xl font-bold text-center text-brandDark mb-2">OSA Call Center</h1>
+    <p class="text-center text-brandDark/60 text-sm mb-8">Sign in to access your workspace</p>
+    
+    <form id="login-form" class="space-y-5">
+      <div>
+        <label class="block text-xs font-bold text-brandDark/70 uppercase mb-1">Email Address</label>
+        <input type="email" id="login-email" required class="glass-input rounded-lg w-full px-4 py-3 text-sm">
+      </div>
+      <div>
+        <label class="block text-xs font-bold text-brandDark/70 uppercase mb-1">Password</label>
+        <input type="password" id="login-password" required class="glass-input rounded-lg w-full px-4 py-3 text-sm">
+      </div>
+      <button type="submit" id="login-btn" class="w-full bg-brandDark hover:bg-slate-800 text-white font-bold py-3 rounded-lg shadow-md transition mt-4">
+        Log In
+      </button>
+      <div id="login-error" class="text-red-500 text-sm font-semibold text-center mt-3 hidden"></div>
+    </form>
+  </div>
+
+  <script src="/callcenter.js"></script>
+  <script>
+    document.getElementById('login-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const btn = document.getElementById('login-btn');
+      const errorDiv = document.getElementById('login-error');
+      btn.innerHTML = 'Authenticating...';
+      errorDiv.classList.add('hidden');
+
+      try {
+        const res = await fetch('/api/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: document.getElementById('login-email').value.trim(),
+            password: document.getElementById('login-password').value
+          })
+        });
+
+        const data = await res.json();
+        
+        if (!res.ok) throw new Error(data.detail || "Login failed");
+
+        // Save session and redirect
+        localStorage.setItem('USER_EMAIL', data.user.email);
+        localStorage.setItem('USER_ROLE', data.user.role);
+        localStorage.setItem('LOGGED_IN_AGENT', data.user.name);
+        window.location.replace('/workspace.html');
+
+      } catch (err) {
+        btn.innerHTML = 'Log In';
+        errorDiv.innerText = err.message;
+        errorDiv.classList.remove('hidden');
+      }
+    });
+  </script>
+</body>
+</html>
