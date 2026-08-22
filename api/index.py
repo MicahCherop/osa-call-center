@@ -76,8 +76,7 @@ def health_check():
 @app.get("/agents")
 def get_agents():
     sheet = get_google_sheet().worksheet("Agents")
-    records = sheet.get_all_records()
-    return records
+    return sheet.get_all_records()
 
 @app.post("/api/agents")
 @app.post("/agents")
@@ -150,14 +149,13 @@ def distribute_customers(campaign: str = Body(...)):
         return {"status": "info", "message": "No unassigned customers remaining"}
     
     agent_idx = 0
-    assigned_count = 0  # Declared as assigned_count
+    assigned_count = 0
     for row_idx in unassigned:
         assigned_agent = agents[agent_idx]["name"]
         cust_sheet.update_cell(row_idx, 8, assigned_agent) # Col 8 = agentId
         assigned_count += 1
         agent_idx = (agent_idx + 1) % len(agents)
         
-    # Returned using the correct variable name
     return {"status": "success", "assignedCount": assigned_count}
 
 # --- DISPOSITION ---
