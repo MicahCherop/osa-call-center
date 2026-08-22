@@ -39,20 +39,23 @@ async function fetchAllData() {
     try {
         // Fetch Agents
         const resAgents = await fetch(`${API_BASE}/agents`);
+        if (!resAgents.ok) throw new Error(`API Error: ${resAgents.status}`);
         const agentsData = await resAgents.json();
         agents = Array.isArray(agentsData) ? agentsData : [];
 
         // Fetch Campaigns
         const resCamps = await fetch(`${API_BASE}/campaigns`);
-        const campaignsData = await resCamps.json();
-        if (Array.isArray(campaignsData)) {
-            campaignsData.forEach(c => {
+        if (!resCamps.ok) throw new Error(`API Error: ${resCamps.status}`);
+        const campaigns = await resCamps.json();
+        if (Array.isArray(campaigns)) {
+            campaigns.forEach(c => {
                 campaignConfigs[c.name] = c.type;
             });
         }
 
         // Fetch Customers
         const resCust = await fetch(`${API_BASE}/customers`);
+        if (!resCust.ok) throw new Error(`API Error: ${resCust.status}`);
         const custData = await resCust.json();
         mockCustomers = Array.isArray(custData) ? custData : [];
 
@@ -61,8 +64,31 @@ async function fetchAllData() {
         console.error("API Error - Could not fetch data:", err);
         agents = []; 
         mockCustomers = [];
-        showAppAlert("Could not connect to the database. The API returned a 404 error.", "Connection Error");
+        showAppAlert("Could not connect to the database. The API returned an error.", "Connection Error");
     }
+}
+
+function renderAgentDropdown() {
+  const sel = document.getElementById('current-agent-select');
+  if (!sel) return;
+  
+  // Failsafe: Ensure agents is always an array
+  if (!Array.isArray(agents)) agents = [];
+
+  if (agents.length === 0) {
+    sel.innerHTML = '<option value="">No Agents Available</option>';
+    LOGGED_IN_AGENT = null;
+  } else {
+    sel.innerHTML = agents.map(a => `<option value="${escapeHtml(a.name)}" ${a.name === LOGGED_IN_AGENT ? 'selected' : ''}>${escapeHtml(a.name)}</option>`).join('');
+    if (!LOGGED_IN_AGENT || !agents.find(a => a.name === LOGGED_IN_AGENT)) {
+        LOGGED_IN_AGENT = agents[0].name;
+        sel.value = LOGGED_IN_AGENT;
+    }
+  }
+  
+  saveAppState();
+  if(isClockedIn) renderAgentQueue();
+  updateWorkspaceStats();
 }
 
 function recalculateGlobalStats() {
