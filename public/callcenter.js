@@ -1198,13 +1198,37 @@ window.renderTLCustomers = function() {
         `;
     });
 };
+window.switchAnalyticsTab = function(tabName) {
+    // Hide all panels
+    document.querySelectorAll('.analytics-panel').forEach(panel => panel.classList.add('hidden'));
+    
+    // Reset all buttons to inactive style
+    document.querySelectorAll('.analytics-tab').forEach(btn => {
+        btn.className = "analytics-tab px-4 py-2 rounded-lg text-sm font-bold bg-white/50 text-brandDark/70 border border-brandDark/10 hover:text-brandDark transition";
+    });
+
+    // Show active panel
+    const activePanel = document.getElementById(`analytics-panel-${tabName}`);
+    if (activePanel) activePanel.classList.remove('hidden');
+
+    // Set active button style
+    const activeBtn = document.getElementById(`analytics-tab-${tabName}`);
+    if (activeBtn) {
+        activeBtn.className = "analytics-tab px-4 py-2 rounded-lg text-sm font-bold bg-brandDark text-white shadow transition";
+    }
+
+    // FIX: Force the table to render when the tab is opened
+    if (tabName === 'responses') {
+        renderAnalyticsResponses();
+    }
+};
+
 window.renderAnalyticsResponses = function() {
     const container = document.getElementById('analytics-responses-container');
     const filterSelect = document.getElementById('dash-response-campaign-filter');
     const countSpan = document.getElementById('dash-response-count');
     if (!container) return;
 
-    // Populate filter dropdown if empty
     if (filterSelect && filterSelect.options.length <= 1) {
         const campaigns = Object.keys(campaignConfigs);
         campaigns.forEach(c => {
@@ -1214,51 +1238,96 @@ window.renderAnalyticsResponses = function() {
 
     const selectedCampaign = filterSelect ? filterSelect.value : "";
     
-    // Filter customers: Must have an outcome, and match the selected campaign (if any)
+    // FIX: Safely check for case-insensitive outcome and campaign keys
     const workedCustomers = mockCustomers.filter(c => {
-        if (!c.outcome) return false;
-        if (selectedCampaign && selectedCampaign !== "" && c.campaign !== selectedCampaign) return false;
+        const outcome = c.outcome || c.Outcome;
+        const campaign = c.campaign || c.Campaign;
+        
+        if (!outcome) return false; // Skip customers who haven't been called
+        if (selectedCampaign && selectedCampaign !== "" && campaign !== selectedCampaign) return false;
         return true;
     });
 
-    if (countSpan) {
-        countSpan.innerText = `${workedCustomers.length} updates`;
-    }
+    if (countSpan) countSpan.innerText = `${workedCustomers.length} updates`;
     
     if (workedCustomers.length === 0) {
         container.innerHTML = '<p class="p-6 text-center text-brandDark/50 italic font-medium">No customer responses match this criteria.</p>';
         return;
     }
 
-    // 1. Get ALL unique CSV column keys dynamically
     let allKeys = new Set();
     workedCustomers.forEach(c => Object.keys(c).forEach(k => allKeys.add(k)));
-    
-    // Hide internal system keys
     const excludeKeys = ['id', 'pendingReschedule', 'worked'];
     const columns = Array.from(allKeys).filter(k => !excludeKeys.includes(k));
 
-    // 2. Build the HTML Table
     let tableHTML = `
         <div class="overflow-x-auto">
             <table class="w-full text-left border-collapse whitespace-nowrap">
                 <thead class="bg-white/90 sticky top-0 z-10 shadow-sm border-b border-brandDark/20">
                     <tr class="text-[11px] font-semibold uppercase text-brandDark/70">`;
     
-    columns.forEach(col => {
-        tableHTML += `<th class="px-4 py-3">${escapeHtml(col)}</th>`;
-    });
-    
+    columns.forEach(col => { tableHTML += `<th class="px-4 py-3">${escapeHtml(col)}</th>`; });
     tableHTML += `</tr></thead><tbody class="text-[13px] font-medium">`;
 
     workedCustomers.forEach(c => {
         tableHTML += `<tr class="border-b border-brandDark/5 hover:bg-white/40 transition">`;
-        columns.forEach(col => {
-            tableHTML += `<td class="px-4 py-3">${escapeHtml(c[col] || '--')}</td>`;
-        });
+        columns.forEach(col => { tableHTML += `<td class="px-4 py-3">${escapeHtml(c[col] || '--')}</td>`; });
         tableHTML += `</tr>`;
     });
 
     tableHTML += `</tbody></table></div>`;
     container.innerHTML = tableHTML;
+};
+
+window.exportResponsesCSV = function() {
+    const filterSelect = document.getElementById('dash-response-campaign-filter');
+    const selectedCampaign = filterSelect ? filterSelect.value : "";
+    
+    const workedCustomers = mockCustomers.filter(c => {
+        const outcome = c.outcome || c.Outcome;
+        const campaign = c.campaign || c.Campaign;
+        if (!outcome) return false;
+        if (selectedCampaign && campaign !== selectedCampaign) return false;
+        return true;
+    });
+
+    if (workedCustomers.length === 0) {
+        showAppAlert("No data available to export.", "Export Failed");
+        return;
+    }
+
+    // Get dynamic headers
+    let allKeys = new Set();
+    workedCustomers.forEach(c => Object.keys(c).forEach(k => allKeys.add(k)));
+    const excludeKeys = ['id', 'pendingReschedule', 'worked'];
+    const columns = Array.from(allKeys).filter(k => !excludeKeys.includes(k));
+
+    // Build CSV String
+    let csvContent = columns.join(",") + "\n";
+    workedCustomers.forEach(c => {
+        let row = columns.map(col => {
+            let val = c[col] || "";
+            val = String(val).replace(/"/g, '""'); // Escape quotes
+            return `"${val}"`;
+        });
+        csvContent += row.join(",") + "\n";
+    });
+
+    // Trigger Download
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    link.setAttribute("href", url);
+    link.setAttribute("download", `Customer_Responses_${new Date().toISOString().slice(0,10)}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+};
+
+window.exportResponsesSheets = function() {
+    // If you want me to write the Python backend code to push this directly to a new tab in your Google Sheet, let me know! 
+    // For now, this triggers the CSV download as a fallback.
+    showAppAlert("Exporting as CSV. (Backend Sheets API endpoint required for direct sync).", "Exporting");
+    exportResponsesCSV();
 };

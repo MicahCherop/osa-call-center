@@ -9,14 +9,26 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@200;300;400&display=swap" rel="stylesheet">
   <script src="https://cdn.tailwindcss.com"></script>
+  <!-- 1. Fetch the absolute thinnest font weights from Google -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100;200;300&display=swap" rel="stylesheet">
+  
+  <!-- 2. Force Tailwind to render ALL text as thin -->
   <script>
-tailwind.config = {
+    tailwind.config = {
       theme: {
         extend: {
           fontFamily: { sans: ['Inter', 'sans-serif'] },
+          // This mapping forces every element to be thin, ignoring "font-bold" classes
           fontWeight: {
-            black: '400', extrabold: '400', bold: '400', semibold: '400',
-            medium: '300', normal: '300', light: '200',
+            black: '200', 
+            extrabold: '200', 
+            bold: '200', 
+            semibold: '200',
+            medium: '200', 
+            normal: '200', 
+            light: '200',
+            extralight: '100',
+            thin: '100'
           },
           colors: {
             brandDark: '#0f172a',

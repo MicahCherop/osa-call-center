@@ -161,9 +161,17 @@
 
         <div id="analytics-panel-responses" class="analytics-panel hidden space-y-4">
           <div class="glass-card rounded-xl p-5">
-            <div class="flex items-center justify-between gap-3 mb-4">
+            <div class="flex items-center justify-between gap-3 mb-4 border-b border-brandDark/10 pb-3">
               <h3 class="text-[15px] font-bold uppercase text-brandDark/70">Customer Response Details</h3>
-              <span id="dash-response-count" class="text-xs font-bold text-brandDark/50">0 updates</span>
+              <div class="flex items-center gap-2">
+                <span id="dash-response-count" class="text-xs font-bold text-brandDark/50 mr-2">0 updates</span>
+                <button onclick="exportResponsesCSV()" class="bg-brandDark hover:bg-slate-800 text-white px-3 py-1.5 rounded text-xs font-bold transition flex items-center gap-1.5 shadow-sm">
+                  <i class="fa-solid fa-file-csv text-brandAmber"></i> Export CSV
+                </button>
+                <button onclick="exportResponsesSheets()" class="bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded text-xs font-bold transition flex items-center gap-1.5 shadow-sm">
+                  <i class="fa-brands fa-google"></i> to Sheets
+                </button>
+              </div>
             </div>
             <div class="mb-4 max-w-xs">
               <label class="block text-[11px] font-bold text-brandDark/70 uppercase mb-1.5">Filter By Campaign</label>
