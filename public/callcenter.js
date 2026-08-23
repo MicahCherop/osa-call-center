@@ -131,12 +131,7 @@ window.updateCampaignDropdowns = function() {
     }
 };
 
-window.renderShiftManager = function() {
-    // Refresh the dropdown when the Shift Manager opens
-    if (typeof updateCampaignDropdowns === 'function') {
-        updateCampaignDropdowns();
-    }
-};
+
 
 window.renderCampaignList = function() {
     const listDiv = document.getElementById('campaign-list-container');
@@ -543,9 +538,71 @@ window.parseCSV = function(text) {
 // ----------------------------------------------------------------------
 // AGENT MANAGEMENT
 // ----------------------------------------------------------------------
+window.renderAdminUserList = function() {
+    const tbody = document.getElementById('admin-users-tbody');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+    
+    if (!agents || agents.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" class="px-4 py-8 text-center text-brandDark/50 italic">No users found in database.</td></tr>';
+        return;
+    }
+
+    agents.forEach(a => {
+        // Map keys dynamically to handle both uppercase/lowercase API returns
+        const role = a.Role || a.role || 'Unknown';
+        const name = a.Name || a.name || 'Unknown';
+        const email = a.Email || a.email || '--';
+        const status = a.Status || a.status || 'Inactive';
+
+        let badgeColor = role === 'Control Agent' ? 'bg-blue-100 text-blue-800' : 'bg-amber-100 text-amber-800';
+        if(role === 'Ops Manager') badgeColor = 'bg-purple-100 text-purple-800';
+        if(role === 'Admin') badgeColor = 'bg-red-100 text-red-800';
+        
+        tbody.innerHTML += `
+            <tr class="border-b border-brandDark/5">
+                <td class="px-4 py-3 font-bold text-brandDark">${escapeHtml(name)}</td>
+                <td class="px-4 py-3">${escapeHtml(email)}</td>
+                <td class="px-4 py-3"><span class="px-2 py-1 rounded text-[11px] font-bold ${badgeColor}">${escapeHtml(role)}</span></td>
+                <td class="px-4 py-3 font-bold ${status === 'Active' ? 'text-green-600' : 'text-gray-500'}">${escapeHtml(status)}</td>
+            </tr>
+        `;
+    });
+};
+
+window.renderShiftManager = function() {
+    const tbody = document.getElementById('shift-manager-tbody');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+    
+    // Safely extract Control Agents
+    const controlAgents = agents.filter(a => (a.Role || a.role) === 'Control Agent');
+    
+    if (controlAgents.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="px-4 py-8 text-center text-brandDark/50 italic">No Control Agents found in database.</td></tr>';
+        return;
+    }
+
+    controlAgents.forEach(a => {
+        const name = a.Name || a.name || 'Unknown';
+        const status = a.Status || a.status || 'Offline';
+        const team = a.Team || a.team || 'General';
+        
+        tbody.innerHTML += `
+            <tr class="border-b border-brandDark/5">
+                <td class="px-4 py-3 font-bold">${escapeHtml(name)}</td>
+                <td class="px-4 py-3 text-brandDark/70">${escapeHtml(team)}</td>
+                <td class="px-4 py-3 font-bold ${status === 'Clocked In' ? 'text-green-600' : 'text-gray-500'}">${escapeHtml(status)}</td>
+                <td class="px-4 py-3 text-brandDark/50">--</td>
+                <td class="px-4 py-3 text-brandDark/50">--</td>
+            </tr>
+        `;
+    });
+};
+
 async function createUser(e, formType) {
     e.preventDefault();
-    const COMPANY_DOMAIN = "@4g-capital.com"; // Update this
+    const COMPANY_DOMAIN = "@yourcompany.com"; // UPDATE THIS
 
     const name = document.getElementById(`${formType}-new-name`).value.trim();
     const email = document.getElementById(`${formType}-new-email`).value.trim();
@@ -557,7 +614,14 @@ async function createUser(e, formType) {
         return;
     }
     
-    const exists = agents.find(a => (a.name && a.name.toLowerCase() === name.toLowerCase()) || (a.email && a.email.toLowerCase() === email.toLowerCase()));
+    // Safely verify existence with uppercase/lowercase checks
+    const exists = agents.find(a => {
+        const aName = a.Name || a.name;
+        const aEmail = a.Email || a.email;
+        return (aName && aName.toLowerCase() === name.toLowerCase()) || 
+               (aEmail && aEmail.toLowerCase() === email.toLowerCase());
+    });
+
     if (exists) {
         showAppAlert("A user with this name or email already exists.", "User Exists");
         return;
@@ -574,50 +638,18 @@ async function createUser(e, formType) {
         
         e.target.reset();
         await fetchAllData(); 
+        
+        // Refresh the lists dynamically based on the current page
         if (currentPage === 'admin') renderAdminUserList();
         if (currentPage === 'teamleader') renderShiftManager();
+        
         showAppAlert("User created successfully!", "Success");
     } catch (err) {
         showAppAlert("Failed to save user to the database.", "Network Error");
     }
 }
-window.renderAdminUserList = function() {
-    const tbody = document.getElementById('admin-users-tbody');
-    if (!tbody) return;
-    tbody.innerHTML = '';
-    agents.forEach(a => {
-        let badgeColor = a.role === 'Control Agent' ? 'bg-blue-100 text-blue-800' : 'bg-amber-100 text-amber-800';
-        if(a.role === 'Ops Manager') badgeColor = 'bg-purple-100 text-purple-800';
-        
-        tbody.innerHTML += `
-            <tr class="border-b border-brandDark/5">
-                <td class="px-4 py-3 font-bold text-brandDark">${escapeHtml(a.name)}</td>
-                <td class="px-4 py-3">${escapeHtml(a.email)}</td>
-                <td class="px-4 py-3"><span class="px-2 py-1 rounded text-[11px] font-bold ${badgeColor}">${escapeHtml(a.role)}</span></td>
-                <td class="px-4 py-3 font-bold ${a.status === 'Active' ? 'text-green-600' : 'text-gray-500'}">${escapeHtml(a.status)}</td>
-            </tr>
-        `;
-    });
-};
 
-window.renderShiftManager = function() {
-    const tbody = document.getElementById('shift-manager-tbody');
-    if (!tbody) return;
-    tbody.innerHTML = '';
-    
-    // Only show Control Agents in the shift roster
-    const controlAgents = agents.filter(a => a.role === 'Control Agent');
-    
-    controlAgents.forEach(a => {
-        tbody.innerHTML += `
-            <tr class="border-b border-brandDark/5">
-                <td class="px-4 py-3 font-bold">${escapeHtml(a.name)}</td>
-                <td class="px-4 py-3 font-bold ${a.status === 'Clocked In' ? 'text-green-600' : 'text-gray-500'}">${escapeHtml(a.status)}</td>
-                <td class="px-4 py-3 text-brandDark/50">...</td>
-            </tr>
-        `;
-    });
-};
+
 
 async function updateAgentStatus(index, status) {
   const agent = agents[index];

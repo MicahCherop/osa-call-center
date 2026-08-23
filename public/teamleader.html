@@ -233,20 +233,50 @@ tailwind.config = {
         <div id="tl-panel-agents" class="tl-panel flex-1 grid grid-cols-1 lg:grid-cols-3 gap-6 overflow-hidden">
           <div class="lg:col-span-2 glass-panel rounded-2xl p-5 overflow-hidden flex flex-col">
             <h3 class="font-bold text-[15px] uppercase text-brandDark/70 mb-4">Agent Roster</h3>
-            <div class="overflow-auto rounded-xl border border-brandDark/10 bg-white/30">
-              <table class="w-full text-left border-collapse whitespace-nowrap">
-                <thead class="sticky top-0 bg-white/90 z-10">
-                  <tr class="text-[11px] font-semibold uppercase text-brandDark/70 border-b border-brandDark/20">
-                    <th class="px-4 py-3">Agent</th>
-                    <th class="px-4 py-3">Team</th>
-                    <th class="px-4 py-3">Shift</th>
-                    <th class="px-4 py-3">Campaign</th>
-                    <th class="px-4 py-3">Queue</th>
-                  </tr>
-                </thead>
-                <tbody id="tl-agent-tbody" class="text-[13px] font-medium"></tbody>
-              </table>
-            </div>
+            <div class="flex-1 flex flex-col lg:flex-row gap-6 overflow-hidden"></div>    
+          <!-- Left: Roster Table -->
+          <div class="flex-[2] overflow-auto rounded-xl border border-brandDark/10 bg-white/30 backdrop-blur-sm shadow-inner relative">
+            <table class="w-full text-left border-collapse whitespace-nowrap">
+              <thead class="sticky top-0 bg-white/90 backdrop-blur-md z-10 shadow-sm">
+                <tr class="text-[11px] font-semibold uppercase tracking-wider text-brandDark/70 border-b border-brandDark/20">
+                  <th class="px-4 py-3">Agent Name</th>
+                  <th class="px-4 py-3">Team</th>
+                  <th class="px-4 py-3">Shift Status</th>
+                  <th class="px-4 py-3">Campaign</th>
+                  <th class="px-4 py-3">Queue</th>
+                </tr>
+              </thead>
+              <tbody class="text-[13px] font-medium" id="shift-manager-tbody">
+                <!-- Populated dynamically -->
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Right: Add Control Agent Side-Panel -->
+          <div class="flex-1 glass-card rounded-xl p-5 border border-brandAmber/20 bg-brandAmber/5 flex flex-col h-fit">
+            <h3 class="font-bold text-[15px] uppercase text-brandDark/70 mb-4 border-b border-brandAmber/20 pb-2 flex items-center gap-2">
+              <i class="fa-solid fa-user-plus"></i> Add Control Agent
+            </h3>
+            <form onsubmit="createUser(event, 'tl')" class="flex flex-col gap-4">
+              <div>
+                <label class="block text-[11px] font-bold text-brandDark/70 uppercase mb-1.5">Full Name</label>
+                <input type="text" id="tl-new-name" required class="glass-input rounded-lg w-full px-3 py-2 border border-brandDark/20 bg-white text-sm">
+              </div>
+              <div>
+                <label class="block text-[11px] font-bold text-brandDark/70 uppercase mb-1.5">Email Address</label>
+                <input type="email" id="tl-new-email" required class="glass-input rounded-lg w-full px-3 py-2 border border-brandDark/20 bg-white text-sm">
+              </div>
+              <div>
+                <label class="block text-[11px] font-bold text-brandDark/70 uppercase mb-1.5">Temporary Password</label>
+                <input type="text" id="tl-new-password" required class="glass-input rounded-lg w-full px-3 py-2 border border-brandDark/20 bg-white text-sm">
+              </div>
+              <button type="submit" class="mt-2 w-full bg-brandDark hover:bg-slate-800 text-white font-bold py-3 rounded-lg shadow-md transition">
+                Create Agent
+              </button>
+            </form>
+          </div>
+          
+        </div>
           </div>
 
         <div class="glass-card p-5 rounded-xl border border-brandAmber/20 bg-brandAmber/5 mb-6">
