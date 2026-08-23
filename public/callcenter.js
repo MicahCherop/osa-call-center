@@ -19,45 +19,48 @@ const CURRENT_USER_ROLE = localStorage.getItem('USER_ROLE');
 const CURRENT_USER_NAME = localStorage.getItem('LOGGED_IN_AGENT');
 let LOGGED_IN_AGENT = CURRENT_USER_NAME || null; 
 const currentPage = document.body.dataset.page;
-
+const isAuthorized = enforceSecurity();
 function enforceSecurity() {
+    // 1. Kick unauthenticated users to login
     if (!CURRENT_USER_EMAIL && currentPage !== 'login') {
         window.location.replace('/login.html');
         return false;
     }
     
+    // 2. Route logged-in users to their correct starting page
     if (CURRENT_USER_EMAIL && currentPage === 'login') {
-        let dest = '/workspace.html';
-        if (CURRENT_USER_ROLE === 'Team Leader') dest = '/teamleader.html';
-        if (CURRENT_USER_ROLE === 'Ops Manager') dest = '/admin.html';
+        let dest = '/workspace.html'; // Default for Agents and Admins
+        if (CURRENT_USER_ROLE === 'Team Leader' || CURRENT_USER_ROLE === 'Ops Manager') {
+            dest = '/teamleader.html';
+        }
+        if (CURRENT_USER_ROLE === 'Admin') {
+            dest = '/admin.html';
+        }
         window.location.replace(dest);
         return false;
     }
 
-    // Role Restrictions
+    // 3. Strict Page Restrictions
     if (CURRENT_USER_ROLE === 'Control Agent' && currentPage !== 'workspace' && currentPage !== 'login') {
         window.location.replace('/workspace.html');
         return false;
     }
-    if (CURRENT_USER_ROLE === 'Team Leader' && (currentPage === 'workspace' || currentPage === 'admin')) {
+    
+    if ((CURRENT_USER_ROLE === 'Team Leader' || CURRENT_USER_ROLE === 'Ops Manager') && (currentPage === 'workspace' || currentPage === 'admin')) {
         window.location.replace('/teamleader.html');
         return false;
     }
-    if (CURRENT_USER_ROLE === 'Ops Manager' && currentPage === 'workspace') {
-        window.location.replace('/admin.html');
-        return false;
-    }
 
-    // UI Updates
+    // 4. Update UI & Hide Sidebar Links
     document.addEventListener("DOMContentLoaded", () => {
         if (CURRENT_USER_ROLE === 'Control Agent') {
             document.querySelectorAll('a[data-page="campaigns"], a[data-page="teamleader"], a[data-page="dashboard"], a[data-page="admin"]').forEach(el => el.style.display = 'none');
-        } else if (CURRENT_USER_ROLE === 'Team Leader') {
+        } else if (CURRENT_USER_ROLE === 'Team Leader' || CURRENT_USER_ROLE === 'Ops Manager') {
             document.querySelectorAll('a[data-page="workspace"], a[data-page="admin"]').forEach(el => el.style.display = 'none');
-        } else if (CURRENT_USER_ROLE === 'Ops Manager') {
-            document.querySelectorAll('a[data-page="workspace"]').forEach(el => el.style.display = 'none');
         }
+        // Admins hide nothing!
 
+        // Replace agent dropdown with profile/logout button
         const agentSelector = document.getElementById('current-agent-select');
         if (agentSelector) {
             agentSelector.parentElement.innerHTML = `
@@ -68,10 +71,9 @@ function enforceSecurity() {
             `;
         }
     });
+    
     return true;
 }
-
-const isAuthorized = enforceSecurity();
 
 window.onload = async () => {
     // Stop execution if they are unauthorized or on the login page
@@ -225,12 +227,21 @@ function saveAppState() {
 }
 
 function initCurrentPage() {
-    renderAgentDropdown();
+    // These run on all applicable pages
     if (typeof updateCampaignDropdowns === 'function') updateCampaignDropdowns();
     if (typeof updateAnalyticsUI === 'function') updateAnalyticsUI();
     if (typeof renderCampaignList === 'function') renderCampaignList();
-    renderAgentQueue();
-    setActiveNavLink();
+    if (typeof renderAgentQueue === 'function') renderAgentQueue();
+    if (typeof setActiveNavLink === 'function') setActiveNavLink();
+
+    // Fix: Trigger specific lists based on what page you are currently viewing
+    if (currentPage === 'admin' && typeof renderAdminUserList === 'function') {
+        renderAdminUserList();
+    }
+    if (currentPage === 'teamleader' && typeof renderShiftManager === 'function') {
+        renderShiftManager();
+        if (typeof renderTLCustomers === 'function') renderTLCustomers();
+    }
 }
 
 function setActiveNavLink() {
