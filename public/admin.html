@@ -20,37 +20,59 @@
   
   <main class="flex-1 p-6 overflow-y-auto">
     <header class="glass-panel rounded-2xl px-6 py-4 mb-6 flex justify-between items-center shadow-sm bg-white/80">
-      <h1 class="text-2xl font-bold tracking-tight"><i class="fa-solid fa-users-gear mr-2 text-brandAmber"></i> User Management</h1>
-      <!-- Updated Amber Logout Button -->
-      <button onclick="logout()" class="text-sm font-bold bg-brandAmber hover:bg-amber-600 text-white px-4 py-2 rounded-lg transition shadow-sm"><i class="fa-solid fa-right-from-bracket mr-1"></i> Logout</button>
+      <h1 class="text-2xl font-bold tracking-tight"><i class="fa-solid fa-shield-halved mr-2 text-brandAmber"></i> Ops Manager Admin</h1>
+      <button onclick="promptLogout()" class="text-sm font-bold bg-brandAmber hover:bg-amber-600 text-white px-4 py-2 rounded-lg transition shadow-sm"><i class="fa-solid fa-right-from-bracket mr-1"></i> Logout</button>
     </header>
 
-    <div class="glass-panel p-6 rounded-2xl max-w-2xl bg-white/80 shadow-md border border-brandDark/10">
-      <h2 class="text-lg font-bold mb-4 border-b border-brandDark/10 pb-2">Add New User</h2>
-        <form onsubmit="addAgent(event)" class="grid grid-cols-2 gap-4">
-        <div>
-          <label class="block text-xs font-bold mb-1 uppercase text-brandDark/70">Full Name</label>
-          <input type="text" id="new-agent-name" required class="glass-input rounded-lg w-full px-3 py-2 border border-brandDark/20">
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <!-- Create Managers Form -->
+      <div class="glass-panel p-6 rounded-2xl bg-white/80 shadow-md border border-brandDark/10 h-fit">
+        <h2 class="text-lg font-bold mb-4 border-b border-brandDark/10 pb-2">Add Leadership Role</h2>
+        <form onsubmit="createUser(event, 'admin')" class="space-y-4">
+          <div>
+            <label class="block text-xs font-bold mb-1 uppercase text-brandDark/70">Full Name</label>
+            <input type="text" id="admin-new-name" required class="glass-input rounded-lg w-full px-3 py-2 border border-brandDark/20">
+          </div>
+          <div>
+            <label class="block text-xs font-bold mb-1 uppercase text-brandDark/70">Email Address</label>
+            <input type="email" id="admin-new-email" required class="glass-input rounded-lg w-full px-3 py-2 border border-brandDark/20">
+          </div>
+          <div>
+            <label class="block text-xs font-bold mb-1 uppercase text-brandDark/70">Role</label>
+            <select id="admin-new-role" required class="glass-input rounded-lg w-full px-3 py-2 border border-brandDark/20">
+              <option value="Team Leader">Team Leader</option>
+              <option value="Ops Manager">Ops Manager</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-bold mb-1 uppercase text-brandDark/70">Temporary Password</label>
+            <input type="text" id="admin-new-password" required class="glass-input rounded-lg w-full px-3 py-2 border border-brandDark/20">
+          </div>
+          <div class="flex justify-end mt-4">
+            <button type="submit" class="w-full bg-brandAmber text-white px-6 py-2 rounded-lg font-bold hover:bg-amber-600 transition shadow-md">Create User</button>
+          </div>
+        </form>
+      </div>
+
+      <!-- System Users List -->
+      <div class="glass-panel p-6 rounded-2xl bg-white/80 shadow-md border border-brandDark/10 lg:col-span-2">
+        <h2 class="text-lg font-bold mb-4 border-b border-brandDark/10 pb-2">All System Users</h2>
+        <div class="overflow-x-auto rounded-xl border border-brandDark/10">
+          <table class="w-full text-left border-collapse whitespace-nowrap">
+            <thead class="bg-brandDark text-white">
+              <tr class="text-[11px] font-bold uppercase tracking-wider">
+                <th class="px-4 py-3">Name</th>
+                <th class="px-4 py-3">Email</th>
+                <th class="px-4 py-3">Role</th>
+                <th class="px-4 py-3">Status</th>
+              </tr>
+            </thead>
+            <tbody id="admin-users-tbody" class="text-[13px] font-medium bg-white">
+              <!-- Dynamically Populated -->
+            </tbody>
+          </table>
         </div>
-        <div>
-          <label class="block text-xs font-bold mb-1 uppercase text-brandDark/70">Email Address</label>
-          <input type="email" id="new-agent-email" required class="glass-input rounded-lg w-full px-3 py-2 border border-brandDark/20">
-        </div>
-        <div>
-          <label class="block text-xs font-bold mb-1 uppercase text-brandDark/70">Role</label>
-          <select id="new-agent-role" required class="glass-input rounded-lg w-full px-3 py-2 border border-brandDark/20">
-            <option value="Control Agent">Control Agent</option>
-            <option value="Team Leader">Team Leader</option>
-          </select>
-        </div>
-        <div>
-          <label class="block text-xs font-bold mb-1 uppercase text-brandDark/70">Temporary Password</label>
-          <input type="text" id="new-agent-password" required class="glass-input rounded-lg w-full px-3 py-2 border border-brandDark/20">
-        </div>
-        <div class="col-span-2 flex justify-end mt-4">
-          <button type="submit" class="bg-brandAmber text-white px-6 py-2 rounded-lg font-bold hover:bg-amber-600 transition shadow-md">Create User</button>
-        </div>
-      </form>
+      </div>
     </div>
   </main>
   

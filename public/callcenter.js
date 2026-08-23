@@ -25,28 +25,37 @@ function enforceSecurity() {
         window.location.replace('/login.html');
         return false;
     }
+    
     if (CURRENT_USER_EMAIL && currentPage === 'login') {
-        const dest = CURRENT_USER_ROLE === 'Control Agent' ? '/workspace.html' : '/teamleader.html';
+        let dest = '/workspace.html';
+        if (CURRENT_USER_ROLE === 'Team Leader') dest = '/teamleader.html';
+        if (CURRENT_USER_ROLE === 'Ops Manager') dest = '/admin.html';
         window.location.replace(dest);
         return false;
     }
-    // Update to 'Control Agent'
+
+    // Role Restrictions
     if (CURRENT_USER_ROLE === 'Control Agent' && currentPage !== 'workspace' && currentPage !== 'login') {
         window.location.replace('/workspace.html');
         return false;
     }
-    if (CURRENT_USER_ROLE === 'Team Leader' && currentPage === 'workspace') {
+    if (CURRENT_USER_ROLE === 'Team Leader' && (currentPage === 'workspace' || currentPage === 'admin')) {
         window.location.replace('/teamleader.html');
         return false;
     }
+    if (CURRENT_USER_ROLE === 'Ops Manager' && currentPage === 'workspace') {
+        window.location.replace('/admin.html');
+        return false;
+    }
+
+    // UI Updates
     document.addEventListener("DOMContentLoaded", () => {
-        // Update to 'Control Agent'
         if (CURRENT_USER_ROLE === 'Control Agent') {
-            const restricted = document.querySelectorAll('a[data-page="campaigns"], a[data-page="teamleader"], a[data-page="dashboard"], a[data-page="admin"]');
-            restricted.forEach(link => link.style.display = 'none');
+            document.querySelectorAll('a[data-page="campaigns"], a[data-page="teamleader"], a[data-page="dashboard"], a[data-page="admin"]').forEach(el => el.style.display = 'none');
         } else if (CURRENT_USER_ROLE === 'Team Leader') {
-            const restricted = document.querySelectorAll('a[data-page="workspace"]');
-            restricted.forEach(link => link.style.display = 'none');
+            document.querySelectorAll('a[data-page="workspace"], a[data-page="admin"]').forEach(el => el.style.display = 'none');
+        } else if (CURRENT_USER_ROLE === 'Ops Manager') {
+            document.querySelectorAll('a[data-page="workspace"]').forEach(el => el.style.display = 'none');
         }
 
         const agentSelector = document.getElementById('current-agent-select');
@@ -55,9 +64,7 @@ function enforceSecurity() {
                 <button onclick="promptLogout()" class="font-bold text-lg text-brandDark hover:text-brandAmber transition flex items-center gap-2 cursor-pointer">
                     ${CURRENT_USER_NAME} <i class="fa-solid fa-right-from-bracket text-sm"></i>
                 </button>
-                <div class="text-[11px] text-brandAmber font-bold uppercase mt-1 pl-1">
-                    ${CURRENT_USER_ROLE}
-                </div>
+                <div class="text-[11px] text-brandAmber font-bold uppercase mt-1 pl-1">${CURRENT_USER_ROLE}</div>
             `;
         }
     });
@@ -525,31 +532,23 @@ window.parseCSV = function(text) {
 // ----------------------------------------------------------------------
 // AGENT MANAGEMENT
 // ----------------------------------------------------------------------
-async function addAgent(e) {
+async function createUser(e, formType) {
     e.preventDefault();
-    const COMPANY_DOMAIN = "@4g-capital.com"; // UPDATE THIS TO YOUR DOMAIN
+    const COMPANY_DOMAIN = "@4g-capital.com"; // Update this
 
-    const nameInput = document.getElementById('new-agent-name');
-    const emailInput = document.getElementById('new-agent-email');
-    const roleInput = document.getElementById('new-agent-role');
-    const passwordInput = document.getElementById('new-agent-password');
-    
-    const name = nameInput.value.trim();
-    const email = emailInput.value.trim();
+    const name = document.getElementById(`${formType}-new-name`).value.trim();
+    const email = document.getElementById(`${formType}-new-email`).value.trim();
+    const password = document.getElementById(`${formType}-new-password`).value;
+    const role = formType === 'admin' ? document.getElementById('admin-new-role').value : 'Control Agent';
     
     if (!email.toLowerCase().endsWith(COMPANY_DOMAIN)) {
-        showAppAlert(`Users must have a ${COMPANY_DOMAIN} email address.`, "Invalid Email Domain");
+        showAppAlert(`Users must have a ${COMPANY_DOMAIN} email address.`, "Invalid Email");
         return;
     }
     
-    // Safety check to prevent crashes if a Google Sheet row is blank
-    const exists = agents.find(a => 
-        (a.name && a.name.toLowerCase() === name.toLowerCase()) || 
-        (a.email && a.email.toLowerCase() === email.toLowerCase())
-    );
-
+    const exists = agents.find(a => (a.name && a.name.toLowerCase() === name.toLowerCase()) || (a.email && a.email.toLowerCase() === email.toLowerCase()));
     if (exists) {
-        showAppAlert("A user with this name or email already exists.", "User already exists");
+        showAppAlert("A user with this name or email already exists.", "User Exists");
         return;
     }
 
@@ -557,27 +556,57 @@ async function addAgent(e) {
         const res = await fetch(`${API_BASE}/agents`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-                name: name,
-                email: email,
-                role: roleInput.value,
-                password: passwordInput.value,
-                status: 'Active' 
-            })
+            body: JSON.stringify({ name, email, role, password, status: 'Active' })
         });
 
         if (!res.ok) throw new Error(`Server returned HTTP ${res.status}`);
         
         e.target.reset();
         await fetchAllData(); 
-        
+        if (currentPage === 'admin') renderAdminUserList();
+        if (currentPage === 'teamleader') renderShiftManager();
         showAppAlert("User created successfully!", "Success");
-
     } catch (err) {
-        console.error("Add Agent error:", err);
-        showAppAlert("Failed to save agent to the database.", "Network Error");
+        showAppAlert("Failed to save user to the database.", "Network Error");
     }
 }
+window.renderAdminUserList = function() {
+    const tbody = document.getElementById('admin-users-tbody');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+    agents.forEach(a => {
+        let badgeColor = a.role === 'Control Agent' ? 'bg-blue-100 text-blue-800' : 'bg-amber-100 text-amber-800';
+        if(a.role === 'Ops Manager') badgeColor = 'bg-purple-100 text-purple-800';
+        
+        tbody.innerHTML += `
+            <tr class="border-b border-brandDark/5">
+                <td class="px-4 py-3 font-bold text-brandDark">${escapeHtml(a.name)}</td>
+                <td class="px-4 py-3">${escapeHtml(a.email)}</td>
+                <td class="px-4 py-3"><span class="px-2 py-1 rounded text-[11px] font-bold ${badgeColor}">${escapeHtml(a.role)}</span></td>
+                <td class="px-4 py-3 font-bold ${a.status === 'Active' ? 'text-green-600' : 'text-gray-500'}">${escapeHtml(a.status)}</td>
+            </tr>
+        `;
+    });
+};
+
+window.renderShiftManager = function() {
+    const tbody = document.getElementById('shift-manager-tbody');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+    
+    // Only show Control Agents in the shift roster
+    const controlAgents = agents.filter(a => a.role === 'Control Agent');
+    
+    controlAgents.forEach(a => {
+        tbody.innerHTML += `
+            <tr class="border-b border-brandDark/5">
+                <td class="px-4 py-3 font-bold">${escapeHtml(a.name)}</td>
+                <td class="px-4 py-3 font-bold ${a.status === 'Clocked In' ? 'text-green-600' : 'text-gray-500'}">${escapeHtml(a.status)}</td>
+                <td class="px-4 py-3 text-brandDark/50">...</td>
+            </tr>
+        `;
+    });
+};
 
 async function updateAgentStatus(index, status) {
   const agent = agents[index];
@@ -1037,8 +1066,11 @@ function updateAnalyticsUI() {
     }
     
     let activeAgt = agents.filter(a => a.status === 'Active').length;
+    // Inside updateAnalyticsUI()
     if (document.getElementById('dash-active-agents')) {
-      document.getElementById('dash-active-agents').innerText = `${activeAgt} / ${agents.length}`;
+        let clockedInAgents = agents.filter(a => a.role === 'Control Agent' && a.status === 'Clocked In').length;
+        let totalAgents = agents.filter(a => a.role === 'Control Agent').length;
+        document.getElementById('dash-active-agents').innerText = `${clockedInAgents} / ${totalAgents}`;
     }
 
     const lbBody = document.getElementById('dash-leaderboard');

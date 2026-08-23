@@ -249,18 +249,24 @@ tailwind.config = {
             </div>
           </div>
 
-          <div class="glass-panel rounded-2xl p-5">
-            <h3 class="font-bold text-[15px] uppercase text-brandDark/70 mb-4">Add Agent</h3>
-            <form onsubmit="addAgent(event)" class="flex flex-col gap-3">
-              <input type="text" id="tl-new-agent-name" required placeholder="Agent Name" class="glass-input rounded-lg px-3 py-2 text-sm font-medium">
-              <select id="tl-new-agent-team" class="glass-input rounded-lg px-3 py-2 text-sm font-medium">
-                <option>Control Agent</option>
-                <option>Collection Agent</option>
-                
-              </select>
-              <button type="submit" class="bg-brandDark text-white px-3 py-2.5 rounded-lg text-sm font-bold shadow hover:bg-slate-800 transition">Add Agent</button>
-            </form>
-          </div>
+        <div class="glass-card p-5 rounded-xl border border-brandAmber/20 bg-brandAmber/5 mb-6">
+          <h3 class="font-bold text-[15px] uppercase text-brandDark/70 mb-3 border-b border-brandAmber/20 pb-2"><i class="fa-solid fa-user-plus mr-2"></i> Add Control Agent</h3>
+          <form onsubmit="createUser(event, 'tl')" class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+            <div>
+              <label class="block text-xs font-bold mb-1 uppercase text-brandDark/70">Full Name</label>
+              <input type="text" id="tl-new-name" required class="glass-input rounded-lg w-full px-3 py-2 border border-brandDark/20 bg-white">
+            </div>
+            <div>
+              <label class="block text-xs font-bold mb-1 uppercase text-brandDark/70">Email Address</label>
+              <input type="email" id="tl-new-email" required class="glass-input rounded-lg w-full px-3 py-2 border border-brandDark/20 bg-white">
+            </div>
+            <div>
+              <label class="block text-xs font-bold mb-1 uppercase text-brandDark/70">Temporary Password</label>
+              <input type="text" id="tl-new-password" required class="glass-input rounded-lg w-full px-3 py-2 border border-brandDark/20 bg-white">
+            </div>
+            <button type="submit" class="bg-brandDark hover:bg-slate-800 text-white font-bold py-2 px-4 rounded-lg shadow-md transition h-10">Create Agent</button>
+          </form>
+        </div>
         </div>
         <!-- ALL CUSTOMERS TAB -->
         <div id="tl-tab-customers" class="teamleader-tab-content hidden space-y-4">
