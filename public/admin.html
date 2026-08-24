@@ -63,27 +63,31 @@
       <!-- Create Managers Form -->
       <div class="glass-panel p-6 rounded-2xl bg-white/80 shadow-md border border-brandDark/10 h-fit">
         <h2 class="text-lg font-bold mb-4 border-b border-brandDark/10 pb-2">Add Leadership Role</h2>
-        <form onsubmit="createUser(event, 'admin')" class="space-y-4">
-          <div>
-            <label class="block text-xs font-bold mb-1 uppercase text-brandDark/70">Full Name</label>
-            <input type="text" id="admin-new-name" required class="glass-input rounded-lg w-full px-3 py-2 border border-brandDark/20">
-          </div>
-          <div>
-            <label class="block text-xs font-bold mb-1 uppercase text-brandDark/70">Email Address</label>
-            <input type="email" id="admin-new-email" required class="glass-input rounded-lg w-full px-3 py-2 border border-brandDark/20">
-          </div>
-        <div>
-            <label class="block text-xs font-bold mb-1 uppercase text-brandDark/70">Role</label>
-            <select id="admin-new-role" required class="glass-input rounded-lg w-full px-3 py-2 border border-brandDark/20">
-              <option value="Team Leader">Team Leader</option>
-              <option value="Ops Manager">Ops Manager</option>
-              <option value="Admin">Admin</option>
-            </select>
-        </div>
-          <div class="flex justify-end mt-4">
-            <button type="submit" class="w-full bg-brandAmber text-white px-6 py-2 rounded-lg font-bold hover:bg-amber-600 transition shadow-md">Create User</button>
-          </div>
-        </form>
+            <form onsubmit="createUser(event)" class="space-y-4">
+            <div>
+                <label class="block text-[11px] font-bold text-brandDark/70 uppercase mb-1">Full Name</label>
+                <input type="text" id="new-agent-name" required placeholder="Jane Doe" class="glass-input rounded-lg w-full px-3 py-2 text-sm border border-brandDark/20 bg-white/50">
+            </div>
+            
+            <div>
+                <label class="block text-[11px] font-bold text-brandDark/70 uppercase mb-1">Email Address</label>
+                <input type="email" id="new-agent-email" required placeholder="jane@company.com" class="glass-input rounded-lg w-full px-3 py-2 text-sm border border-brandDark/20 bg-white/50">
+            </div>
+            
+            <div>
+                <label class="block text-[11px] font-bold text-brandDark/70 uppercase mb-1">Role</label>
+                <select id="new-agent-role" required class="glass-input rounded-lg w-full px-3 py-2 text-sm border border-brandDark/20 bg-white/50">
+                <option value="Control Agent">Control Agent</option>
+                <option value="Team Leader">Team Leader</option>
+                <option value="Ops Manager">Ops Manager</option>
+                <option value="Admin">Admin</option>
+                </select>
+            </div>
+            
+            <button type="submit" class="w-full bg-brandDark hover:bg-slate-800 text-white font-bold py-2.5 rounded-lg shadow-md transition text-sm mt-2">
+                Create User
+            </button>
+            </form>        
       </div>
 
       <!-- System Users List -->
@@ -108,6 +112,6 @@
     </div>
   </main>
   
-  <script src="/callcenter.js"></script>
+  <script src="public/callcenter.js"></script>
 </body>
 </html>
