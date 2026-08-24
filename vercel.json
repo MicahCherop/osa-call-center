@@ -1,14 +1,9 @@
 {
-  "version": 2,
   "cleanUrls": true,
   "builds": [
     {
       "src": "api/index.py",
       "use": "@vercel/python"
-    },
-    {
-      "src": "public/**",
-      "use": "@vercel/static"
     }
   ],
   "rewrites": [
@@ -18,11 +13,7 @@
     },
     {
       "source": "/",
-      "destination": "/public/workspace.html"
-    },
-    {
-      "source": "/(.*)",
-      "destination": "/public/$1"
+      "destination": "/workspace"
     }
   ]
 }
