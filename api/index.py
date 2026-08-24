@@ -190,7 +190,6 @@ def get_customers(agentName: Optional[str] = None):
         records = [r for r in records if str(r.get("agentId")) == agentName and str(r.get("worked")).upper() != "TRUE"]
     return records
 
-# --- ALLOCATION ENGINE ---
 @app.post("/api/distribute")
 @app.post("/distribute")
 def distribute_customers(campaign: str = Body(...)):
@@ -209,17 +208,24 @@ def distribute_customers(campaign: str = Body(...)):
     if not unassigned:
         return {"status": "info", "message": "No unassigned customers remaining"}
     
+    # BATCH UPDATE: Prepare all cell changes in memory
+    cells_to_update = []
     agent_idx = 0
     assigned_count = 0
+    
     for row_idx in unassigned:
         assigned_agent = agents[agent_idx]["name"]
-        cust_sheet.update_cell(row_idx, 8, assigned_agent) # Col 8 = agentId
+        # Create a Cell object: Cell(row, col, value) - Col 8 is agentId
+        cells_to_update.append(gspread.Cell(row_idx, 8, assigned_agent))
+        
         assigned_count += 1
         agent_idx = (agent_idx + 1) % len(agents)
         
+    # Execute ALL updates in ONE single API call to Google!
+    cust_sheet.update_cells(cells_to_update)
+        
     return {"status": "success", "assignedCount": assigned_count}
 
-# --- DISPOSITION ---
 @app.post("/api/disposition")
 @app.post("/disposition")
 def submit_disposition(disp: DispositionModel):
@@ -227,15 +233,18 @@ def submit_disposition(disp: DispositionModel):
     cust_sheet = sh.worksheet("Customers")
     agent_sheet = sh.worksheet("Agents")
     
-    # 1. Update Customer Record
+    # 1. BATCH Update Customer Record
     cust_cell = cust_sheet.find(str(disp.customerId))
     if cust_cell:
         r = cust_cell.row
-        cust_sheet.update_cell(r, 9, "TRUE")       # worked
-        cust_sheet.update_cell(r, 10, disp.outcome) # outcome
-        cust_sheet.update_cell(r, 11, disp.status)  # status
+        customer_updates = [
+            gspread.Cell(r, 9, "TRUE"),       # worked
+            gspread.Cell(r, 10, disp.outcome), # outcome
+            gspread.Cell(r, 11, disp.status)   # status
+        ]
+        cust_sheet.update_cells(customer_updates)
         
-    # 2. Update Agent Metrics
+    # 2. BATCH Update Agent Metrics
     agent_cell = agent_sheet.find(disp.agentName)
     if agent_cell:
         ar = agent_cell.row
@@ -243,8 +252,11 @@ def submit_disposition(disp: DispositionModel):
         connected = int(agent_sheet.cell(ar, 6).value or 0) + (1 if disp.outcome == "Answered" else 0)
         conversion = float(agent_sheet.cell(ar, 7).value or 0) + disp.amountRec
         
-        agent_sheet.update_cell(ar, 5, calls)
-        agent_sheet.update_cell(ar, 6, connected)
-        agent_sheet.update_cell(ar, 7, conversion)
+        agent_updates = [
+            gspread.Cell(ar, 5, calls),
+            gspread.Cell(ar, 6, connected),
+            gspread.Cell(ar, 7, conversion)
+        ]
+        agent_sheet.update_cells(agent_updates)
         
     return {"status": "success"}

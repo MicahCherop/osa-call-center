@@ -117,7 +117,7 @@ window.closeLogoutModal = function() {
 
 window.logout = function() {
     localStorage.clear();
-    window.location.replace('/login');
+    window.location.replace('/login.html');
 };
 // ----------------------------------------------------------------------
 // RENDER FUNCTIONS (Restored to fix Shift Manager and Campaigns)
