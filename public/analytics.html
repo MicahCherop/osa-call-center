@@ -9,25 +9,26 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- 1. Fetch the absolute thinnest font weights from Google -->
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100;200;300&display=swap" rel="stylesheet">
+  <!-- 1. Fetch Poppins from Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@200;300;400&display=swap" rel="stylesheet">
   
-  <!-- 2. Force Tailwind to render ALL text as thin -->
+  <!-- 2. Force Tailwind to use Poppins and keep weights light -->
   <script>
     tailwind.config = {
       theme: {
         extend: {
-          fontFamily: { sans: ['Inter', 'sans-serif'] },
-          // This mapping forces every element to be thin, ignoring "font-bold" classes
+          fontFamily: { sans: ['Poppins', 'sans-serif'] },
+          // Maps standard bold classes to lighter Poppins weights for a neat look
           fontWeight: {
-            black: '200', 
-            extrabold: '200', 
-            bold: '200', 
-            semibold: '200',
-            medium: '200', 
-            normal: '200', 
+            black: '300', 
+            extrabold: '300', 
+            bold: '300', 
+            semibold: '300',
+            medium: '300', 
+            normal: '300', 
             light: '200',
-            extralight: '100',
-            thin: '100'
+            extralight: '200',
+            thin: '200'
           },
           colors: {
             brandDark: '#0f172a',
@@ -63,23 +64,23 @@
 
   <!-- SIDEBAR -->
   <aside class="z-10 w-20 md:w-24 glass-panel border-r flex flex-col items-center py-6">
-    <a href="workspace.html" data-page="workspace" class="nav-btn w-full py-4 flex flex-col items-center gap-1.5 text-[11px] font-semibold text-brandDark/70 hover:text-brandDark transition-colors relative">
+    <a href="/workspace" data-page="workspace" class="nav-btn w-full py-4 flex flex-col items-center gap-1.5 text-[11px] font-semibold text-brandDark/70 hover:text-brandDark transition-colors relative">
       <i class="fa-solid fa-headset text-[20px]"></i> Workspace
       <div class="active-indicator absolute left-0 top-0 h-full w-1 bg-brandAmber hidden"></div>
     </a>
-    <a href="campaigns.html" data-page="campaigns" class="nav-btn w-full py-4 flex flex-col items-center gap-1.5 text-[11px] font-semibold text-brandDark/70 hover:text-brandDark transition-colors relative">
+    <a href="/campaigns" data-page="campaigns" class="nav-btn w-full py-4 flex flex-col items-center gap-1.5 text-[11px] font-semibold text-brandDark/70 hover:text-brandDark transition-colors relative">
       <i class="fa-solid fa-bullhorn text-[20px]"></i> Campaigns
       <div class="active-indicator absolute left-0 top-0 h-full w-1 bg-brandAmber hidden"></div>
     </a>
-    <a href="teamleader.html" data-page="teamleader" class="nav-btn w-full py-4 flex flex-col items-center gap-1.5 text-[11px] font-semibold text-brandDark/70 hover:text-brandDark transition-colors relative">
+    <a href="/teamleader" data-page="teamleader" class="nav-btn w-full py-4 flex flex-col items-center gap-1.5 text-[11px] font-semibold text-brandDark/70 hover:text-brandDark transition-colors relative">
       <i class="fa-solid fa-user-tie text-[20px]"></i> Team Lead
       <div class="active-indicator absolute left-0 top-0 h-full w-1 bg-brandAmber hidden"></div>
     </a>
-    <a href="analytics.html" data-page="dashboard" class="nav-btn w-full py-4 flex flex-col items-center gap-1.5 text-[11px] font-semibold text-brandDark/70 hover:text-brandDark transition-colors relative bg-white/40">
+    <a href="/analytics" data-page="dashboard" class="nav-btn w-full py-4 flex flex-col items-center gap-1.5 text-[11px] font-semibold text-brandDark/70 hover:text-brandDark transition-colors relative bg-white/40">
       <i class="fa-solid fa-chart-pie text-[20px]"></i> Analytics
       <div class="active-indicator absolute left-0 top-0 h-full w-1 bg-brandAmber"></div>
     </a>
-    <a href="admin.html" data-page="admin" class="nav-btn w-full py-4 flex flex-col items-center gap-1.5 text-[11px] font-semibold text-brandDark/70 hover:text-brandDark transition-colors relative">
+    <a href="/admin" data-page="admin" class="nav-btn w-full py-4 flex flex-col items-center gap-1.5 text-[11px] font-semibold text-brandDark/70 hover:text-brandDark transition-colors relative">
       <i class="fa-solid fa-shield-halved text-[20px]"></i> Admin
       <div class="active-indicator absolute left-0 top-0 h-full w-1 bg-brandAmber hidden"></div>
     </a>

@@ -8,25 +8,26 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <script src="https://cdn.tailwindcss.com"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100;200;300&display=swap" rel="stylesheet">
+  <!-- 1. Fetch Poppins from Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@200;300;400&display=swap" rel="stylesheet">
   
-  <!-- 2. Force Tailwind to render ALL text as thin -->
+  <!-- 2. Force Tailwind to use Poppins and keep weights light -->
   <script>
     tailwind.config = {
       theme: {
         extend: {
-          fontFamily: { sans: ['Inter', 'sans-serif'] },
-          // This mapping forces every element to be thin, ignoring "font-bold" classes
+          fontFamily: { sans: ['Poppins', 'sans-serif'] },
+          // Maps standard bold classes to lighter Poppins weights for a neat look
           fontWeight: {
-            black: '200', 
-            extrabold: '200', 
-            bold: '200', 
-            semibold: '200',
-            medium: '200', 
-            normal: '200', 
+            black: '300', 
+            extrabold: '300', 
+            bold: '300', 
+            semibold: '300',
+            medium: '300', 
+            normal: '300', 
             light: '200',
-            extralight: '100',
-            thin: '100'
+            extralight: '200',
+            thin: '200'
           },
           colors: {
             brandDark: '#0f172a',

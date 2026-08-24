@@ -901,7 +901,92 @@ async function distributeCustomers() {
       showAppAlert("Failed to distribute customers via backend.", "Error");
   }
 }
+// 1. Populate the agent list when a campaign is selected
+window.updateAvailableAgents = function() {
+    const campaignSelect = document.getElementById('allocate-campaign');
+    const agentsContainer = document.getElementById('allocate-agents-list');
+    
+    if (!campaignSelect || !agentsContainer) return;
 
+    const campaign = campaignSelect.value;
+    if (!campaign) {
+        agentsContainer.innerHTML = '<p class="text-[13px] text-brandDark/50 italic p-3">Select a campaign to view available agents.</p>';
+        return;
+    }
+
+    // Find all Control Agents safely handling case-sensitivity
+    const controlAgents = agents.filter(a => {
+        const role = a.Role || a.role;
+        return role === 'Control Agent';
+    });
+
+    if (controlAgents.length === 0) {
+        agentsContainer.innerHTML = '<p class="text-[13px] text-red-500 font-bold p-3">No Control Agents found in the database.</p>';
+        return;
+    }
+
+    // Build a scrollable list of checkboxes
+    let html = '<div class="max-h-40 overflow-y-auto p-2 space-y-1">';
+    controlAgents.forEach(a => {
+        const name = a.Name || a.name;
+        html += `
+            <label class="flex items-center gap-3 p-2 hover:bg-white/80 rounded-md cursor-pointer transition">
+                <input type="checkbox" name="selected-agents" value="${escapeHtml(name)}" class="w-4 h-4 text-brandAmber rounded border-brandDark/20 focus:ring-brandAmber">
+                <span class="text-[13px] font-bold text-brandDark">${escapeHtml(name)}</span>
+            </label>
+        `;
+    });
+    html += '</div>';
+
+    agentsContainer.innerHTML = html;
+};
+
+// 2. Handle the form submission and distribute customers
+window.submitAllocation = function(e) {
+    e.preventDefault();
+    
+    const campaignSelect = document.getElementById('allocate-campaign');
+    const campaign = campaignSelect ? campaignSelect.value : null;
+    
+    // Get all checked agents
+    const checkedBoxes = document.querySelectorAll('input[name="selected-agents"]:checked');
+    const selectedAgents = Array.from(checkedBoxes).map(box => box.value);
+    
+    if (!campaign || selectedAgents.length === 0) {
+        showAppAlert("Please select a campaign and at least one agent.", "Allocation Failed");
+        return;
+    }
+
+    // Find all unassigned customers for this specific campaign
+    let unassignedCustomers = mockCustomers.filter(c => {
+        const cCampaign = c.campaign || c.Campaign;
+        const cAgent = c.agentId || c.AgentId;
+        return cCampaign === campaign && (!cAgent || cAgent.trim() === '');
+    });
+
+    if (unassignedCustomers.length === 0) {
+        showAppAlert("There are no unassigned customers available in this campaign.", "Nothing to Allocate");
+        return;
+    }
+
+    // Distribute customers evenly using a round-robin approach
+    unassignedCustomers.forEach((customer, index) => {
+        const assignedAgent = selectedAgents[index % selectedAgents.length];
+        customer.agentId = assignedAgent; 
+        
+        // Note: If you have an API endpoint to save this to Google Sheets, you would trigger it here.
+        // e.g., fetch(`/api/customers/${customer.id}/assign`, { method: 'POST', body: JSON.stringify({ agent: assignedAgent }) })
+    });
+
+    showAppAlert(`Successfully distributed ${unassignedCustomers.length} customers across ${selectedAgents.length} agent(s)!`, "Allocation Complete");
+    
+    // Reset the UI
+    e.target.reset();
+    document.getElementById('allocate-agents-list').innerHTML = '<p class="text-[13px] text-brandDark/50 italic p-3">Select a campaign to view available agents.</p>';
+    
+    // Refresh any campaign lists if they are visible
+    if (typeof renderCampaignList === 'function') renderCampaignList();
+};
 // ----------------------------------------------------------------------
 // DOM & WORKSPACE UI HELPERS
 // ----------------------------------------------------------------------
