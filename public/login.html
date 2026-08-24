@@ -66,7 +66,8 @@
         response_type: "token",
         scope: "email profile",
         include_granted_scopes: "true",
-        state: "pass-through value"
+        state: "pass-through value",
+        prompt: "select_account" // This forces the account chooser screen!
       };
 
       for (let p in params) {
