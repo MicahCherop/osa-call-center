@@ -1,0 +1,12 @@
+{
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": "/api/index.py" },
+    { "source": "/login", "destination": "/login.html" },
+    { "source": "/workspace", "destination": "/workspace.html" },
+    { "source": "/teamleader", "destination": "/teamleader.html" },
+    { "source": "/campaigns", "destination": "/campaigns.html" },
+    { "source": "/analytics", "destination": "/analytics.html" },
+    { "source": "/admin", "destination": "/admin.html" },
+    { "source": "/", "destination": "/login.html" }
+  ]
+}
