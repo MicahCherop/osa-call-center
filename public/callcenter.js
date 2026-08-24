@@ -123,12 +123,26 @@ window.logout = function() {
 // ----------------------------------------------------------------------
 
 window.updateCampaignDropdowns = function() {
-    const allocSelect = document.getElementById('alloc-campaign');
-    if (allocSelect) {
-        const camps = Object.keys(campaignConfigs);
-        allocSelect.innerHTML = '<option value="">Select a campaign to allocate...</option>' + 
-            camps.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+    // 1. Get the exact dropdown element we created earlier
+    const allocateDropdown = document.getElementById('allocate-campaign');
+    
+    if (allocateDropdown) {
+        // 2. Preserve the default "Select campaign..." option
+        const defaultOption = '<option value="">Select campaign...</option>';
+        allocateDropdown.innerHTML = defaultOption;
+        
+        // 3. Loop through the campaignConfigs dictionary we built in fetchAllData
+        // Object.keys(campaignConfigs) gives us an array of all the campaign names!
+        Object.keys(campaignConfigs).forEach(campaignName => {
+            const opt = document.createElement('option');
+            opt.value = campaignName;
+            opt.textContent = campaignName;
+            allocateDropdown.appendChild(opt);
+        });
     }
+
+    // (Optional) If you have other campaign dropdowns on the page like a filter, 
+    // you can replicate the block above for those IDs too!
 };
 
 
@@ -600,18 +614,36 @@ window.renderShiftManager = function() {
     });
 };
 
-async function createUser(e, formType) {
+window.createUser = async function(e, formType) {
     e.preventDefault();
-    const COMPANY_DOMAIN = "@4g-capital.com"; // UPDATE THIS
 
-    const name = document.getElementById(`${formType}-new-name`).value.trim();
-    const email = document.getElementById(`${formType}-new-email`).value.trim();
-    const password = document.getElementById(`${formType}-new-password`).value;
-    const role = formType === 'admin' ? document.getElementById('admin-new-role').value : 'Control Agent';
+    // 1. Define your exact company domain
+    const COMPANY_DOMAIN = "@4g-capital.com"; 
+
+    // Safely grab the input elements based on the formType prefix
+    const nameEl = document.getElementById(`${formType}-new-name`);
+    const emailEl = document.getElementById(`${formType}-new-email`);
     
+    // Check if elements exist to prevent the "null" crash
+    if (!nameEl || !emailEl) {
+        showAppAlert("Form error: Could not find the required input fields.", "System Error");
+        return;
+    }
+
+    const name = nameEl.value.trim();
+    const email = emailEl.value.trim();
+
+    // 2. The Domain Restriction Check
     if (!email.toLowerCase().endsWith(COMPANY_DOMAIN)) {
         showAppAlert(`Users must have a ${COMPANY_DOMAIN} email address.`, "Invalid Email");
         return;
+    }
+    
+    // If it's the admin form, grab the role dropdown. Otherwise, default to Control Agent.
+    let role = 'Control Agent';
+    if (formType === 'admin') {
+        const roleEl = document.getElementById('admin-new-role');
+        if (roleEl) role = roleEl.value;
     }
     
     // Safely verify existence with uppercase/lowercase checks
@@ -631,7 +663,7 @@ async function createUser(e, formType) {
         const res = await fetch(`${API_BASE}/agents`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name, email, role, password, status: 'Active' })
+            body: JSON.stringify({ name, email, role, status: 'Active' })
         });
 
         if (!res.ok) throw new Error(`Server returned HTTP ${res.status}`);
@@ -640,8 +672,8 @@ async function createUser(e, formType) {
         await fetchAllData(); 
         
         // Refresh the lists dynamically based on the current page
-        if (currentPage === 'admin') renderAdminUserList();
-        if (currentPage === 'teamleader') renderShiftManager();
+        if (currentPage === 'admin' && typeof renderAdminUserList === 'function') renderAdminUserList();
+        if (currentPage === 'teamleader' && typeof renderShiftManager === 'function') renderShiftManager();
         
         showAppAlert("User created successfully!", "Success");
     } catch (err) {
