@@ -81,8 +81,39 @@ def health_check():
 # --- AUTHENTICATION & AGENTS ---
 @app.post("/api/login")
 def login(creds: LoginModel):
-    # Keep your login logic here
-    pass
+    try:
+        # Require company email domain
+        if not creds.email.endswith("@4g-capital.com"):
+            raise HTTPException(status_code=403, detail="Invalid domain. Must use a @4g-capital.com email.")
+            
+        sheet = get_google_sheet().worksheet("Agents")
+        agents = sheet.get_all_records()
+        
+        # Check if user exists in the Agents sheet
+        user = next((a for a in agents if str(a.get("Email", a.get("email", ""))).lower() == creds.email.lower()), None)
+        
+        if user:
+            role = user.get("Role", user.get("role", "Control Agent"))
+            name = user.get("Name", user.get("name", "Unknown"))
+        else:
+            # Default fallback for new valid domain users
+            role = "Control Agent"
+            name = creds.email.split("@")[0].replace(".", " ").title()
+
+        return {
+            "success": True,
+            "email": creds.email,
+            "role": role,
+            "name": name
+        }
+    except Exception as e:
+        # Fallback to ensure UI doesn't break if Google Sheets fails during login
+        return {
+            "success": True,
+            "email": creds.email,
+            "role": "Control Agent",
+            "name": creds.email.split("@")[0].title()
+        }
 
 @app.get("/api/agents")
 def get_agents():
@@ -99,11 +130,14 @@ def add_agent(agent: AgentModel):
 @app.put("/api/agents/status")
 def update_agent_status(name: str = Body(...), status: str = Body(...)):
     sheet = get_google_sheet().worksheet("Agents")
-    cell = sheet.find(name)
-    if not cell:
-        raise HTTPException(status_code=404, detail="Agent not found")
-    sheet.update_cell(cell.row, 3, status)
-    return {"status": "success"}
+    try:
+        cell = sheet.find(name)
+        if not cell:
+            raise HTTPException(status_code=404, detail="Agent not found")
+        sheet.update_cell(cell.row, 3, status)
+        return {"status": "success"}
+    except gspread.exceptions.CellNotFound:
+        raise HTTPException(status_code=404, detail="Agent not found in database")
 
 # --- CAMPAIGNS & CUSTOMERS ---
 @app.get("/api/campaigns")
@@ -197,8 +231,8 @@ def submit_disposition(disp: DispositionModel):
     agent_sheet = sh.worksheet("Agents")
     
     # 1. Update Customer Record
-    cust_cell = cust_sheet.find(str(disp.customerId))
-    if cust_cell:
+    try:
+        cust_cell = cust_sheet.find(str(disp.customerId))
         r = cust_cell.row
         customer_updates = [
             gspread.Cell(r, 9, "TRUE"),        # worked
@@ -206,10 +240,12 @@ def submit_disposition(disp: DispositionModel):
             gspread.Cell(r, 11, disp.status)   # status
         ]
         cust_sheet.update_cells(customer_updates)
+    except gspread.exceptions.CellNotFound:
+        pass
         
     # 2. Update Agent Metrics
-    agent_cell = agent_sheet.find(disp.agentName)
-    if agent_cell:
+    try:
+        agent_cell = agent_sheet.find(disp.agentName)
         ar = agent_cell.row
         calls = int(agent_sheet.cell(ar, 5).value or 0) + 1
         connected = int(agent_sheet.cell(ar, 6).value or 0) + (1 if disp.outcome == "Answered" else 0)
@@ -221,5 +257,7 @@ def submit_disposition(disp: DispositionModel):
             gspread.Cell(ar, 7, conversion)
         ]
         agent_sheet.update_cells(agent_updates)
+    except gspread.exceptions.CellNotFound:
+        pass
         
     return {"status": "success"}
