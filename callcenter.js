@@ -100,10 +100,6 @@ window.closeLogoutModal = function() {
     if (modal) modal.classList.add('hidden');
 };
 
-window.logout = function() {
-    localStorage.clear();
-    window.location.replace('/login.html');
-};
 // ----------------------------------------------------------------------
 // RENDER FUNCTIONS (Restored to fix Shift Manager and Campaigns)
 // ----------------------------------------------------------------------
