@@ -602,7 +602,7 @@ window.renderShiftManager = function() {
 
 async function createUser(e, formType) {
     e.preventDefault();
-    const COMPANY_DOMAIN = "@yourcompany.com"; // UPDATE THIS
+    const COMPANY_DOMAIN = "@4g-capital.com"; // UPDATE THIS
 
     const name = document.getElementById(`${formType}-new-name`).value.trim();
     const email = document.getElementById(`${formType}-new-email`).value.trim();
