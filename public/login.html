@@ -36,7 +36,24 @@
     <p class="text-brandDark/60 text-sm mb-8">Sign in securely with your company account</p>
     
     <!-- 2. Container for the Google Button -->
-    <div id="google-btn-container" class="flex justify-center mb-4"></div>
+   <!-- 2. Google Sign-In HTML API -->
+    <div class="flex justify-center mb-4">
+      <!-- The Configuration -->
+      <div id="g_id_onload"
+         data-client_id="106325673835-4moq7op50u80oet78ln84t241a88a200.apps.googleusercontent.com"
+         data-callback="handleCredentialResponse"
+         data-auto_prompt="false">
+      </div>
+      <!-- The Button -->
+      <div class="g_id_signin"
+         data-type="standard"
+         data-size="large"
+         data-theme="filled_black"
+         data-text="continue_with"
+         data-shape="rectangular"
+         data-logo_alignment="left">
+      </div>
+    </div>
     
     <div id="login-status" class="text-brandDark text-sm mt-3 font-bold hidden">Verifying authorization...</div>
     <div id="login-error" class="text-red-500 text-sm mt-3 hidden"></div>
@@ -45,7 +62,6 @@
   <script src="/callcenter.js"></script>
   
   <script>
-    // 3. Helper function to decode the secure token Google hands back to us
     function decodeJwtResponse(token) {
       let base64Url = token.split('.')[1];
       let base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
@@ -55,21 +71,20 @@
       return JSON.parse(jsonPayload);
     }
 
-    // 4. The function that runs exactly when the user clicks the Google button
     async function handleCredentialResponse(response) {
       const statusDiv = document.getElementById('login-status');
       const errorDiv = document.getElementById('login-error');
       
       statusDiv.classList.remove('hidden');
       errorDiv.classList.add('hidden');
-      document.getElementById('google-btn-container').style.display = 'none'; // Hide button while processing
+      
+      // Hide the Google button wrapper while processing
+      document.querySelector('.g_id_signin').style.display = 'none'; 
 
       try {
-        // Extract the verified email from Google's response
         const responsePayload = decodeJwtResponse(response.credential);
         const verifiedEmail = responsePayload.email;
 
-        // Send the verified email to our backend to check against Google Sheets
         const res = await fetch('/api/login', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -78,10 +93,8 @@
         
         const data = await res.json();
         
-        // If the email is not in your Google Sheet, the backend throws an error
         if (!res.ok) throw new Error(data.detail || "Database verification failed.");
 
-        // If successful, save the session and route them!
         localStorage.setItem('USER_EMAIL', data.user.email);
         localStorage.setItem('USER_ROLE', data.user.role);
         localStorage.setItem('LOGGED_IN_AGENT', data.user.name);
@@ -92,29 +105,9 @@
         statusDiv.classList.add('hidden');
         errorDiv.innerText = err.message;
         errorDiv.classList.remove('hidden');
-        document.getElementById('google-btn-container').style.display = 'flex'; // Bring button back so they can try again
+        document.querySelector('.g_id_signin').style.display = 'block'; 
       }
     }
-
-    // 5. Initialize Google Identity when the page loads
-    window.onload = function () {
-      google.accounts.id.initialize({
-        client_id: "106325673835-4moq7op50u80oet78ln84t241a88a200.apps.googleusercontent.com", // <--- PASTE YOUR CLIENT ID HERE
-        callback: handleCredentialResponse,
-        // Optional: Force them to select an account rather than auto-logging in if they have multiple Gmails open
-        prompt_parent_id: "google-btn-container"
-      });
-      
-      google.accounts.id.renderButton(
-        document.getElementById("google-btn-container"),
-        { theme: "filled_black", size: "large", shape: "rectangular", text: "continue_with" }
-      );
-      
-      // Enforce our internal RBAC logic (kicks them to workspace if they are already logged in locally)
-      if (typeof enforceSecurity === 'function') {
-          enforceSecurity();
-      }
-    };
   </script>
 </body>
 </html>
