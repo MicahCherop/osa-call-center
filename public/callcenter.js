@@ -20,21 +20,22 @@ const CURRENT_USER_NAME = localStorage.getItem('LOGGED_IN_AGENT');
 let LOGGED_IN_AGENT = CURRENT_USER_NAME || null; 
 const currentPage = document.body.dataset.page;
 const isAuthorized = enforceSecurity();
+
 function enforceSecurity() {
     // 1. Kick unauthenticated users to login
     if (!CURRENT_USER_EMAIL && currentPage !== 'login') {
-        window.location.replace('/login.html');
+        window.location.replace('/login');
         return false;
     }
     
     // 2. Route logged-in users to their correct starting page
     if (CURRENT_USER_EMAIL && currentPage === 'login') {
-        let dest = '/workspace.html'; // Default for Agents and Admins
+        let dest = '/workspace'; // Default for Agents and Admins
         if (CURRENT_USER_ROLE === 'Team Leader' || CURRENT_USER_ROLE === 'Ops Manager') {
-            dest = '/teamleader.html';
+            dest = '/teamleader';
         }
         if (CURRENT_USER_ROLE === 'Admin') {
-            dest = '/admin.html';
+            dest = '/admin';
         }
         window.location.replace(dest);
         return false;
@@ -42,12 +43,12 @@ function enforceSecurity() {
 
     // 3. Strict Page Restrictions
     if (CURRENT_USER_ROLE === 'Control Agent' && currentPage !== 'workspace' && currentPage !== 'login') {
-        window.location.replace('/workspace.html');
+        window.location.replace('/workspace');
         return false;
     }
     
     if ((CURRENT_USER_ROLE === 'Team Leader' || CURRENT_USER_ROLE === 'Ops Manager') && (currentPage === 'workspace' || currentPage === 'admin')) {
-        window.location.replace('/teamleader.html');
+        window.location.replace('/teamleader');
         return false;
     }
 
@@ -116,7 +117,7 @@ window.closeLogoutModal = function() {
 
 window.logout = function() {
     localStorage.clear();
-    window.location.replace('/login.html');
+    window.location.replace('/login');
 };
 // ----------------------------------------------------------------------
 // RENDER FUNCTIONS (Restored to fix Shift Manager and Campaigns)
