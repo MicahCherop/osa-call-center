@@ -1,13 +1,9 @@
 {
   "cleanUrls": true,
   "rewrites": [
-    { "source": "/", "destination": "/index.html" },
-    { "source": "/login", "destination": "/login.html" },
-    { "source": "/workspace", "destination": "/workspace.html" },
-    { "source": "/teamleader", "destination": "/teamleader.html" },
-    { "source": "/campaigns", "destination": "/campaigns.html" },
-    { "source": "/analytics", "destination": "/analytics.html" },
-    { "source": "/admin", "destination": "/admin.html" },
-    { "source": "/api/(.*)", "destination": "/api/index.py" }
+    {
+      "source": "/api/(.*)",
+      "destination": "/api/index.py"
+    }
   ]
 }
