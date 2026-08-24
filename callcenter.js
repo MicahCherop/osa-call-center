@@ -24,18 +24,18 @@ const isAuthorized = enforceSecurity();
 function enforceSecurity() {
     // 1. Kick unauthenticated users to login
     if (!CURRENT_USER_EMAIL && currentPage !== 'login') {
-    window.location.replace('/login.html');
-    return false;
-}
+        window.location.replace('/login.html');
+        return false;
+    }
     
     // 2. Route logged-in users to their correct starting page
     if (CURRENT_USER_EMAIL && currentPage === 'login') {
-        let dest = '/workspace'; // Default for Agents and Admins
+        let dest = '/workspace.html'; 
         if (CURRENT_USER_ROLE === 'Team Leader' || CURRENT_USER_ROLE === 'Ops Manager') {
-            dest = '/teamleader';
+            dest = '/teamleader.html';
         }
         if (CURRENT_USER_ROLE === 'Admin') {
-            dest = '/admin';
+            dest = '/admin.html';
         }
         window.location.replace(dest);
         return false;
@@ -43,38 +43,22 @@ function enforceSecurity() {
 
     // 3. Strict Page Restrictions
     if (CURRENT_USER_ROLE === 'Control Agent' && currentPage !== 'workspace' && currentPage !== 'login') {
-        window.location.replace('/workspace');
+        window.location.replace('/workspace.html');
         return false;
     }
     
     if ((CURRENT_USER_ROLE === 'Team Leader' || CURRENT_USER_ROLE === 'Ops Manager') && (currentPage === 'workspace' || currentPage === 'admin')) {
-        window.location.replace('/teamleader');
+        window.location.replace('/teamleader.html');
         return false;
     }
 
-    // 4. Update UI & Hide Sidebar Links
-    document.addEventListener("DOMContentLoaded", () => {
-        if (CURRENT_USER_ROLE === 'Control Agent') {
-            document.querySelectorAll('a[data-page="campaigns"], a[data-page="teamleader"], a[data-page="dashboard"], a[data-page="admin"]').forEach(el => el.style.display = 'none');
-        } else if (CURRENT_USER_ROLE === 'Team Leader' || CURRENT_USER_ROLE === 'Ops Manager') {
-            document.querySelectorAll('a[data-page="workspace"], a[data-page="admin"]').forEach(el => el.style.display = 'none');
-        }
-        // Admins hide nothing!
-
-        // Replace agent dropdown with profile/logout button
-        const agentSelector = document.getElementById('current-agent-select');
-        if (agentSelector) {
-            agentSelector.parentElement.innerHTML = `
-                <button onclick="promptLogout()" class="font-bold text-lg text-brandDark hover:text-brandAmber transition flex items-center gap-2 cursor-pointer">
-                    ${CURRENT_USER_NAME} <i class="fa-solid fa-right-from-bracket text-sm"></i>
-                </button>
-                <div class="text-[11px] text-brandAmber font-bold uppercase mt-1 pl-1">${CURRENT_USER_ROLE}</div>
-            `;
-        }
-    });
-    
     return true;
 }
+
+window.logout = function() {
+    localStorage.clear();
+    window.location.replace('/login.html');
+};
 
 window.onload = async () => {
     // Stop execution if they are unauthorized or on the login page
