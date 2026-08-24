@@ -53,8 +53,8 @@
     
     // 1. Build the Redirect URL
     function redirectToGoogle() {
-      // Use window.location.origin to support both Vercel and local testing dynamically
-      const redirectUri = window.location.origin + "/login.html";
+      // Fix: Removed .html extension for cleanUrls compatibility
+      const redirectUri = window.location.origin + "/login";
       const oauth2Endpoint = "https://accounts.google.com/o/oauth2/v2/auth";
       
       const form = document.createElement("form");
@@ -118,12 +118,13 @@
           const data = await backendRes.json();
           if (!backendRes.ok) throw new Error(data.detail || "Database verification failed.");
 
-          // Save Session & Route
-          localStorage.setItem('USER_EMAIL', data.user.email);
-          localStorage.setItem('USER_ROLE', data.user.role);
-          localStorage.setItem('LOGGED_IN_AGENT', data.user.name);
+          // Fix: Mapped directly to data instead of data.user
+          localStorage.setItem('USER_EMAIL', data.email);
+          localStorage.setItem('USER_ROLE', data.role);
+          localStorage.setItem('LOGGED_IN_AGENT', data.name);
           
-          window.location.replace('/workspace.html');
+          // Fix: Removed .html extension 
+          window.location.replace('/workspace');
 
         } catch (err) {
           document.getElementById('login-status').classList.add('hidden');
