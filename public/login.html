@@ -5,9 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Login - OSA Call Center</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- 1. Google Identity Services Library -->
-  <script src="https://accounts.google.com/gsi/client" async defer></script>
-  
   <script>
     tailwind.config = {
       theme: {
@@ -23,6 +20,7 @@
     }
   </script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100;200;300&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <link rel="stylesheet" href="/callcenter.css">
 </head>
 <body data-page="login" class="h-screen bg-slate-50 flex items-center justify-center relative overflow-hidden">
@@ -35,79 +33,107 @@
     <h1 class="text-3xl font-bold text-brandDark mb-2">OSA Call Center</h1>
     <p class="text-brandDark/60 text-sm mb-8">Sign in securely with your company account</p>
     
-    <!-- 2. Container for the Google Button -->
-   <!-- 2. Google Sign-In HTML API -->
-    <div class="flex justify-center mb-4">
-      <!-- The Configuration -->
-      <div id="g_id_onload"
-         data-client_id="106325673835-4moq7op50u80oet78ln84t241a88a200.apps.googleusercontent.com"
-         data-callback="handleCredentialResponse"
-         data-auto_prompt="false">
-      </div>
-      <!-- The Button -->
-      <div class="g_id_signin"
-         data-type="standard"
-         data-size="large"
-         data-theme="filled_black"
-         data-text="continue_with"
-         data-shape="rectangular"
-         data-logo_alignment="left">
-      </div>
+    <div id="google-btn-container" class="flex justify-center mb-4">
+      <button onclick="redirectToGoogle()" class="w-full bg-brandDark hover:bg-slate-800 text-white py-3 rounded-lg shadow-md transition flex items-center justify-center gap-3">
+        <i class="fa-brands fa-google text-brandAmber text-lg"></i> Continue with Google
+      </button>
     </div>
     
-    <div id="login-status" class="text-brandDark text-sm mt-3 font-bold hidden">Verifying authorization...</div>
-    <div id="login-error" class="text-red-500 text-sm mt-3 hidden"></div>
+    <div id="login-status" class="text-brandAmber text-sm mt-3 font-bold hidden flex items-center justify-center gap-2">
+      <i class="fa-solid fa-circle-notch fa-spin"></i> Verifying authorization...
+    </div>
+    <div id="login-error" class="text-red-500 text-sm mt-3 hidden font-bold"></div>
   </div>
 
   <script src="/callcenter.js"></script>
   
   <script>
-    function decodeJwtResponse(token) {
-      let base64Url = token.split('.')[1];
-      let base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-      let jsonPayload = decodeURIComponent(window.atob(base64).split('').map(function(c) {
-          return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
-      }).join(''));
-      return JSON.parse(jsonPayload);
-    }
-
-    async function handleCredentialResponse(response) {
-      const statusDiv = document.getElementById('login-status');
-      const errorDiv = document.getElementById('login-error');
+    const CLIENT_ID = "106325673835-4moq7op50u80oet78ln84t241a88a200.apps.googleusercontent.com";
+    
+    // 1. Build the Redirect URL
+    function redirectToGoogle() {
+      // Use window.location.origin to support both Vercel and local testing dynamically
+      const redirectUri = window.location.origin + "/login.html";
+      const oauth2Endpoint = "https://accounts.google.com/o/oauth2/v2/auth";
       
-      statusDiv.classList.remove('hidden');
-      errorDiv.classList.add('hidden');
-      
-      // Hide the Google button wrapper while processing
-      document.querySelector('.g_id_signin').style.display = 'none'; 
+      const form = document.createElement("form");
+      form.setAttribute("method", "GET");
+      form.setAttribute("action", oauth2Endpoint);
 
-      try {
-        const responsePayload = decodeJwtResponse(response.credential);
-        const verifiedEmail = responsePayload.email;
+      const params = {
+        client_id: CLIENT_ID,
+        redirect_uri: redirectUri,
+        response_type: "token",
+        scope: "email profile",
+        include_granted_scopes: "true",
+        state: "pass-through value"
+      };
 
-        const res = await fetch('/api/login', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: verifiedEmail })
-        });
-        
-        const data = await res.json();
-        
-        if (!res.ok) throw new Error(data.detail || "Database verification failed.");
-
-        localStorage.setItem('USER_EMAIL', data.user.email);
-        localStorage.setItem('USER_ROLE', data.user.role);
-        localStorage.setItem('LOGGED_IN_AGENT', data.user.name);
-        
-        window.location.replace('/workspace.html');
-
-      } catch (err) {
-        statusDiv.classList.add('hidden');
-        errorDiv.innerText = err.message;
-        errorDiv.classList.remove('hidden');
-        document.querySelector('.g_id_signin').style.display = 'block'; 
+      for (let p in params) {
+        let input = document.createElement("input");
+        input.setAttribute("type", "hidden");
+        input.setAttribute("name", p);
+        input.setAttribute("value", params[p]);
+        form.appendChild(input);
       }
+
+      document.body.appendChild(form);
+      form.submit();
     }
+
+    // 2. Intercept the URL when Google sends them back
+    window.onload = async function() {
+      const hash = window.location.hash;
+      
+      if (hash && hash.includes("access_token")) {
+        // We have returned from Google!
+        document.getElementById('login-status').classList.remove('hidden');
+        document.getElementById('google-btn-container').classList.add('hidden');
+        
+        // Parse the token from the URL
+        const params = new URLSearchParams(hash.substring(1));
+        const accessToken = params.get("access_token");
+
+        // Clean up the URL so it looks nice
+        window.history.replaceState(null, null, window.location.pathname);
+
+        try {
+          // Exchange the token for the user's email
+          const res = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
+            headers: { Authorization: `Bearer ${accessToken}` }
+          });
+          const userInfo = await res.json();
+          
+          if (!userInfo.email) throw new Error("Could not retrieve email from Google.");
+
+          // Send the email to our FastAPI backend
+          const backendRes = await fetch('/api/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: userInfo.email })
+          });
+          
+          const data = await backendRes.json();
+          if (!backendRes.ok) throw new Error(data.detail || "Database verification failed.");
+
+          // Save Session & Route
+          localStorage.setItem('USER_EMAIL', data.user.email);
+          localStorage.setItem('USER_ROLE', data.user.role);
+          localStorage.setItem('LOGGED_IN_AGENT', data.user.name);
+          
+          window.location.replace('/workspace.html');
+
+        } catch (err) {
+          document.getElementById('login-status').classList.add('hidden');
+          document.getElementById('login-error').innerText = err.message;
+          document.getElementById('login-error').classList.remove('hidden');
+          document.getElementById('google-btn-container').classList.remove('hidden');
+        }
+      } else {
+        // Normal page load, check standard RBAC
+        if (typeof enforceSecurity === 'function') enforceSecurity();
+      }
+    };
   </script>
 </body>
 </html>
