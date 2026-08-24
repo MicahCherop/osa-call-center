@@ -5,118 +5,116 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Login - OSA Call Center</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- 1. Fetch the absolute thinnest font weights from Google -->
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100;200;300&display=swap" rel="stylesheet">
+  <!-- 1. Google Identity Services Library -->
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
   
-  <!-- 2. Force Tailwind to render ALL text as thin -->
   <script>
     tailwind.config = {
       theme: {
         extend: {
           fontFamily: { sans: ['Inter', 'sans-serif'] },
-          // This mapping forces every element to be thin, ignoring "font-bold" classes
           fontWeight: {
-            black: '200', 
-            extrabold: '200', 
-            bold: '200', 
-            semibold: '200',
-            medium: '200', 
-            normal: '200', 
-            light: '200',
-            extralight: '100',
-            thin: '100'
+            black: '200', extrabold: '200', bold: '200', semibold: '200',
+            medium: '200', normal: '200', light: '200', extralight: '100', thin: '100'
           },
-          colors: {
-            brandDark: '#0f172a',
-            brandAmber: '#f59e0b',
-            glass: 'rgba(255, 255, 255, 0.65)',
-            glassDarker: 'rgba(255, 255, 255, 0.8)',
-          },
-          animation: {
-            blob: "blob 10s infinite",
-            pulseSlow: "pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite",
-          },
-          keyframes: {
-            blob: {
-              "0%": { transform: "translate(0px, 0px) scale(1)" },
-              "33%": { transform: "translate(30px, -50px) scale(1.1)" },
-              "66%": { transform: "translate(-20px, 20px) scale(0.9)" },
-              "100%": { transform: "translate(0px, 0px) scale(1)" }
-            }
-          }
+          colors: { brandDark: '#0f172a', brandAmber: '#f59e0b' }
         }
       }
     }
   </script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100;200;300&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/callcenter.css">
 </head>
 <body data-page="login" class="h-screen bg-slate-50 flex items-center justify-center relative overflow-hidden">
+  
   <div class="absolute inset-0 z-0 overflow-hidden pointer-events-none">
     <div class="absolute top-[-10%] left-[-10%] w-[40rem] h-[40rem] bg-amber-200 rounded-full mix-blend-multiply filter blur-3xl opacity-60"></div>
   </div>
   
-  <div class="glass-panel p-8 rounded-2xl w-full max-w-md relative z-10 shadow-2xl bg-white/90 backdrop-blur-md border border-brandDark/10">
-    <h1 class="text-3xl font-bold text-center text-brandDark mb-2">OSA Call Center</h1>
-    <p class="text-center text-brandDark/60 text-sm mb-8">Sign in to access your workspace</p>
+  <div class="glass-panel p-8 rounded-2xl w-full max-w-md relative z-10 shadow-2xl bg-white/90 backdrop-blur-md border border-brandDark/10 text-center">
+    <h1 class="text-3xl font-bold text-brandDark mb-2">OSA Call Center</h1>
+    <p class="text-brandDark/60 text-sm mb-8">Sign in securely with your company account</p>
     
-<!-- Updated Form without Password -->
-    <form id="login-form" class="space-y-5">
-      <div>
-        <label class="block text-xs uppercase mb-1 text-brandDark/70">Email Address</label>
-        <input type="email" id="login-email" required placeholder="Enter your company email" class="glass-input rounded-lg w-full px-4 py-3 text-sm border border-brandDark/20">
-      </div>
-      <button type="submit" id="login-btn" class="w-full bg-brandAmber hover:bg-amber-600 text-white py-3 rounded-lg shadow-md transition mt-4">
-        Verify & Continue
-      </button>
-      <div id="login-error" class="text-red-500 text-sm text-center mt-3 hidden"></div>
-    </form>
-  </div>    
+    <!-- 2. Container for the Google Button -->
+    <div id="google-btn-container" class="flex justify-center mb-4"></div>
+    
+    <div id="login-status" class="text-brandDark text-sm mt-3 font-bold hidden">Verifying authorization...</div>
+    <div id="login-error" class="text-red-500 text-sm mt-3 hidden"></div>
   </div>
 
   <script src="/callcenter.js"></script>
+  
   <script>
-    document.getElementById('login-form').addEventListener('submit', async (e) => {
-      e.preventDefault();
-      
-      const COMPANY_DOMAIN = "@4g-capital.com"; // UPDATE THIS TO YOUR ACTUAL DOMAIN
-      const emailInput = document.getElementById('login-email').value.trim();
-      const btn = document.getElementById('login-btn');
+    // 3. Helper function to decode the secure token Google hands back to us
+    function decodeJwtResponse(token) {
+      let base64Url = token.split('.')[1];
+      let base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+      let jsonPayload = decodeURIComponent(window.atob(base64).split('').map(function(c) {
+          return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+      }).join(''));
+      return JSON.parse(jsonPayload);
+    }
+
+    // 4. The function that runs exactly when the user clicks the Google button
+    async function handleCredentialResponse(response) {
+      const statusDiv = document.getElementById('login-status');
       const errorDiv = document.getElementById('login-error');
       
-      // Frontend Domain Check
-      if (!emailInput.toLowerCase().endsWith(COMPANY_DOMAIN)) {
-          errorDiv.innerText = `Only ${COMPANY_DOMAIN} emails are permitted.`;
-          errorDiv.classList.remove('hidden');
-          return;
-      }
-
-      btn.innerHTML = 'Verifying Database...';
+      statusDiv.classList.remove('hidden');
       errorDiv.classList.add('hidden');
+      document.getElementById('google-btn-container').style.display = 'none'; // Hide button while processing
 
       try {
+        // Extract the verified email from Google's response
+        const responsePayload = decodeJwtResponse(response.credential);
+        const verifiedEmail = responsePayload.email;
+
+        // Send the verified email to our backend to check against Google Sheets
         const res = await fetch('/api/login', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: emailInput }) // We now ONLY send the email
+          body: JSON.stringify({ email: verifiedEmail })
         });
         
         const data = await res.json();
-        if (!res.ok) throw new Error(data.detail || "Verification failed");
+        
+        // If the email is not in your Google Sheet, the backend throws an error
+        if (!res.ok) throw new Error(data.detail || "Database verification failed.");
 
-        // Save session locally
+        // If successful, save the session and route them!
         localStorage.setItem('USER_EMAIL', data.user.email);
         localStorage.setItem('USER_ROLE', data.user.role);
         localStorage.setItem('LOGGED_IN_AGENT', data.user.name);
         
-        // Redirect (the RBAC script in callcenter.js will automatically route them to their proper dashboard)
         window.location.replace('/workspace.html');
 
       } catch (err) {
-        btn.innerHTML = 'Verify & Continue';
+        statusDiv.classList.add('hidden');
         errorDiv.innerText = err.message;
         errorDiv.classList.remove('hidden');
+        document.getElementById('google-btn-container').style.display = 'flex'; // Bring button back so they can try again
       }
-    });
+    }
+
+    // 5. Initialize Google Identity when the page loads
+    window.onload = function () {
+      google.accounts.id.initialize({
+        client_id: "106325673835-4moq7op50u80oet78ln84t241a88a200.apps.googleusercontent.com", // <--- PASTE YOUR CLIENT ID HERE
+        callback: handleCredentialResponse,
+        // Optional: Force them to select an account rather than auto-logging in if they have multiple Gmails open
+        prompt_parent_id: "google-btn-container"
+      });
+      
+      google.accounts.id.renderButton(
+        document.getElementById("google-btn-container"),
+        { theme: "filled_black", size: "large", shape: "rectangular", text: "continue_with" }
+      );
+      
+      // Enforce our internal RBAC logic (kicks them to workspace if they are already logged in locally)
+      if (typeof enforceSecurity === 'function') {
+          enforceSecurity();
+      }
+    };
   </script>
 </body>
 </html>
