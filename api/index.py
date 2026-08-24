@@ -50,30 +50,42 @@ class AgentModel(BaseModel):
     password: str
     status: str = "Active"
 
+# 1. Update the Pydantic Model to remove the password
 class LoginModel(BaseModel):
     email: str
-    password: str
 
+# 2. Update the Login Endpoint
 @app.post("/api/login")
 def login(creds: LoginModel):
+    # Keep your domain check if you are using it
+    # if not creds.email.lower().endswith(COMPANY_DOMAIN):
+    #    raise HTTPException(status_code=403, detail=f"Access restricted to {COMPANY_DOMAIN} emails.")
+        
     sheet = get_google_sheet().worksheet("Agents")
     agents = sheet.get_all_records()
     
     for a in agents:
-        if str(a.get("Email", "")).lower() == creds.email.lower() and str(a.get("Password", "")) == creds.password:
-            if str(a.get("Status", "")) != "Active":
+        sheet_email = str(a.get("Email", a.get("email", ""))).lower().strip()
+        
+        # Check if the email exists in the database
+        if sheet_email == creds.email.lower().strip():
+            
+            # Make sure they are not deactivated
+            sheet_status = str(a.get("Status", a.get("status", ""))).lower().strip()
+            if sheet_status != "active":
                 raise HTTPException(status_code=403, detail="Account is disabled.")
             
             return {
                 "status": "success", 
                 "user": {
-                    "name": a.get("Name"), 
-                    "email": a.get("Email"), 
-                    "role": a.get("Role")
+                    "name": a.get("Name", a.get("name", "Unknown")), 
+                    "email": sheet_email, 
+                    "role": a.get("Role", a.get("role", "Control Agent"))
                 }
             }
             
-    raise HTTPException(status_code=401, detail="Invalid email or password")
+    # If the loop finishes and no email was found:
+    raise HTTPException(status_code=401, detail="Email not found in the system. Access Denied.")
 
 # Update the Add Agent Endpoint
 @app.post("/api/agents")

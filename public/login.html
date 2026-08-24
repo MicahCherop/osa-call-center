@@ -59,50 +59,60 @@
     <h1 class="text-3xl font-bold text-center text-brandDark mb-2">OSA Call Center</h1>
     <p class="text-center text-brandDark/60 text-sm mb-8">Sign in to access your workspace</p>
     
+<!-- Updated Form without Password -->
     <form id="login-form" class="space-y-5">
       <div>
-        <label class="block text-xs font-bold text-brandDark/70 uppercase mb-1">Email Address</label>
-        <input type="email" id="login-email" required class="glass-input rounded-lg w-full px-4 py-3 text-sm border border-brandDark/20">
+        <label class="block text-xs uppercase mb-1 text-brandDark/70">Email Address</label>
+        <input type="email" id="login-email" required placeholder="Enter your company email" class="glass-input rounded-lg w-full px-4 py-3 text-sm border border-brandDark/20">
       </div>
-      <div>
-        <label class="block text-xs font-bold text-brandDark/70 uppercase mb-1">Password</label>
-        <input type="password" id="login-password" required class="glass-input rounded-lg w-full px-4 py-3 text-sm border border-brandDark/20">
-      </div>
-      <!-- Updated Amber Button -->
-      <button type="submit" id="login-btn" class="w-full bg-brandAmber hover:bg-amber-600 text-white font-bold py-3 rounded-lg shadow-md transition mt-4">
-        Log In
+      <button type="submit" id="login-btn" class="w-full bg-brandAmber hover:bg-amber-600 text-white py-3 rounded-lg shadow-md transition mt-4">
+        Verify & Continue
       </button>
-      <div id="login-error" class="text-red-500 text-sm font-semibold text-center mt-3 hidden"></div>
+      <div id="login-error" class="text-red-500 text-sm text-center mt-3 hidden"></div>
     </form>
+  </div>    
   </div>
 
   <script src="/callcenter.js"></script>
   <script>
     document.getElementById('login-form').addEventListener('submit', async (e) => {
       e.preventDefault();
+      
+      const COMPANY_DOMAIN = "@yourcompany.com"; // UPDATE THIS TO YOUR ACTUAL DOMAIN
+      const emailInput = document.getElementById('login-email').value.trim();
       const btn = document.getElementById('login-btn');
       const errorDiv = document.getElementById('login-error');
-      btn.innerHTML = 'Authenticating...';
+      
+      // Frontend Domain Check
+      if (!emailInput.toLowerCase().endsWith(COMPANY_DOMAIN)) {
+          errorDiv.innerText = `Only ${COMPANY_DOMAIN} emails are permitted.`;
+          errorDiv.classList.remove('hidden');
+          return;
+      }
+
+      btn.innerHTML = 'Verifying Database...';
       errorDiv.classList.add('hidden');
 
       try {
         const res = await fetch('/api/login', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            email: document.getElementById('login-email').value.trim(),
-            password: document.getElementById('login-password').value
-          })
+          body: JSON.stringify({ email: emailInput }) // We now ONLY send the email
         });
+        
         const data = await res.json();
-        if (!res.ok) throw new Error(data.detail || "Login failed");
+        if (!res.ok) throw new Error(data.detail || "Verification failed");
 
+        // Save session locally
         localStorage.setItem('USER_EMAIL', data.user.email);
         localStorage.setItem('USER_ROLE', data.user.role);
         localStorage.setItem('LOGGED_IN_AGENT', data.user.name);
+        
+        // Redirect (the RBAC script in callcenter.js will automatically route them to their proper dashboard)
         window.location.replace('/workspace.html');
+
       } catch (err) {
-        btn.innerHTML = 'Log In';
+        btn.innerHTML = 'Verify & Continue';
         errorDiv.innerText = err.message;
         errorDiv.classList.remove('hidden');
       }
