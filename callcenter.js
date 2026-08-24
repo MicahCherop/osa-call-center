@@ -24,18 +24,18 @@ const isAuthorized = enforceSecurity();
 function enforceSecurity() {
     // 1. Kick unauthenticated users to login
     if (!CURRENT_USER_EMAIL && currentPage !== 'login') {
-        window.location.replace('/login.html');
+        window.location.replace('/login');
         return false;
     }
     
     // 2. Route logged-in users to their correct starting page
     if (CURRENT_USER_EMAIL && currentPage === 'login') {
-        let dest = '/workspace.html'; 
+        let dest = '/workspace'; 
         if (CURRENT_USER_ROLE === 'Team Leader' || CURRENT_USER_ROLE === 'Ops Manager') {
-            dest = '/teamleader.html';
+            dest = '/teamleader';
         }
         if (CURRENT_USER_ROLE === 'Admin') {
-            dest = '/admin.html';
+            dest = '/admin';
         }
         window.location.replace(dest);
         return false;
@@ -43,12 +43,12 @@ function enforceSecurity() {
 
     // 3. Strict Page Restrictions
     if (CURRENT_USER_ROLE === 'Control Agent' && currentPage !== 'workspace' && currentPage !== 'login') {
-        window.location.replace('/workspace.html');
+        window.location.replace('/workspace');
         return false;
     }
     
     if ((CURRENT_USER_ROLE === 'Team Leader' || CURRENT_USER_ROLE === 'Ops Manager') && (currentPage === 'workspace' || currentPage === 'admin')) {
-        window.location.replace('/teamleader.html');
+        window.location.replace('/teamleader');
         return false;
     }
 
@@ -57,8 +57,9 @@ function enforceSecurity() {
 
 window.logout = function() {
     localStorage.clear();
-    window.location.replace('/login.html');
+    window.location.replace('/login');
 };
+
 
 window.onload = async () => {
     // Stop execution if they are unauthorized or on the login page
