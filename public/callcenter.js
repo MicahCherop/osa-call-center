@@ -24,9 +24,9 @@ const isAuthorized = enforceSecurity();
 function enforceSecurity() {
     // 1. Kick unauthenticated users to login
     if (!CURRENT_USER_EMAIL && currentPage !== 'login') {
-        window.location.replace('/login');
-        return false;
-    }
+    window.location.replace('/login.html');
+    return false;
+}
     
     // 2. Route logged-in users to their correct starting page
     if (CURRENT_USER_EMAIL && currentPage === 'login') {
