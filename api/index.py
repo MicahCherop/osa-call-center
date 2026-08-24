@@ -18,7 +18,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Load Google Credentials from Environment Variable in Vercel
 SCOPE = [
     "https://www.googleapis.com/auth/spreadsheets",
     "https://www.googleapis.com/auth/drive"
@@ -34,7 +33,6 @@ def get_google_sheet():
     creds = Credentials.from_service_account_info(creds_dict, scopes=SCOPE)
     client = gspread.authorize(creds)
     
-    # Replace the string below with your actual Google Sheet ID
     sheet_id = os.getenv("GOOGLE_SHEET_ID", "1VmLCg_6iY0QsjPbDjgDRNugFyyNRWABtPIASGDepZeU")
     
     try:
@@ -42,66 +40,16 @@ def get_google_sheet():
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to open sheet: {str(e)}")
 
-# Simplified Schema
+# Pydantic Schemas
 class AgentModel(BaseModel):
     name: str
     email: str
     role: str
-    password: str
+    password: str = ""
     status: str = "Active"
 
-# 1. Update the Pydantic Model to remove the password
 class LoginModel(BaseModel):
     email: str
-
-# 2. Update the Login Endpoint
-@app.post("/api/login")
-def login(creds: LoginModel):
-    # Keep your domain check if you are using it
-    # if not creds.email.lower().endswith(COMPANY_DOMAIN):
-    #    raise HTTPException(status_code=403, detail=f"Access restricted to {COMPANY_DOMAIN} emails.")
-        
-    sheet = get_google_sheet().worksheet("Agents")
-    agents = sheet.get_all_records()
-    
-    for a in agents:
-        sheet_email = str(a.get("Email", a.get("email", ""))).lower().strip()
-        
-        # Check if the email exists in the database
-        if sheet_email == creds.email.lower().strip():
-            
-            # Make sure they are not deactivated
-            sheet_status = str(a.get("Status", a.get("status", ""))).lower().strip()
-            if sheet_status != "active":
-                raise HTTPException(status_code=403, detail="Account is disabled.")
-            
-            return {
-                "status": "success", 
-                "user": {
-                    "name": a.get("Name", a.get("name", "Unknown")), 
-                    "email": sheet_email, 
-                    "role": a.get("Role", a.get("role", "Control Agent"))
-                }
-            }
-            
-    # If the loop finishes and no email was found:
-    raise HTTPException(status_code=401, detail="Email not found in the system. Access Denied.")
-
-# Update the Add Agent Endpoint
-@app.post("/api/agents")
-@app.post("/agents")
-def add_agent(agent: AgentModel):
-    # (Keep your domain check here if you are using one)
-    # if not agent.email.lower().endswith(COMPANY_DOMAIN):
-    #     raise HTTPException(status_code=400, detail="Invalid domain.")
-        
-    sheet = get_google_sheet().worksheet("Agents")
-    
-    # Strictly appending only the 5 requested columns in order
-    row_data = [agent.status, agent.name, agent.email, agent.role, agent.password]
-    sheet.append_row(row_data)
-    
-    return {"status": "success", "message": f"Agent {agent.name} added successfully"}
 
 class DispositionModel(BaseModel):
     customerId: int
@@ -119,9 +67,7 @@ class CustomerUploadModel(BaseModel):
     balance: str
     campaign: str
 
-# Endpoints
-
-# Add root routes so the browser doesn't show "Not Found"
+# --- ROOT & HEALTH ENDPOINTS ---
 @app.get("/")
 @app.get("/api")
 def read_root():
@@ -132,7 +78,32 @@ def read_root():
 def health_check():
     return {"status": "ok", "message": "Call Center API is running"}
 
-# --- AGENTS ---
+# --- AUTHENTICATION & AGENTS ---
+@app.post("/api/login")
+@app.post("/login")
+def login(creds: LoginModel):
+    sheet = get_google_sheet().worksheet("Agents")
+    agents = sheet.get_all_records()
+    
+    for a in agents:
+        sheet_email = str(a.get("Email", a.get("email", ""))).lower().strip()
+        
+        if sheet_email == creds.email.lower().strip():
+            sheet_status = str(a.get("Status", a.get("status", ""))).lower().strip()
+            if sheet_status != "active":
+                raise HTTPException(status_code=403, detail="Account is disabled.")
+            
+            return {
+                "status": "success", 
+                "user": {
+                    "name": a.get("Name", a.get("name", "Unknown")), 
+                    "email": sheet_email, 
+                    "role": a.get("Role", a.get("role", "Control Agent"))
+                }
+            }
+            
+    raise HTTPException(status_code=401, detail="Email not found in the system. Access Denied.")
+
 @app.get("/api/agents")
 @app.get("/agents")
 def get_agents():
@@ -143,8 +114,9 @@ def get_agents():
 @app.post("/agents")
 def add_agent(agent: AgentModel):
     sheet = get_google_sheet().worksheet("Agents")
-    sheet.append_row([agent.name, agent.team, agent.status, 0, 0, 0, 0])
-    return {"status": "success", "message": f"Agent {agent.name} added"}
+    row_data = [agent.status, agent.name, agent.email, agent.role, agent.password]
+    sheet.append_row(row_data)
+    return {"status": "success", "message": f"Agent {agent.name} added successfully"}
 
 @app.put("/api/agents/status")
 @app.put("/agents/status")
@@ -165,14 +137,21 @@ def get_campaigns():
 
 @app.post("/api/campaigns")
 @app.post("/campaigns")
-def create_campaign(name: str = Body(...), type: str = Body(...), priority: str = Body(...), startDate: str = Body(...), endDate: str = Body(...), customers: List[CustomerUploadModel] = Body(...)):
+def create_campaign(
+    name: str = Body(...), 
+    type: str = Body(...), 
+    priority: str = Body(...), 
+    startDate: str = Body(...), 
+    endDate: str = Body(...), 
+    customers: List[CustomerUploadModel] = Body(...)
+):
     sh = get_google_sheet()
     
-    # Save campaign
+    # Save campaign metadata
     camp_sheet = sh.worksheet("Campaigns")
     camp_sheet.append_row([name, type, priority, startDate, endDate])
     
-    # Save customers
+    # Save imported customers
     cust_sheet = sh.worksheet("Customers")
     rows = []
     for c in customers:
@@ -187,9 +166,13 @@ def get_customers(agentName: Optional[str] = None):
     sheet = get_google_sheet().worksheet("Customers")
     records = sheet.get_all_records()
     if agentName:
-        records = [r for r in records if str(r.get("agentId")) == agentName and str(r.get("worked")).upper() != "TRUE"]
+        records = [
+            r for r in records 
+            if str(r.get("agentId")) == agentName and str(r.get("worked")).upper() != "TRUE"
+        ]
     return records
 
+# --- ALLOCATION ENGINE ---
 @app.post("/api/distribute")
 @app.post("/distribute")
 def distribute_customers(campaign: str = Body(...)):
@@ -198,34 +181,37 @@ def distribute_customers(campaign: str = Body(...)):
     agent_sheet = sh.worksheet("Agents")
     
     customers = cust_sheet.get_all_records()
-    agents = [a for a in agent_sheet.get_all_records() if a.get("status") == "Active"]
+    agents = [
+        a for a in agent_sheet.get_all_records() 
+        if str(a.get("Status", a.get("status", ""))).lower() == "active"
+    ]
     
     if not agents:
         raise HTTPException(status_code=400, detail="No active agents found")
     
-    unassigned = [i + 2 for i, c in enumerate(customers) if c.get("campaign") == campaign and not c.get("agentId") and str(c.get("worked")).upper() != "TRUE"]
+    unassigned = [
+        i + 2 for i, c in enumerate(customers) 
+        if c.get("campaign") == campaign and not c.get("agentId") and str(c.get("worked")).upper() != "TRUE"
+    ]
     
     if not unassigned:
         return {"status": "info", "message": "No unassigned customers remaining"}
     
-    # BATCH UPDATE: Prepare all cell changes in memory
     cells_to_update = []
     agent_idx = 0
     assigned_count = 0
     
     for row_idx in unassigned:
-        assigned_agent = agents[agent_idx]["name"]
-        # Create a Cell object: Cell(row, col, value) - Col 8 is agentId
-        cells_to_update.append(gspread.Cell(row_idx, 8, assigned_agent))
-        
+        assigned_agent = agents[agent_idx].get("Name", agents[agent_idx].get("name"))
+        cells_to_update.append(gspread.Cell(row_idx, 8, assigned_agent))  # Col 8 = agentId
         assigned_count += 1
         agent_idx = (agent_idx + 1) % len(agents)
         
-    # Execute ALL updates in ONE single API call to Google!
     cust_sheet.update_cells(cells_to_update)
         
     return {"status": "success", "assignedCount": assigned_count}
 
+# --- DISPOSITION LOGGING ---
 @app.post("/api/disposition")
 @app.post("/disposition")
 def submit_disposition(disp: DispositionModel):
@@ -233,18 +219,18 @@ def submit_disposition(disp: DispositionModel):
     cust_sheet = sh.worksheet("Customers")
     agent_sheet = sh.worksheet("Agents")
     
-    # 1. BATCH Update Customer Record
+    # 1. Update Customer Record
     cust_cell = cust_sheet.find(str(disp.customerId))
     if cust_cell:
         r = cust_cell.row
         customer_updates = [
-            gspread.Cell(r, 9, "TRUE"),       # worked
+            gspread.Cell(r, 9, "TRUE"),        # worked
             gspread.Cell(r, 10, disp.outcome), # outcome
             gspread.Cell(r, 11, disp.status)   # status
         ]
         cust_sheet.update_cells(customer_updates)
         
-    # 2. BATCH Update Agent Metrics
+    # 2. Update Agent Metrics
     agent_cell = agent_sheet.find(disp.agentName)
     if agent_cell:
         ar = agent_cell.row
