@@ -53,8 +53,8 @@
     
     // 1. Build the Redirect URL
     function redirectToGoogle() {
-      // Fix: Removed .html extension for cleanUrls compatibility
-      const redirectUri = window.location.origin + "/login";
+      // FIX: Hardcoded the exact production URL so Google doesn't block Vercel preview URLs
+      const redirectUri = "https://osa-call-center.vercel.app/login"; 
       const oauth2Endpoint = "https://accounts.google.com/o/oauth2/v2/auth";
       
       const form = document.createElement("form");

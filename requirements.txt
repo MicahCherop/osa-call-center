@@ -1,5 +1,5 @@
-fastapi==0.110.0
-uvicorn==0.28.0
-gspread==6.0.0
-google-auth==2.28.0
-pydantic==2.6.0
+fastapi
+uvicorn
+pydantic
+gspread
+google-auth
