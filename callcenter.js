@@ -71,6 +71,43 @@ window.onload = async () => {
     
     initCurrentPage();
 };
+// --- USER PROFILE & LOGOUT LOGIC ---
+
+// 1. Populate the header with the logged-in user's details
+function loadUserProfile() {
+    const name = localStorage.getItem('LOGGED_IN_AGENT') || 'Unknown User';
+    const role = localStorage.getItem('USER_ROLE') || 'Agent';
+    const email = localStorage.getItem('USER_EMAIL') || '';
+
+    const nameEl = document.getElementById('header-user-name');
+    const roleEl = document.getElementById('header-user-role');
+    const emailEl = document.getElementById('modal-user-email');
+
+    if (nameEl) nameEl.innerText = name;
+    if (roleEl) roleEl.innerText = role;
+    if (emailEl) emailEl.innerText = email;
+}
+
+// 2. Toggle the logout dropdown modal
+function toggleLogoutModal() {
+    const modal = document.getElementById('logout-modal');
+    if (modal) {
+        modal.classList.toggle('hidden');
+    }
+}
+
+// 3. Close the modal automatically if the user clicks anywhere else on the screen
+document.addEventListener('click', function(event) {
+    const modal = document.getElementById('logout-modal');
+    const triggerBtn = event.target.closest('button[onclick="toggleLogoutModal()"]');
+    
+    if (!triggerBtn && modal && !modal.classList.contains('hidden') && !event.target.closest('#logout-modal')) {
+        modal.classList.add('hidden');
+    }
+});
+
+// Run the data loader as soon as the page opens
+document.addEventListener('DOMContentLoaded', loadUserProfile);
 
 window.promptLogout = function() {
     let modal = document.getElementById('logout-modal-backdrop');

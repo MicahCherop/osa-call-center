@@ -1,47 +1,75 @@
-﻿::-webkit-scrollbar { width: 6px; height: 6px; }
-    ::-webkit-scrollbar-track { background: transparent; }
-    ::-webkit-scrollbar-thumb { background: rgba(15, 23, 42, 0.2); border-radius: 10px; }
-    ::-webkit-scrollbar-thumb:hover { background: rgba(15, 23, 42, 0.4); }
+﻿/* 1. Scrollbar - Softer, smoother hover states */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { 
+  background: rgba(15, 23, 42, 0.15); 
+  border-radius: 10px; 
+  transition: background 0.2s ease; 
+}
+::-webkit-scrollbar-thumb:hover { background: rgba(15, 23, 42, 0.35); }
 
-    .glass-panel {
-      background: rgba(255, 255, 255, 0.65);
-      backdrop-filter: blur(20px);
-      -webkit-backdrop-filter: blur(20px);
-      border: 1px solid rgba(255, 255, 255, 0.6);
-      box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.1);
-    }
-    
-    .glass-card {
-      background: rgba(255, 255, 255, 0.45);
-      border: 1px solid rgba(255, 255, 255, 0.7);
-      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
-    }
-    
-    .glass-input {
-      background: rgba(255, 255, 255, 0.5);
-      border: 1px solid rgba(255, 255, 255, 0.8);
-      color: #0f172a;
-      transition: all 0.2s;
-    }
-    .glass-input:not(:disabled):focus {
-      outline: none;
-      border-color: #f59e0b;
-      background: rgba(255, 255, 255, 0.9);
-      box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.2);
-    }
+/* 2. Glass Panels - Crisper frost effect and softer shadows for depth */
+.glass-panel {
+  background: rgba(255, 255, 255, 0.75);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  box-shadow: 0 10px 40px -10px rgba(15, 23, 42, 0.06);
+}
 
-    .toggle-checkbox:checked { right: 0; border-color: #10b981; }
-    .toggle-checkbox:checked + .toggle-label { background-color: #10b981; }
+/* 3. Glass Cards - Added a subtle hover lift effect */
+.glass-card {
+  background: rgba(255, 255, 255, 0.5);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  box-shadow: 0 4px 12px -2px rgba(15, 23, 42, 0.04);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.glass-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 16px -4px rgba(15, 23, 42, 0.08);
+}
 
-    .app-modal-backdrop {
-      background: rgba(15, 23, 42, 0.45);
-      backdrop-filter: blur(8px);
-      -webkit-backdrop-filter: blur(8px);
-    }
+/* 4. Inputs - Cleaner focus rings matching your Amber brand color */
+.glass-input {
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  color: #0f172a;
+  transition: all 0.25s ease;
+}
+.glass-input:not(:disabled):focus {
+  outline: none;
+  border-color: #f59e0b; 
+  background: #ffffff;
+  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.15); 
+}
+.glass-input:disabled {
+  background: rgba(255, 255, 255, 0.3);
+  color: rgba(15, 23, 42, 0.4);
+  cursor: not-allowed;
+}
 
-    .app-modal-card { animation: app-modal-in 0.2s ease-out; }
+/* 5. Toggles - Smoother sliding animation */
+.toggle-checkbox { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+.toggle-checkbox:checked { right: 0; border-color: #10b981; }
+.toggle-checkbox:checked + .toggle-label { 
+  background-color: #10b981; 
+  transition: background-color 0.3s ease; 
+}
 
-    @keyframes app-modal-in {
-      from { opacity: 0; transform: translateY(8px) scale(0.98); }
-      to { opacity: 1; transform: translateY(0) scale(1); }
-    }
+/* 6. Modals - Fluid entrance animation */
+.app-modal-backdrop {
+  background: rgba(15, 23, 42, 0.4); 
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+.app-modal-card { 
+  /* Uses cubic-bezier for a more "snappy" but smooth pop-in */
+  animation: app-modal-in 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; 
+}
+
+@keyframes app-modal-in {
+  from { opacity: 0; transform: translateY(12px) scale(0.96); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
