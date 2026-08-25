@@ -21,40 +21,75 @@ let LOGGED_IN_AGENT = CURRENT_USER_NAME || null;
 const currentPage = document.body.dataset.page;
 const isAuthorized = enforceSecurity();
 
+// ==========================================
+// 1. STRICT ROLE-BASED ACCESS CONTROL (RBAC)
+// ==========================================
+
 function enforceSecurity() {
-    // 1. Kick unauthenticated users to login
-    if (!CURRENT_USER_EMAIL && currentPage !== 'login') {
-        window.location.replace('/login');
-        return false;
-    }
-    
-    // 2. Route logged-in users to their correct starting page
-    if (CURRENT_USER_EMAIL && currentPage === 'login') {
-        let dest = '/workspace'; 
-        if (CURRENT_USER_ROLE === 'Team Leader' || CURRENT_USER_ROLE === 'Ops Manager') {
-            dest = '/teamleader';
-        }
-        if (CURRENT_USER_ROLE === 'Admin') {
-            dest = '/admin';
-        }
-        window.location.replace(dest);
-        return false;
+    const role = localStorage.getItem('USER_ROLE');
+    const email = localStorage.getItem('USER_EMAIL');
+    const currentPage = document.body.getAttribute('data-page');
+
+    // 1. Unauthenticated users are sent straight to login
+    if ((!role || !email) && currentPage !== 'login') {
+        window.location.replace('/login.html');
+        return;
     }
 
-    // 3. Strict Page Restrictions
-    if (CURRENT_USER_ROLE === 'Control Agent' && currentPage !== 'workspace' && currentPage !== 'login') {
-        window.location.replace('/workspace');
-        return false;
-    }
-    
-    if ((CURRENT_USER_ROLE === 'Team Leader' || CURRENT_USER_ROLE === 'Ops Manager') && (currentPage === 'workspace' || currentPage === 'admin')) {
-        window.location.replace('/teamleader');
-        return false;
+    // 2. If already logged in but sitting on the login page, auto-forward them
+    if (currentPage === 'login' && role) {
+        routeUserByRole(role);
+        return;
     }
 
-    return true;
+    // 3. THE ACCESS MATRIX (Define who can see what)
+    // Note: These match the 'data-page' attributes on your <body> tags
+    const accessMatrix = {
+        'Admin': ['workspace', 'campaigns', 'teamleader', 'dashboard', 'admin'],
+        'Ops Manager': ['workspace', 'campaigns', 'teamleader', 'dashboard', 'admin'],
+        'Team Leader': ['workspace', 'campaigns', 'teamleader', 'dashboard'],
+        'Control Agent': ['workspace']
+    };
+
+    // 4. Enforce Page Access
+    if (currentPage !== 'login') {
+        const allowedPages = accessMatrix[role] || [];
+        
+        // If their role doesn't have the current page in its allowed list:
+        if (!allowedPages.includes(currentPage)) {
+            routeUserByRole(role); // Boot them to their default page
+            return;
+        }
+
+        // 5. Hide unauthorized sidebar links visually
+        hideUnauthorizedMenuLinks(allowedPages);
+    }
 }
 
+// Helper: Routes users to their specific default dashboard
+function routeUserByRole(role) {
+    if (role === 'Admin' || role === 'Ops Manager') {
+        window.location.replace('/admin.html');
+    } else if (role === 'Team Leader') {
+        window.location.replace('/teamleader.html');
+    } else {
+        window.location.replace('/workspace.html'); // Default for Control Agents
+    }
+}
+
+// Helper: Hides sidebar icons the user isn't allowed to click
+function hideUnauthorizedMenuLinks(allowedPages) {
+    const sidebarLinks = document.querySelectorAll('aside a[data-page]');
+    sidebarLinks.forEach(link => {
+        const targetPage = link.getAttribute('data-page');
+        if (!allowedPages.includes(targetPage)) {
+            link.style.display = 'none'; // Erase the button completely
+        }
+    });
+}
+
+// Execute the bouncer immediately when the page loads
+document.addEventListener('DOMContentLoaded', enforceSecurity);
 window.logout = function() {
     localStorage.clear();
     window.location.replace('/login');
