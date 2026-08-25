@@ -1,4 +1,3 @@
-
 import os
 import json
 from typing import List, Optional
@@ -25,6 +24,7 @@ SCOPE = [
     "https://www.googleapis.com/auth/drive"
 ]
 
+
 def get_google_sheet():
     creds_json = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")
     
@@ -42,13 +42,22 @@ def get_google_sheet():
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to open sheet: {str(e)}")
 
-# Pydantic Schemas
-class AgentModel(BaseModel):
+# --- PYDANTIC SCHEMAS ---
+
+class UserCreateModel(BaseModel):
     name: str
     email: str
     role: str
-    password: str = ""
     status: str = "Active"
+    # No password required!
+
+class UserEditModel(BaseModel):
+    email: str
+    name: str
+    role: str
+
+class UserDeleteModel(BaseModel):
+    email: str
 
 class LoginModel(BaseModel):
     email: str
@@ -69,6 +78,7 @@ class CustomerUploadModel(BaseModel):
     balance: str
     campaign: str
 
+
 # --- ROOT & HEALTH ENDPOINTS ---
 @app.get("/")
 @app.get("/api")
@@ -80,7 +90,8 @@ def read_root():
 def health_check():
     return {"status": "ok", "message": "Call Center API is running"}
 
-# --- AUTHENTICATION & AGENTS ---
+
+# --- AUTHENTICATION ---
 @app.post("/login")
 @app.post("/api/login")
 def login(creds: LoginModel):
@@ -117,12 +128,13 @@ def login(creds: LoginModel):
         }
         
     except HTTPException:
-        # Re-raise our custom 403 blocks so FastAPI sends them to the frontend
         raise
     except Exception as e:
-        # 5. NO FALLBACKS: If the DB crashes, do NOT let them in.
         print(f"Database Login Error: {str(e)}")
         raise HTTPException(status_code=500, detail="Secure database connection failed. Please try again later.")
+
+
+# --- USER MANAGEMENT (ADMIN ENDPOINTS) ---
 
 @app.get("/agents")
 @app.get("/api/agents")
@@ -130,13 +142,79 @@ def get_agents():
     sheet = get_google_sheet().worksheet("Agents")
     return sheet.get_all_records()
 
-@app.post("/agents")
-@app.post("/api/agents")
-def add_agent(agent: AgentModel):
-    sheet = get_google_sheet().worksheet("Agents")
-    row_data = [agent.status, agent.name, agent.email, agent.role, agent.password]
-    sheet.append_row(row_data)
-    return {"status": "success", "message": f"Agent {agent.name} added successfully"}
+@app.post("/api/users/add")
+def add_user(user: UserCreateModel):
+    try:
+        sheet = get_google_sheet().worksheet("Agents")
+        
+        # Check if user already exists
+        existing_users = sheet.get_all_records()
+        for u in existing_users:
+            if str(u.get("Email", "")).lower().strip() == user.email.lower().strip():
+                raise HTTPException(status_code=400, detail="A user with this email already exists.")
+        
+        # Get headers to ensure we map correctly, or just append standard columns
+        # Structure assuming: Status | Name | Email | Role
+        row_data = [user.status, user.name, user.email, user.role]
+        sheet.append_row(row_data)
+        
+        return {"status": "success", "message": f"User {user.name} created successfully"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/users/edit")
+def edit_user(user: UserEditModel):
+    try:
+        sheet = get_google_sheet().worksheet("Agents")
+        records = sheet.get_all_records()
+        
+        row_idx = None
+        for idx, record in enumerate(records):
+            if str(record.get("Email", record.get("email", ""))).lower().strip() == user.email.lower().strip():
+                row_idx = idx + 2  # +2 because header is row 1, and index starts at 0
+                break
+                
+        if not row_idx:
+            raise HTTPException(status_code=404, detail="User not found in database.")
+            
+        # Dynamically find column numbers based on headers
+        headers = sheet.row_values(1)
+        name_col = headers.index("Name") + 1 if "Name" in headers else 2
+        role_col = headers.index("Role") + 1 if "Role" in headers else 4
+        
+        # Update specific cells
+        sheet.update_cell(row_idx, name_col, user.name)
+        sheet.update_cell(row_idx, role_col, user.role)
+        
+        return {"success": True}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/users/delete")
+def delete_user(user: UserDeleteModel):
+    try:
+        sheet = get_google_sheet().worksheet("Agents")
+        records = sheet.get_all_records()
+        
+        row_idx = None
+        for idx, record in enumerate(records):
+            if str(record.get("Email", record.get("email", ""))).lower().strip() == user.email.lower().strip():
+                row_idx = idx + 2
+                break
+                
+        if not row_idx:
+            raise HTTPException(status_code=404, detail="User not found in database.")
+            
+        sheet.delete_rows(row_idx)
+        return {"success": True}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.put("/agents/status")
 @app.put("/api/agents/status")
@@ -146,10 +224,12 @@ def update_agent_status(name: str = Body(...), status: str = Body(...)):
         cell = sheet.find(name)
         if not cell:
             raise HTTPException(status_code=404, detail="Agent not found")
-        sheet.update_cell(cell.row, 3, status)
+        # Ensure your status column is correctly mapped (using Col 1 as standard, change if your sheet differs)
+        sheet.update_cell(cell.row, 1, status) 
         return {"status": "success"}
     except gspread.exceptions.CellNotFound:
         raise HTTPException(status_code=404, detail="Agent not found in database")
+
 
 # --- CAMPAIGNS & CUSTOMERS ---
 @app.get("/campaigns")
@@ -195,6 +275,7 @@ def get_customers(agentName: Optional[str] = None):
         ]
     return records
 
+
 # --- ALLOCATION ENGINE ---
 @app.post("/distribute")
 @app.post("/api/distribute")
@@ -233,6 +314,7 @@ def distribute_customers(campaign: str = Body(...)):
     cust_sheet.update_cells(cells_to_update)
         
     return {"status": "success", "assignedCount": assigned_count}
+
 
 # --- DISPOSITION LOGGING ---
 @app.post("/disposition")
@@ -275,6 +357,5 @@ def submit_disposition(disp: DispositionModel):
     return {"status": "success"}
 
 # --- LOCALHOST STATIC FILE SERVING ---
-# This serves your HTML/JS/CSS locally, but gets out of the way on Vercel's live servers
 if os.getenv("VERCEL") is None:
     app.mount("/", StaticFiles(directory=".", html=True), name="static")

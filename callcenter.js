@@ -68,12 +68,12 @@ function enforceSecurity() {
 
 // Helper: Routes users to their specific default dashboard
 function routeUserByRole(role) {
-    if (role === 'Admin' || role === 'Ops Manager') {
-        window.location.replace('/admin.html');
-    } else if (role === 'Team Leader') {
-        window.location.replace('/teamleader.html');
+    if (role === 'Admin' || role === 'Ops Manager' || role === 'Team Leader') {
+        // Leaders now land on the Overview Command Center by default
+        window.location.replace('/overview.html');
     } else {
-        window.location.replace('/workspace.html'); // Default for Control Agents
+        // Control Agents still land directly in their workspace
+        window.location.replace('/workspace.html'); 
     }
 }
 
@@ -758,72 +758,48 @@ window.renderShiftManager = function() {
     });
 };
 
-window.createUser = async function(e, formType) {
-    e.preventDefault();
-
-    // 1. Define your exact company domain
-    const COMPANY_DOMAIN = "@4g-capital.com"; 
-
-    // Safely grab the input elements based on the formType prefix
-    const nameEl = document.getElementById(`${formType}-new-name`);
-    const emailEl = document.getElementById(`${formType}-new-email`);
+window.createUser = async function(event, context) {
+    event.preventDefault();
     
-    // Check if elements exist to prevent the "null" crash
-    if (!nameEl || !emailEl) {
-        showAppAlert("Form error: Could not find the required input fields.", "System Error");
-        return;
-    }
-
-    const name = nameEl.value.trim();
-    const email = emailEl.value.trim();
-
-    // 2. The Domain Restriction Check
-    if (!email.toLowerCase().endsWith(COMPANY_DOMAIN)) {
-        showAppAlert(`Users must have a ${COMPANY_DOMAIN} email address.`, "Invalid Email");
-        return;
-    }
+    let name, email, role;
     
-    // If it's the admin form, grab the role dropdown. Otherwise, default to Control Agent.
-    let role = 'Control Agent';
-    if (formType === 'admin') {
-        const roleEl = document.getElementById('admin-new-role');
-        if (roleEl) role = roleEl.value;
-    }
-    
-    // Safely verify existence with uppercase/lowercase checks
-    const exists = agents.find(a => {
-        const aName = a.Name || a.name;
-        const aEmail = a.Email || a.email;
-        return (aName && aName.toLowerCase() === name.toLowerCase()) || 
-               (aEmail && aEmail.toLowerCase() === email.toLowerCase());
-    });
-
-    if (exists) {
-        showAppAlert("A user with this name or email already exists.", "User Exists");
-        return;
+    // Check if the request is coming from the Admin page or Team Leader page
+    if (context === 'admin') {
+        name = document.getElementById('new-agent-name').value;
+        email = document.getElementById('new-agent-email').value;
+        role = document.getElementById('new-agent-role').value;
+    } else if (context === 'tl') {
+        name = document.getElementById('tl-new-name').value;
+        email = document.getElementById('tl-new-email').value;
+        role = 'Control Agent'; // TLs can only create Control Agents
     }
 
     try {
-        const res = await fetch(`${API_BASE}/agents`, {
+        // Change '/api/users/add' if your Python route is named differently!
+        const res = await fetch('/api/users/add', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name, email, role, status: 'Active' })
+            // NO password sent! Just the core identity.
+            body: JSON.stringify({ 
+                name: name.trim(), 
+                email: email.trim().toLowerCase(), 
+                role: role,
+                status: 'Active' 
+            })
         });
 
-        if (!res.ok) throw new Error(`Server returned HTTP ${res.status}`);
-        
-        e.target.reset();
-        await fetchAllData(); 
-        
-        // Refresh the lists dynamically based on the current page
-        if (currentPage === 'admin' && typeof renderAdminUserList === 'function') renderAdminUserList();
-        if (currentPage === 'teamleader' && typeof renderShiftManager === 'function') renderShiftManager();
-        
-        showAppAlert("User created successfully!", "Success");
-    } catch (err) {
-        showAppAlert("Failed to save user to the database.", "Network Error");
+        if (res.ok) {
+            // Refresh the page so the new user appears in the list immediately
+            location.reload(); 
+        } else {
+            const data = await res.json();
+            alert(data.detail || "Failed to create user.");
+        }
+    } catch (error) {
+        console.error("Error creating user:", error);
+        alert("Error connecting to the server.");
     }
-}
+};
 
 
 
@@ -1592,3 +1568,75 @@ window.exportResponsesSheets = function() {
     showAppAlert("Exporting as CSV. (Backend Sheets API endpoint required for direct sync).", "Exporting");
     exportResponsesCSV();
 };
+
+// ==========================================
+// DATA FETCHING & INITIALIZATION
+// ==========================================
+
+// Global variables to store the data
+window.agents = [];
+window.customers = [];
+
+// 1. Fetch Agents (Used by Admin and Team Leader pages)
+window.fetchAgentsData = async function() {
+    try {
+        const res = await fetch('/api/agents');
+        if (res.ok) {
+            window.agents = await res.json();
+            
+            const currentPage = document.body.getAttribute('data-page');
+            
+            // If on Admin page, render the Admin table
+            if (currentPage === 'admin' && typeof renderAdminUserList === 'function') {
+                renderAdminUserList();
+            }
+            
+            // If on Team Leader page, render the Shift Roster
+            if (currentPage === 'teamleader' && typeof renderShiftManager === 'function') {
+                renderShiftManager();
+            }
+        }
+    } catch (err) {
+        console.error("Failed to fetch agents:", err);
+    }
+};
+
+// 2. Fetch Customers (Used by Team Leader page)
+window.fetchCustomersData = async function() {
+    try {
+        const res = await fetch('/api/customers');
+        if (res.ok) {
+            window.customers = await res.json();
+            
+            const currentPage = document.body.getAttribute('data-page');
+            
+            if (currentPage === 'teamleader') {
+                if (typeof renderTLCustomers === 'function') renderTLCustomers();
+                if (typeof renderTLPending === 'function') renderTLPending();
+            }
+        }
+    } catch (err) {
+        console.error("Failed to fetch customers:", err);
+    }
+};
+
+// 3. Initialize everything when the page loads
+document.addEventListener('DOMContentLoaded', () => {
+    const currentPage = document.body.getAttribute('data-page');
+    
+    // Always load the header profile (name/role)
+    if (typeof loadUserProfile === 'function') loadUserProfile();
+
+    // Fetch the necessary data depending on which page we are on
+    if (currentPage === 'admin') {
+        fetchAgentsData();
+    } 
+    else if (currentPage === 'teamleader') {
+        fetchAgentsData();
+        fetchCustomersData();
+    }
+    else if (currentPage === 'workspace') {
+        // Assuming your workspace has its own fetch function for assigned leads
+        if (typeof fetchWorkspaceCustomers === 'function') fetchWorkspaceCustomers();
+    }
+});
