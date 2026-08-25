@@ -1556,12 +1556,6 @@ document.addEventListener('DOMContentLoaded', () => {
 // DATA RENDERING & OVERVIEW LOGIC
 // ==========================================
 
-// Helper to prevent HTML injection crashes
-const escapeHtml = (str) => {
-    if (!str) return '--';
-    return str.toString().replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
-};
-
 window.renderTLCustomers = function() {
     const tbody = document.getElementById('tl-customers-tbody');
     if (!tbody) return;
@@ -1689,11 +1683,8 @@ window.fetchCustomersData = async function() {
     await originalFetchCustomers();
     renderOverviewData();
 };
-// Auto-apply Dark Mode on load
-if (localStorage.getItem('theme') === 'dark' || (!localStorage.getItem('theme') && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-    document.documentElement.classList.add('dark');
-}
 
+// --- DARK MODE LOGIC ---
 window.toggleDarkMode = function() {
     const htmlEl = document.documentElement;
     if (htmlEl.classList.contains('dark')) {
@@ -1704,3 +1695,8 @@ window.toggleDarkMode = function() {
         localStorage.setItem('theme', 'dark');
     }
 };
+
+// Auto-apply Dark Mode on load
+if (localStorage.getItem('theme') === 'dark' || (!localStorage.getItem('theme') && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+    document.documentElement.classList.add('dark');
+}
