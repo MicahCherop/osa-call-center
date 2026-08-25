@@ -73,12 +73,13 @@ class CustomerUploadModel(BaseModel):
 def read_root():
     return {"message": "FastAPI Server is running successfully on Vercel!"}
 
-@app.get("/api/health")
 @app.get("/health")
+@app.get("/api/health")
 def health_check():
     return {"status": "ok", "message": "Call Center API is running"}
 
 # --- AUTHENTICATION & AGENTS ---
+@app.post("/login")
 @app.post("/api/login")
 def login(creds: LoginModel):
     try:
@@ -115,11 +116,13 @@ def login(creds: LoginModel):
             "name": creds.email.split("@")[0].title()
         }
 
+@app.get("/agents")
 @app.get("/api/agents")
 def get_agents():
     sheet = get_google_sheet().worksheet("Agents")
     return sheet.get_all_records()
 
+@app.post("/agents")
 @app.post("/api/agents")
 def add_agent(agent: AgentModel):
     sheet = get_google_sheet().worksheet("Agents")
@@ -127,6 +130,7 @@ def add_agent(agent: AgentModel):
     sheet.append_row(row_data)
     return {"status": "success", "message": f"Agent {agent.name} added successfully"}
 
+@app.put("/agents/status")
 @app.put("/api/agents/status")
 def update_agent_status(name: str = Body(...), status: str = Body(...)):
     sheet = get_google_sheet().worksheet("Agents")
@@ -140,14 +144,14 @@ def update_agent_status(name: str = Body(...), status: str = Body(...)):
         raise HTTPException(status_code=404, detail="Agent not found in database")
 
 # --- CAMPAIGNS & CUSTOMERS ---
-@app.get("/api/campaigns")
 @app.get("/campaigns")
+@app.get("/api/campaigns")
 def get_campaigns():
     sheet = get_google_sheet().worksheet("Campaigns")
     return sheet.get_all_records()
 
-@app.post("/api/campaigns")
 @app.post("/campaigns")
+@app.post("/api/campaigns")
 def create_campaign(
     name: str = Body(...), 
     type: str = Body(...), 
@@ -171,8 +175,8 @@ def create_campaign(
     
     return {"status": "success", "imported": len(customers)}
 
-@app.get("/api/customers")
 @app.get("/customers")
+@app.get("/api/customers")
 def get_customers(agentName: Optional[str] = None):
     sheet = get_google_sheet().worksheet("Customers")
     records = sheet.get_all_records()
@@ -184,8 +188,8 @@ def get_customers(agentName: Optional[str] = None):
     return records
 
 # --- ALLOCATION ENGINE ---
-@app.post("/api/distribute")
 @app.post("/distribute")
+@app.post("/api/distribute")
 def distribute_customers(campaign: str = Body(...)):
     sh = get_google_sheet()
     cust_sheet = sh.worksheet("Customers")
@@ -223,8 +227,8 @@ def distribute_customers(campaign: str = Body(...)):
     return {"status": "success", "assignedCount": assigned_count}
 
 # --- DISPOSITION LOGGING ---
-@app.post("/api/disposition")
 @app.post("/disposition")
+@app.post("/api/disposition")
 def submit_disposition(disp: DispositionModel):
     sh = get_google_sheet()
     cust_sheet = sh.worksheet("Customers")
