@@ -4,7 +4,16 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Login - OSA Call Center</title>
-  <script src="https://cdn.tailwindcss.com"></script>  
+  <!-- Cleaned up Tailwind Config -->
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: { brandDark: '#0f172a', brandAmber: '#f59e0b' }
+        }
+      }
+    }
+  </script>
   <link rel="icon" href="data:,">
   <link rel="stylesheet" href="/callcenter.css">
 </head>
@@ -39,10 +48,15 @@
   <script>
     const CLIENT_ID = "106325673835-4moq7op50u80oet78ln84t241a88a200.apps.googleusercontent.com";
     
-    // 1. Build the Redirect URL
     function redirectToGoogle() {
-      const redirectUri = "https://osa-call-center.vercel.app/login"; 
-      const oauth2Endpoint = "https://accounts.google.com/o/oauth2/v2/auth";
+    // Smart Redirect: Detects if you are testing locally or on the live site
+    const isLocalhost = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+    const redirectUri = isLocalhost 
+        ? window.location.origin + "/login" 
+        : "https://osa-call-center.vercel.app/login";
+      
+  const oauth2Endpoint = "https://accounts.google.com/o/oauth2/v2/auth";
+  // ...
       
       const form = document.createElement("form");
       form.setAttribute("method", "GET");
