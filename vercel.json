@@ -1,8 +1,7 @@
 {
-  "cleanUrls": true,
   "builds": [
     {
-      "src": "api/index.py",
+      "src": "api/**/*.py",
       "use": "@vercel/python"
     },
     {
@@ -14,6 +13,13 @@
     {
       "source": "/api/(.*)",
       "destination": "/api/index.py"
+    }
+  ],
+  "redirects": [
+    {
+      "source": "/",
+      "destination": "/login.html",
+      "permanent": true
     }
   ]
 }
