@@ -5,22 +5,24 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Login - OSA Call Center</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  
   <!-- Fetch standard weights for Poppins -->
-<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 
-<!-- Cleaned up Tailwind Config -->
-<script>
-  tailwind.config = {
-    theme: {
-      extend: {
-        fontFamily: { sans: ['Poppins', 'sans-serif'] },
-        colors: { brandDark: '#0f172a', brandAmber: '#f59e0b' }
+  <!-- Cleaned up Tailwind Config -->
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Poppins', 'sans-serif'] },
+          colors: { brandDark: '#0f172a', brandAmber: '#f59e0b' }
+        }
       }
     }
-  }
-</script>
+  </script>
+  
   <link rel="icon" href="data:,">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100;200;300&display=swap" rel="stylesheet">
+  <!-- Removed the old conflicting Inter font from here -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <link rel="stylesheet" href="/callcenter.css">
 </head>
@@ -31,19 +33,23 @@
   </div>
   
   <div class="glass-panel p-8 rounded-2xl w-full max-w-md relative z-10 shadow-2xl bg-white/90 backdrop-blur-md border border-brandDark/10 text-center">
-    <h1 class="text-3xl font-bold text-brandDark mb-2">OSA Call Center</h1>
+    
+    <!-- Changed from font-bold to font-semibold for a cleaner look -->
+    <h1 class="text-3xl font-semibold text-brandDark mb-2">OSA Call Center</h1>
     <p class="text-brandDark/60 text-sm mb-8">Sign in securely with your company account</p>
     
     <div id="google-btn-container" class="flex justify-center mb-4">
-      <button onclick="redirectToGoogle()" class="w-full bg-brandDark hover:bg-slate-800 text-white py-3 rounded-lg shadow-md transition flex items-center justify-center gap-3">
+      <!-- Added font-medium to make the button text crisp but not heavy -->
+      <button onclick="redirectToGoogle()" class="w-full bg-brandDark hover:bg-slate-800 text-white py-3 rounded-lg shadow-md transition flex items-center justify-center gap-3 font-medium">
         <i class="fa-brands fa-google text-brandAmber text-lg"></i> Continue with Google
       </button>
     </div>
     
-    <div id="login-status" class="text-brandAmber text-sm mt-3 font-bold hidden flex items-center justify-center gap-2">
+    <!-- Changed font-bold to font-medium for the status text -->
+    <div id="login-status" class="text-brandAmber text-sm mt-3 font-medium hidden flex items-center justify-center gap-2">
       <i class="fa-solid fa-circle-notch fa-spin"></i> Verifying authorization...
     </div>
-    <div id="login-error" class="text-red-500 text-sm mt-3 hidden font-bold"></div>
+    <div id="login-error" class="text-red-500 text-sm mt-3 hidden font-medium"></div>
   </div>
 
   <script src="/callcenter.js"></script>
@@ -53,7 +59,6 @@
     
     // 1. Build the Redirect URL
     function redirectToGoogle() {
-      // FIX: Hardcoded the exact production URL so Google doesn't block Vercel preview URLs
       const redirectUri = "https://osa-call-center.vercel.app/login"; 
       const oauth2Endpoint = "https://accounts.google.com/o/oauth2/v2/auth";
       

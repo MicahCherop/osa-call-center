@@ -4,27 +4,32 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>OSA Call Center - Workspace</title>
+  
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- Fetch standard weights for Poppins -->
-<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  
+  <!-- ONLY Poppins is loaded now. Conflicting Inter font has been removed! -->
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 
-<!-- Cleaned up Tailwind Config -->
-<script>
-  tailwind.config = {
-    theme: {
-      extend: {
-        fontFamily: { sans: ['Poppins', 'sans-serif'] },
-        colors: { brandDark: '#0f172a', brandAmber: '#f59e0b' }
+  <!-- Cleaned up Tailwind Config -->
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Poppins', 'sans-serif'] },
+          colors: { brandDark: '#0f172a', brandAmber: '#f59e0b' }
+        }
       }
     }
-  }
-</script>
+  </script>
   <link rel="stylesheet" href="/callcenter.css">
 </head>
-<body data-page="workspace" class="text-brandDark font-sans font-normal h-screen overflow-hidden flex relative bg-slate-50">
+
+<!-- Added text-sm here to proportionally scale down all text in the workspace -->
+<body data-page="workspace" class="text-brandDark font-sans font-normal text-sm h-screen overflow-hidden flex relative bg-slate-50">
+  
   <!-- BACKGROUND -->
   <div class="absolute inset-0 z-0 overflow-hidden pointer-events-none">
     <div class="absolute top-[-10%] left-[-10%] w-[40rem] h-[40rem] bg-amber-200 rounded-full mix-blend-multiply filter blur-3xl opacity-60 animate-blob"></div>
@@ -148,23 +153,23 @@
 
   <!-- SIDEBAR -->
   <aside class="z-10 w-20 md:w-24 glass-panel border-r flex flex-col items-center py-6">
-    <a href="/workspace.html" data-page="workspace" class="nav-btn w-full py-4 flex flex-col items-center gap-1.5 text-[11px] font-semibold text-brandDark/70 hover:text-brandDark transition-colors relative bg-white/40">
+    <a href="/workspace" data-page="workspace" class="nav-btn w-full py-4 flex flex-col items-center gap-1.5 text-[11px] font-semibold text-brandDark/70 hover:text-brandDark transition-colors relative bg-white/40">
       <i class="fa-solid fa-headset text-[20px]"></i> Workspace
       <div class="active-indicator absolute left-0 top-0 h-full w-1 bg-brandAmber"></div>
     </a>
-    <a href="/campaigns.html" data-page="campaigns" class="nav-btn w-full py-4 flex flex-col items-center gap-1.5 text-[11px] font-semibold text-brandDark/70 hover:text-brandDark transition-colors relative">
+    <a href="/campaigns" data-page="campaigns" class="nav-btn w-full py-4 flex flex-col items-center gap-1.5 text-[11px] font-semibold text-brandDark/70 hover:text-brandDark transition-colors relative">
       <i class="fa-solid fa-bullhorn text-[20px]"></i> Campaigns
       <div class="active-indicator absolute left-0 top-0 h-full w-1 bg-brandAmber hidden"></div>
     </a>
-    <a href="/teamleader.html" data-page="teamleader" class="nav-btn w-full py-4 flex flex-col items-center gap-1.5 text-[11px] font-semibold text-brandDark/70 hover:text-brandDark transition-colors relative">
+    <a href="/teamleader" data-page="teamleader" class="nav-btn w-full py-4 flex flex-col items-center gap-1.5 text-[11px] font-semibold text-brandDark/70 hover:text-brandDark transition-colors relative">
       <i class="fa-solid fa-user-tie text-[20px]"></i> Team Lead
       <div class="active-indicator absolute left-0 top-0 h-full w-1 bg-brandAmber hidden"></div>
     </a>
-    <a href="/analytics.html" data-page="dashboard" class="nav-btn w-full py-4 flex flex-col items-center gap-1.5 text-[11px] font-semibold text-brandDark/70 hover:text-brandDark transition-colors relative">
+    <a href="/analytics" data-page="dashboard" class="nav-btn w-full py-4 flex flex-col items-center gap-1.5 text-[11px] font-semibold text-brandDark/70 hover:text-brandDark transition-colors relative">
       <i class="fa-solid fa-chart-pie text-[20px]"></i> Analytics
       <div class="active-indicator absolute left-0 top-0 h-full w-1 bg-brandAmber hidden"></div>
     </a>
-    <a href="admin.html" data-page="admin" class="nav-btn w-full py-4 flex flex-col items-center gap-1.5 text-[11px] font-semibold text-brandDark/70 hover:text-brandDark transition-colors relative">
+    <a href="/admin" data-page="admin" class="nav-btn w-full py-4 flex flex-col items-center gap-1.5 text-[11px] font-semibold text-brandDark/70 hover:text-brandDark transition-colors relative">
       <i class="fa-solid fa-shield-halved text-[20px]"></i> Admin
       <div class="active-indicator absolute left-0 top-0 h-full w-1 bg-brandAmber hidden"></div>
     </a>
@@ -173,47 +178,45 @@
   <main class="z-10 flex-1 flex flex-col p-6 overflow-hidden">
     <!-- TOP BAR -->
     <header class="glass-panel rounded-2xl px-6 py-4 mb-6 flex justify-between items-center shrink-0">
-      <h1 class="text-2xl font-bold tracking-tight flex items-center gap-3">
+      <h1 class="text-2xl font-semibold tracking-tight flex items-center gap-3">
         <i class="fa-solid fa-phone-volume text-brandAmber"></i> OSA Call Center
       </h1>
       <div class="flex items-center gap-5 text-sm">
         <button class="text-brandDark/60 hover:text-brandDark transition"><i class="fa-regular fa-bell text-xl"></i></button>
+        
         <div class="flex items-center gap-3 pl-4 border-l border-brandDark/20">
-          <i class="fa-solid fa-circle-user text-3xl text-brandDark/80"></i>
-          <div class="leading-tight">
+          
           <!-- Clickable Profile Section -->
-          <div class="relative ml-4 pl-4 border-l border-slate-200">
-            <button onclick="toggleLogoutModal()" class="flex items-center gap-3 hover:bg-slate-100 p-1.5 rounded-lg transition text-left outline-none">
-              
+          <div class="relative">
+            <button onclick="toggleLogoutModal()" class="flex items-center gap-3 hover:bg-slate-100/50 p-1.5 rounded-lg transition text-left outline-none">
               <!-- Avatar -->
               <div class="w-9 h-9 bg-slate-700 text-white rounded-full flex items-center justify-center">
                 <i class="fa-solid fa-user text-sm"></i>
               </div>
-              
-              <!-- Dynamic Name & Role (Thinner Fonts) -->
+              <!-- Dynamic Name & Role -->
               <div class="hidden sm:block">
                 <div id="header-user-name" class="text-sm font-medium text-slate-800">Loading...</div>
-                <div id="header-user-role" class="text-xs font-normal text-slate-500">Role</div>
+                <div id="header-user-role" class="text-[11px] font-normal text-slate-500">Role</div>
               </div>
-              
               <i class="fa-solid fa-chevron-down text-xs text-slate-400 ml-1"></i>
             </button>
 
-            <!-- The Logout Modal (Hidden by default) -->
-            <div id="logout-modal" class="hidden absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-slate-100 z-50 overflow-hidden">
+            <!-- The Logout Modal -->
+            <div id="logout-modal" class="hidden absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-xl border border-slate-100 z-50 overflow-hidden">
               <div class="p-4 border-b border-slate-50 bg-slate-50/50">
                 <p class="text-xs font-normal text-slate-500 mb-1">Signed in as</p>
-                <p id="modal-user-email" class="text-xs font-medium text-slate-800 truncate">email@loading.com</p>
+                <p id="modal-user-email" class="text-sm font-medium text-slate-800 truncate">email@loading.com</p>
               </div>
               <button onclick="logout()" class="w-full text-left px-4 py-3 text-sm font-medium text-red-600 hover:bg-red-50 transition flex items-center gap-2">
                 <i class="fa-solid fa-arrow-right-from-bracket"></i> Sign out
               </button>
             </div>
           </div>
-            <div id="global-status-text" class="text-[11px] text-gray-500 font-bold flex items-center gap-1 uppercase transition-colors mt-1 pl-1">
-              <span id="global-status-dot" class="w-2 h-2 rounded-full bg-gray-400 transition-colors"></span> OFFLINE
-            </div>
+          
+          <div id="global-status-text" class="text-[11px] text-gray-500 font-medium flex items-center gap-1 uppercase transition-colors mt-1 pl-2 border-l border-brandDark/10">
+            <span id="global-status-dot" class="w-2 h-2 rounded-full bg-gray-400 transition-colors"></span> OFFLINE
           </div>
+          
         </div>
       </div>
     </header>
@@ -235,16 +238,16 @@
             <div class="flex gap-6 text-center border-r border-brandDark/10 pr-8">
               <div>
                 <div class="text-[10px] font-bold text-brandDark/50 uppercase">Calls Today</div>
-                <div class="text-xl font-bold" id="ws-stats-calls">0</div>
+                <div class="text-xl font-semibold" id="ws-stats-calls">0</div>
               </div>
               <div>
                 <div class="text-[10px] font-bold text-brandDark/50 uppercase">Conversion</div>
-                <div class="text-xl font-bold text-green-700" id="ws-stats-conv">Sh 0</div>
+                <div class="text-xl font-semibold text-green-700" id="ws-stats-conv">Sh 0</div>
               </div>
             </div>
             
             <div class="flex items-center gap-3">
-              <span class="font-semibold text-sm" id="clock-status-label">Clocked Out</span>
+              <span class="font-medium text-sm" id="clock-status-label">Clocked Out</span>
               <div class="relative inline-block w-12 mr-2 align-middle select-none transition duration-200 ease-in">
                 <input type="checkbox" name="toggle" id="clock-in-toggle" onchange="toggleAgentStatus(this)" class="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-4 border-gray-300 appearance-none cursor-pointer transition-all duration-300 z-10"/>
                 <label for="clock-in-toggle" class="toggle-label block overflow-hidden h-6 rounded-full bg-gray-300 cursor-pointer transition-colors duration-300"></label>
@@ -267,11 +270,11 @@
           <div id="workspace-queue" class="w-1/3 glass-panel rounded-2xl p-5 flex flex-col h-full bg-white/40 hidden">
             <div class="flex justify-between items-center mb-4 border-b border-brandDark/10 pb-3">
                <h3 class="font-semibold text-brandDark flex items-center gap-2"><i class="fa-solid fa-list-ul text-brandAmber"></i> Workspace</h3>
-               <span class="text-xs font-bold bg-brandAmber/20 text-amber-700 px-2 py-1 rounded" id="queue-count">0 Remaining</span>
+               <span class="text-xs font-semibold bg-brandAmber/20 text-amber-700 px-2 py-1 rounded" id="queue-count">0 Remaining</span>
             </div>
             <div class="grid grid-cols-2 gap-2 mb-4">
-              <button id="ws-queue-tab-active" onclick="switchWorkspaceQueueTab('active')" class="ws-queue-tab rounded-lg bg-brandDark text-white text-xs font-bold py-2 transition">Active</button>
-              <button id="ws-queue-tab-pending" onclick="switchWorkspaceQueueTab('pending')" class="ws-queue-tab rounded-lg bg-white/50 border border-brandDark/10 text-brandDark/70 text-xs font-bold py-2 transition">Pending</button>
+              <button id="ws-queue-tab-active" onclick="switchWorkspaceQueueTab('active')" class="ws-queue-tab rounded-lg bg-brandDark text-white text-xs font-medium py-2 transition">Active</button>
+              <button id="ws-queue-tab-pending" onclick="switchWorkspaceQueueTab('pending')" class="ws-queue-tab rounded-lg bg-white/50 border border-brandDark/10 text-brandDark/70 text-xs font-medium py-2 transition">Pending</button>
             </div>
             <div id="agent-customer-list" class="flex-1 overflow-y-auto space-y-3 pr-2">
                <!-- JS Injects customers here -->
@@ -292,30 +295,30 @@
               <div class="flex justify-between items-start border-b border-brandDark/10 pb-4 mb-6">
                 <div>
                   <div class="flex items-center gap-3 mb-2">
-                    <h3 class="text-2xl font-bold" id="active-name">--</h3>
-                    <span class="bg-red-500/10 text-red-600 border border-red-500/20 px-2.5 py-1 rounded-md text-[11px] font-bold flex items-center gap-1">
+                    <h3 class="text-2xl font-semibold" id="active-name">--</h3>
+                    <span class="bg-red-500/10 text-red-600 border border-red-500/20 px-2.5 py-1 rounded-md text-[11px] font-semibold flex items-center gap-1">
                       <i class="fa-solid fa-lock"></i> Locked
                     </span>
                   </div>
                   <p class="text-lg text-brandDark/70 font-medium" id="active-phone">--</p>
                 </div>
                 <div class="text-right">
-                  <p class="text-xs font-bold text-brandDark/50 uppercase">Campaign</p>
-                  <p class="font-semibold text-brandDark" id="active-campaign">--</p>
+                  <p class="text-[10px] font-bold text-brandDark/50 uppercase">Campaign</p>
+                  <p class="font-medium text-brandDark" id="active-campaign">--</p>
                 </div>
               </div>
               <div class="grid grid-cols-2 gap-4 mb-6">
                 <div class="bg-white/50 p-4 rounded-xl border border-white/60">
-                  <p class="text-xs font-bold text-brandDark/50 uppercase mb-1">Debt Amount</p>
-                  <p class="text-lg font-bold text-red-600" id="active-debt">--</p>
+                  <p class="text-[10px] font-bold text-brandDark/50 uppercase mb-1">Debt Amount</p>
+                  <p class="text-lg font-semibold text-red-600" id="active-debt">--</p>
                 </div>
                 <div class="bg-white/50 p-4 rounded-xl border border-white/60">
-                  <p class="text-xs font-bold text-brandDark/50 uppercase mb-1">Branch / Sector</p>
-                  <p class="text-sm font-bold text-brandDark truncate" id="active-branch">--</p>
+                  <p class="text-[10px] font-bold text-brandDark/50 uppercase mb-1">Branch / Sector</p>
+                  <p class="text-sm font-medium text-brandDark truncate" id="active-branch">--</p>
                 </div>
               </div>
               <div class="border-t border-brandDark/10 pt-4">
-                <h4 class="text-xs font-bold text-brandDark/50 uppercase mb-3">Uploaded Customer Details</h4>
+                <h4 class="text-[10px] font-bold text-brandDark/50 uppercase mb-3">Uploaded Customer Details</h4>
                 <div class="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
                   <div><p class="text-[10px] font-bold uppercase text-brandDark/50">URL</p><a id="active-url" class="font-medium text-blue-700 hover:underline break-all" target="_blank" rel="noopener">--</a></div>
                   <div><p class="text-[10px] font-bold uppercase text-brandDark/50">Mobile No</p><p id="active-mobile-no" class="font-medium">--</p></div>
@@ -361,7 +364,7 @@
                   </select>
                 </div>
 
-                <!-- DYNAMIC CONDITIONAL: Customer Response (For No Loan / Dormant) -->
+                <!-- DYNAMIC CONDITIONAL: Customer Response -->
                 <div id="container-customer-response" class="hidden">
                   <label class="block text-[11px] font-bold text-brandDark/70 uppercase mb-1.5">Customer Response *</label>
                   <select class="glass-input rounded-lg w-full px-3 py-2 text-sm font-medium bg-white/50" id="disp-response" onchange="handleOutcomeChangeGlass()">
@@ -373,7 +376,7 @@
                   </select>
                 </div>
 
-                <!-- DYNAMIC CONDITIONAL: Account Status (For Defaulted / Upcoming Dues) -->
+                <!-- DYNAMIC CONDITIONAL: Account Status -->
                 <div id="container-account-status" class="hidden">
                   <label class="block text-[11px] font-bold text-brandDark/70 uppercase mb-1.5">Account Status *</label>
                   <div class="flex gap-2">
@@ -387,7 +390,7 @@
                   </div>
                 </div>
 
-                <!-- Business Status (Global for all) -->
+                <!-- Business Status -->
                 <div>
                   <label class="block text-[11px] font-bold text-brandDark/70 uppercase mb-1.5">Business Status</label>
                   <div class="flex gap-2">
@@ -401,7 +404,7 @@
                   </div>
                 </div>
 
-                <!-- DYNAMIC: Amount recovered (Triggered by PTP or Settled) -->
+                <!-- DYNAMIC: Amount recovered -->
                 <div id="dynamic-amount" class="hidden flex flex-col gap-3 bg-white/40 p-3 rounded-xl border border-brandAmber/20">
                   <div>
                     <label class="block text-[11px] font-bold text-brandDark/70 uppercase mb-1.5">Amount (Sh) *</label>
@@ -414,7 +417,7 @@
                   <textarea id="disp-comments" placeholder="Summarize call..." class="glass-input rounded-lg w-full h-16 px-3 py-2 text-sm font-medium bg-white/50 resize-none"></textarea>
                 </div>
 
-                <button type="submit" class="w-full bg-gradient-to-br from-amber-400 to-amber-500 hover:from-amber-500 hover:to-amber-600 text-brandDark font-bold px-4 py-3 rounded-xl shadow-md transition transform hover:-translate-y-0.5 mt-auto flex items-center justify-center gap-2">
+                <button type="submit" class="w-full bg-gradient-to-br from-amber-400 to-amber-500 hover:from-amber-500 hover:to-amber-600 text-brandDark font-semibold px-4 py-3 rounded-xl shadow-md transition transform hover:-translate-y-0.5 mt-auto flex items-center justify-center gap-2">
                   <i class="fa-solid fa-check-double"></i> Submit
                 </button>
               </form>

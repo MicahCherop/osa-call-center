@@ -2,83 +2,161 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Admin - User Management</title>
+  
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="icon" href="data:,">
-  <!-- Fetch standard weights for Poppins -->
-<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  
+  <!-- ONLY Poppins is loaded -->
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 
-<!-- Cleaned up Tailwind Config -->
-<script>
-  tailwind.config = {
-    theme: {
-      extend: {
-        fontFamily: { sans: ['Poppins', 'sans-serif'] },
-        colors: { brandDark: '#0f172a', brandAmber: '#f59e0b' }
+  <!-- Cleaned up Tailwind Config -->
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Poppins', 'sans-serif'] },
+          colors: { brandDark: '#0f172a', brandAmber: '#f59e0b' }
+        }
       }
     }
-  }
-</script>
+  </script>
   
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <link rel="stylesheet" href="/callcenter.css">
 </head>
-<body data-page="admin" class="flex h-screen bg-slate-50 text-brandDark">
+
+<!-- Added text-sm to proportionally scale down all text -->
+<body data-page="admin" class="text-brandDark font-sans font-normal text-sm h-screen overflow-hidden flex relative bg-slate-50">
   
-  <main class="flex-1 p-6 overflow-y-auto">
-    <header class="glass-panel rounded-2xl px-6 py-4 mb-6 flex justify-between items-center shadow-sm bg-white/80">
-      <h1 class="text-2xl font-bold tracking-tight"><i class="fa-solid fa-shield-halved mr-2 text-brandAmber"></i> Ops Manager Admin</h1>
-      <button onclick="promptLogout()" class="text-sm font-bold bg-brandAmber hover:bg-amber-600 text-white px-4 py-2 rounded-lg transition shadow-sm"><i class="fa-solid fa-right-from-bracket mr-1"></i> Logout</button>
+  <!-- BACKGROUND -->
+  <div class="absolute inset-0 z-0 overflow-hidden pointer-events-none">
+    <div class="absolute top-[-10%] left-[-10%] w-[40rem] h-[40rem] bg-amber-200 rounded-full mix-blend-multiply filter blur-3xl opacity-60 animate-blob"></div>
+    <div class="absolute top-[20%] right-[-10%] w-[35rem] h-[35rem] bg-blue-200 rounded-full mix-blend-multiply filter blur-3xl opacity-60 animate-blob" style="animation-delay: 2s"></div>
+    <div class="absolute bottom-[-20%] left-[20%] w-[45rem] h-[45rem] bg-indigo-200 rounded-full mix-blend-multiply filter blur-3xl opacity-60 animate-blob" style="animation-delay: 4s"></div>
+  </div>
+
+  <!-- SIDEBAR (Added so the layout matches the rest of the app) -->
+  <aside class="z-10 w-20 md:w-24 glass-panel border-r flex flex-col items-center py-6">
+    <a href="/workspace" data-page="workspace" class="nav-btn w-full py-4 flex flex-col items-center gap-1.5 text-[11px] font-semibold text-brandDark/70 hover:text-brandDark transition-colors relative">
+      <i class="fa-solid fa-headset text-[20px]"></i> Workspace
+      <div class="active-indicator absolute left-0 top-0 h-full w-1 bg-brandAmber hidden"></div>
+    </a>
+    <a href="/campaigns" data-page="campaigns" class="nav-btn w-full py-4 flex flex-col items-center gap-1.5 text-[11px] font-semibold text-brandDark/70 hover:text-brandDark transition-colors relative">
+      <i class="fa-solid fa-bullhorn text-[20px]"></i> Campaigns
+      <div class="active-indicator absolute left-0 top-0 h-full w-1 bg-brandAmber hidden"></div>
+    </a>
+    <a href="/teamleader" data-page="teamleader" class="nav-btn w-full py-4 flex flex-col items-center gap-1.5 text-[11px] font-semibold text-brandDark/70 hover:text-brandDark transition-colors relative">
+      <i class="fa-solid fa-user-tie text-[20px]"></i> Team Lead
+      <div class="active-indicator absolute left-0 top-0 h-full w-1 bg-brandAmber hidden"></div>
+    </a>
+    <a href="/analytics" data-page="dashboard" class="nav-btn w-full py-4 flex flex-col items-center gap-1.5 text-[11px] font-semibold text-brandDark/70 hover:text-brandDark transition-colors relative">
+      <i class="fa-solid fa-chart-pie text-[20px]"></i> Analytics
+      <div class="active-indicator absolute left-0 top-0 h-full w-1 bg-brandAmber hidden"></div>
+    </a>
+    <a href="/admin" data-page="admin" class="nav-btn w-full py-4 flex flex-col items-center gap-1.5 text-[11px] font-semibold text-brandDark/70 hover:text-brandDark transition-colors relative bg-white/40">
+      <i class="fa-solid fa-shield-halved text-[20px]"></i> Admin
+      <div class="active-indicator absolute left-0 top-0 h-full w-1 bg-brandAmber"></div>
+    </a>
+  </aside>
+
+  <main class="z-10 flex-1 flex flex-col p-6 overflow-hidden">
+    <!-- TOP BAR -->
+    <header class="glass-panel rounded-2xl px-6 py-4 mb-6 flex justify-between items-center shrink-0">
+      <h1 class="text-2xl font-semibold tracking-tight flex items-center gap-3">
+        <i class="fa-solid fa-shield-halved text-brandAmber"></i> Ops Manager Admin
+      </h1>
+      
+      <div class="flex items-center gap-5 text-sm">
+        <button class="text-brandDark/60 hover:text-brandDark transition"><i class="fa-regular fa-bell text-xl"></i></button>
+        
+        <div class="flex items-center gap-3 pl-4 border-l border-brandDark/20">
+          <!-- Clickable Profile Section -->
+          <div class="relative">
+            <button onclick="toggleLogoutModal()" class="flex items-center gap-3 hover:bg-slate-100/50 p-1.5 rounded-lg transition text-left outline-none">
+              <!-- Avatar -->
+              <div class="w-9 h-9 bg-slate-700 text-white rounded-full flex items-center justify-center">
+                <i class="fa-solid fa-user text-sm"></i>
+              </div>
+              <!-- Dynamic Name & Role -->
+              <div class="hidden sm:block">
+                <div id="header-user-name" class="text-sm font-medium text-slate-800">Loading...</div>
+                <div id="header-user-role" class="text-[11px] font-normal text-slate-500">Role</div>
+              </div>
+              <i class="fa-solid fa-chevron-down text-xs text-slate-400 ml-1"></i>
+            </button>
+
+            <!-- The Logout Modal -->
+            <div id="logout-modal" class="hidden absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-xl border border-slate-100 z-50 overflow-hidden">
+              <div class="p-4 border-b border-slate-50 bg-slate-50/50">
+                <p class="text-xs font-normal text-slate-500 mb-1">Signed in as</p>
+                <p id="modal-user-email" class="text-sm font-medium text-slate-800 truncate">email@loading.com</p>
+              </div>
+              <button onclick="logout()" class="w-full text-left px-4 py-3 text-sm font-medium text-red-600 hover:bg-red-50 transition flex items-center gap-2">
+                <i class="fa-solid fa-arrow-right-from-bracket"></i> Sign out
+              </button>
+            </div>
+          </div>
+          
+          <div id="global-status-text" class="text-[11px] text-gray-500 font-medium flex items-center gap-1 uppercase transition-colors mt-1 pl-2 border-l border-brandDark/10">
+            <span id="global-status-dot" class="w-2 h-2 rounded-full bg-gray-400 transition-colors"></span> OFFLINE
+          </div>
+          
+        </div>
+      </div>
     </header>
 
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      <!-- Create Managers Form -->
-      <div class="glass-panel p-6 rounded-2xl bg-white/80 shadow-md border border-brandDark/10 h-fit">
-        <h2 class="text-lg font-bold mb-4 border-b border-brandDark/10 pb-2">Add Leadership Role</h2>
-            <form onsubmit="createUser(event)" class="space-y-4">
+    <div class="flex-1 overflow-y-auto pr-2 pb-6">
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Create Managers Form -->
+        <div class="glass-panel p-6 rounded-2xl bg-white/80 shadow-md border border-brandDark/10 h-fit">
+          <h2 class="text-lg font-semibold mb-4 border-b border-brandDark/10 pb-2">Add Leadership Role</h2>
+          <form onsubmit="createUser(event, 'admin')" class="space-y-4">
             <div>
-                <label class="block text-[11px] font-bold text-brandDark/70 uppercase mb-1">Full Name</label>
-                <input type="text" id="new-agent-name" required placeholder="Jane Doe" class="glass-input rounded-lg w-full px-3 py-2 text-sm border border-brandDark/20 bg-white/50">
+              <label class="block text-[11px] font-semibold text-brandDark/70 uppercase mb-1">Full Name</label>
+              <input type="text" id="new-agent-name" required placeholder="Jane Doe" class="glass-input rounded-lg w-full px-3 py-2 text-sm border border-brandDark/20 bg-white/50">
             </div>
             
             <div>
-                <label class="block text-[11px] font-bold text-brandDark/70 uppercase mb-1">Email Address</label>
-                <input type="email" id="new-agent-email" required placeholder="jane@4g-capital.com" class="glass-input rounded-lg w-full px-3 py-2 text-sm border border-brandDark/20 bg-white/50">
+              <label class="block text-[11px] font-semibold text-brandDark/70 uppercase mb-1">Email Address</label>
+              <input type="email" id="new-agent-email" required placeholder="jane@4g-capital.com" class="glass-input rounded-lg w-full px-3 py-2 text-sm border border-brandDark/20 bg-white/50">
             </div>
             
             <div>
-                <label class="block text-[11px] font-bold text-brandDark/70 uppercase mb-1">Role</label>
-                <select id="new-agent-role" required class="glass-input rounded-lg w-full px-3 py-2 text-sm border border-brandDark/20 bg-white/50">
+              <label class="block text-[11px] font-semibold text-brandDark/70 uppercase mb-1">Role</label>
+              <select id="new-agent-role" required class="glass-input rounded-lg w-full px-3 py-2 text-sm border border-brandDark/20 bg-white/50">
                 <option value="Control Agent">Control Agent</option>
                 <option value="Team Leader">Team Leader</option>
                 <option value="Ops Manager">Ops Manager</option>
                 <option value="Admin">Admin</option>
-                </select>
+              </select>
             </div>
             
-            <button type="submit" class="w-full bg-brandDark hover:bg-slate-800 text-white font-bold py-2.5 rounded-lg shadow-md transition text-sm mt-2">
-                Create User
+            <button type="submit" class="w-full bg-brandDark hover:bg-slate-800 text-white font-medium py-2.5 rounded-lg shadow-md transition text-sm mt-2">
+              Create User
             </button>
-            </form>        
-      </div>
+          </form>        
+        </div>
 
-      <!-- System Users List -->
-      <div class="glass-panel p-6 rounded-2xl bg-white/80 shadow-md border border-brandDark/10 lg:col-span-2">
-        <h2 class="text-lg font-bold mb-4 border-b border-brandDark/10 pb-2">All System Users</h2>
-        <div class="overflow-x-auto rounded-xl border border-brandDark/10">
-          <table class="w-full text-left border-collapse whitespace-nowrap">
-            <thead class="bg-brandDark text-white">
-              <tr class="text-[11px] font-bold uppercase tracking-wider">
-                <th class="px-4 py-3">Name</th>
-                <th class="px-4 py-3">Email</th>
-                <th class="px-4 py-3">Role</th>
-                <th class="px-4 py-3">Status</th>
-              </tr>
-            </thead>
-            <tbody id="admin-users-tbody" class="text-[13px] font-medium bg-white">
-              <!-- Dynamically Populated -->
-            </tbody>
-          </table>
+        <!-- System Users List -->
+        <div class="glass-panel p-6 rounded-2xl bg-white/80 shadow-md border border-brandDark/10 lg:col-span-2">
+          <h2 class="text-lg font-semibold mb-4 border-b border-brandDark/10 pb-2">All System Users</h2>
+          <div class="overflow-x-auto rounded-xl border border-brandDark/10 bg-white/50">
+            <table class="w-full text-left border-collapse whitespace-nowrap">
+              <thead class="bg-brandDark/5">
+                <tr class="text-[11px] font-semibold uppercase tracking-wider text-brandDark/70 border-b border-brandDark/10">
+                  <th class="px-4 py-3">Name</th>
+                  <th class="px-4 py-3">Email</th>
+                  <th class="px-4 py-3">Role</th>
+                  <th class="px-4 py-3">Status</th>
+                </tr>
+              </thead>
+              <tbody id="admin-users-tbody" class="text-[13px] font-medium bg-transparent">
+                <!-- Dynamically Populated -->
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     </div>
