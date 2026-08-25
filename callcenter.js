@@ -45,10 +45,10 @@ function enforceSecurity() {
     // 3. THE ACCESS MATRIX (Define who can see what)
     // Note: These match the 'data-page' attributes on your <body> tags
     const accessMatrix = {
-        'Admin': ['workspace', 'campaigns', 'teamleader', 'dashboard', 'admin'], // Admins see everything
-        'Ops Manager': ['campaigns', 'teamleader', 'dashboard', 'admin'], // Removed 'workspace'
-        'Team Leader': ['campaigns', 'teamleader', 'dashboard'], // Removed 'workspace'
-        'Control Agent': ['workspace'] // Only workspace
+        'Admin': ['overview', 'workspace', 'campaigns', 'teamleader', 'dashboard', 'admin'],
+        'Ops Manager': ['overview', 'campaigns', 'teamleader', 'dashboard', 'admin'],
+        'Team Leader': ['overview', 'campaigns', 'teamleader', 'dashboard'],
+        'Control Agent': ['workspace']
     };
 
     // 4. Enforce Page Access
