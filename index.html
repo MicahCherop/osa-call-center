@@ -3,47 +3,66 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Login - OSA Call Center</title>
+  <title>Login - Pulse CX</title>
+  
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- Fetch standard weights for Poppins -->
-<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-
-<!-- Cleaned up Tailwind Config -->
-<script>
-  tailwind.config = {
-    theme: {
-      extend: {
-        fontFamily: { sans: ['Poppins', 'sans-serif'] },
-        colors: { brandDark: '#0f172a', brandAmber: '#f59e0b' }
+  
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Inter', 'sans-serif'] },
+          colors: { brandDark: '#0f172a', brandAmber: '#f59e0b' }
+        }
       }
     }
-  }
-</script>
-  <link rel="icon" href="data:,">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100;200;300&display=swap" rel="stylesheet">
+  </script>
+  
+  <link rel="icon" type="image/png" href="/logo.png">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <link rel="stylesheet" href="/callcenter.css">
 </head>
-<body data-page="login" class="h-screen bg-slate-50 flex items-center justify-center relative overflow-hidden">
+
+<body data-page="login" class="text-brandDark font-sans font-normal text-sm h-screen overflow-hidden flex items-center justify-center relative bg-white">
   
-  <div class="absolute inset-0 z-0 overflow-hidden pointer-events-none">
-    <div class="absolute top-[-10%] left-[-10%] w-[40rem] h-[40rem] bg-amber-200 rounded-full mix-blend-multiply filter blur-3xl opacity-60"></div>
+  <!-- BACKGROUND BLOBS -->
+  <div class="absolute inset-0 z-0 overflow-hidden pointer-events-none opacity-40">
+    <div class="absolute top-[-10%] left-[-10%] w-[40rem] h-[40rem] bg-amber-100 rounded-full mix-blend-multiply filter blur-3xl animate-blob"></div>
+    <div class="absolute bottom-[-20%] right-[-10%] w-[45rem] h-[45rem] bg-slate-100 rounded-full mix-blend-multiply filter blur-3xl animate-blob"></div>
   </div>
   
-  <div class="glass-panel p-8 rounded-2xl w-full max-w-md relative z-10 shadow-2xl bg-white/90 backdrop-blur-md border border-brandDark/10 text-center">
-    <h1 class="text-3xl font-bold text-brandDark mb-2">OSA Call Center</h1>
-    <p class="text-brandDark/60 text-sm mb-8">Sign in securely with your company account</p>
+  <!-- LOGIN CARD -->
+  <div class="glass-panel p-10 rounded-2xl w-full max-w-md relative z-10 shadow-2xl text-center page-enter border border-brandDark/5">
     
-    <div id="google-btn-container" class="flex justify-center mb-4">
-      <button onclick="redirectToGoogle()" class="w-full bg-brandDark hover:bg-slate-800 text-white py-3 rounded-lg shadow-md transition flex items-center justify-center gap-3">
-        <i class="fa-brands fa-google text-brandAmber text-lg"></i> Continue with Google
+    <!-- FIX: Added 4G Capital Logo Here -->
+    <img src="https://images.squarespace-cdn.com/content/v1/55ed8436e4b038f693789ca0/1599234024445-FSJEOUYNYWV4X6HDN50R/4G+CAPITAL+LOGO+FA-01.png?format=750w" 
+         alt="4G Capital Logo" 
+         class="h-14 mx-auto mb-6 object-contain">
+    
+    <h1 class="text-3xl font-medium text-brandDark mb-2">4G UPIA Campaigns</h1>
+    <p class="text-brandDark/60 text-sm font-normal mb-8">Welcome to 4G UPIA Campaigns<br>Sign in securely to access your workspace</p>
+    
+    <div id="google-btn-container" class="flex justify-center mb-2">
+      <button onclick="handleLoginClick()" class="w-3/4 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 py-2.5 rounded-lg shadow-sm transition ease-in flex items-center justify-center gap-3 font-medium">
+        <svg class="w-5 h-5" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+          <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+          <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+          <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+          <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+        </svg>
+        Sign in with Google
       </button>
     </div>
-    
-    <div id="login-status" class="text-brandAmber text-sm mt-3 font-bold hidden flex items-center justify-center gap-2">
-      <i class="fa-solid fa-circle-notch fa-spin"></i> Verifying authorization...
+    <div id="login-error" class="text-red-500 text-sm mt-4 hidden font-medium"></div>
+  </div>
+
+  <!-- REDIRECTING / LOADING MODAL -->
+  <div id="loading-overlay" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 hidden opacity-0 transition-opacity duration-300 flex items-center justify-center">
+    <div class="bg-white p-8 rounded-2xl shadow-2xl flex flex-col items-center max-w-sm w-full mx-4 transform scale-95 transition-transform duration-300" id="loading-modal-card">
+      <div class="w-12 h-12 border-4 border-brandAmber border-t-transparent rounded-full animate-spin mb-4"></div>
+      <h3 class="text-lg font-medium text-brandDark" id="loading-title">Redirecting...</h3>
+      <p class="text-sm text-brandDark/50 mt-1 text-center" id="loading-text">Connecting securely to Google.</p>
     </div>
-    <div id="login-error" class="text-red-500 text-sm mt-3 hidden font-bold"></div>
   </div>
 
   <script src="/callcenter.js"></script>
@@ -51,10 +70,30 @@
   <script>
     const CLIENT_ID = "106325673835-4moq7op50u80oet78ln84t241a88a200.apps.googleusercontent.com";
     
-    // 1. Build the Redirect URL
+    function handleLoginClick() {
+      const overlay = document.getElementById('loading-overlay');
+      const card = document.getElementById('loading-modal-card');
+      
+      document.getElementById('loading-title').innerText = "Redirecting...";
+      document.getElementById('loading-text').innerText = "Connecting securely to Google.";
+      
+      overlay.classList.remove('hidden');
+      setTimeout(() => {
+          overlay.classList.remove('opacity-0');
+          card.classList.remove('scale-95');
+      }, 10);
+      
+      setTimeout(() => {
+          redirectToGoogle();
+      }, 800);
+    }
+
     function redirectToGoogle() {
-      // Use window.location.origin to support both Vercel and local testing dynamically
-      const redirectUri = window.location.origin + "/login.html";
+      const isLocalhost = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+      const redirectUri = isLocalhost 
+          ? window.location.origin + "/login.html" 
+          : "https://osa-call-center.vercel.app/login";
+        
       const oauth2Endpoint = "https://accounts.google.com/o/oauth2/v2/auth";
       
       const form = document.createElement("form");
@@ -68,7 +107,7 @@
         scope: "email profile",
         include_granted_scopes: "true",
         state: "pass-through value",
-        prompt: "select_account" // This forces the account chooser screen!
+        prompt: "select_account"
       };
 
       for (let p in params) {
@@ -83,24 +122,29 @@
       form.submit();
     }
 
-    // 2. Intercept the URL when Google sends them back
     window.onload = async function() {
       const hash = window.location.hash;
       
       if (hash && hash.includes("access_token")) {
-        // We have returned from Google!
-        document.getElementById('login-status').classList.remove('hidden');
+        const overlay = document.getElementById('loading-overlay');
+        const card = document.getElementById('loading-modal-card');
+        
+        document.getElementById('loading-title').innerText = "Verifying...";
+        document.getElementById('loading-text').innerText = "Checking authorization securely.";
         document.getElementById('google-btn-container').classList.add('hidden');
         
-        // Parse the token from the URL
+        overlay.classList.remove('hidden');
+        setTimeout(() => {
+            overlay.classList.remove('opacity-0');
+            card.classList.remove('scale-95');
+        }, 10);
+        
         const params = new URLSearchParams(hash.substring(1));
         const accessToken = params.get("access_token");
 
-        // Clean up the URL so it looks nice
         window.history.replaceState(null, null, window.location.pathname);
 
         try {
-          // Exchange the token for the user's email
           const res = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
             headers: { Authorization: `Bearer ${accessToken}` }
           });
@@ -108,7 +152,6 @@
           
           if (!userInfo.email) throw new Error("Could not retrieve email from Google.");
 
-          // Send the email to our FastAPI backend
           const backendRes = await fetch('/api/login', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -118,21 +161,27 @@
           const data = await backendRes.json();
           if (!backendRes.ok) throw new Error(data.detail || "Database verification failed.");
 
-          // Save Session & Route
-          localStorage.setItem('USER_EMAIL', data.user.email);
-          localStorage.setItem('USER_ROLE', data.user.role);
-          localStorage.setItem('LOGGED_IN_AGENT', data.user.name);
+          localStorage.setItem('USER_EMAIL', data.email);
+          localStorage.setItem('USER_ROLE', data.role);
+          localStorage.setItem('LOGGED_IN_AGENT', data.name);
           
-          window.location.replace('/workspace.html');
+          if(data.role === "Admin") {
+            window.location.replace('/admin.html');
+          } else if(data.role === "Team Leader" || data.role === "Ops Manager") {
+            window.location.replace('/teamleader.html');
+          } else {
+            window.location.replace('/workspace.html');
+          }
 
         } catch (err) {
-          document.getElementById('login-status').classList.add('hidden');
+          overlay.classList.add('opacity-0');
+          setTimeout(() => overlay.classList.add('hidden'), 300);
+          
           document.getElementById('login-error').innerText = err.message;
           document.getElementById('login-error').classList.remove('hidden');
           document.getElementById('google-btn-container').classList.remove('hidden');
         }
       } else {
-        // Normal page load, check standard RBAC
         if (typeof enforceSecurity === 'function') enforceSecurity();
       }
     };
