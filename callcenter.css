@@ -1,88 +1,78 @@
 ﻿/* =========================================================
-   GLOBAL FONT & TYPOGRAPHY
+   GLOBAL FONT, TYPOGRAPHY & ANIMATIONS
    ========================================================= */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500&display=swap');
 
 body {
   font-family: 'Inter', sans-serif;
-  font-size: 14px; /* Matches Tailwind's text-sm */
-  color: #0f172a; /* Your brandDark color */
+  font-size: 14px;
+  color: #0f172a; /* brandDark */
+  background-color: #ffffff; /* Pure white background */
   -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
 }
 
-/* 1. Scrollbar - Softer, smoother hover states */
+/* Page Ease-in Animation */
+.page-enter {
+  animation: fadeIn 0.4s ease-in forwards;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* 1. Scrollbar */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { 
-  background: rgba(15, 23, 42, 0.15); 
-  border-radius: 10px; 
-  transition: background 0.2s ease; 
-}
+::-webkit-scrollbar-thumb { background: rgba(15, 23, 42, 0.15); border-radius: 10px; }
 ::-webkit-scrollbar-thumb:hover { background: rgba(15, 23, 42, 0.35); }
 
-/* 2. Glass Panels - Crisper frost effect and softer shadows for depth */
+/* 2. Glass Panels - Refined for White Backgrounds */
 .glass-panel {
-  background: rgba(255, 255, 255, 0.75);
+  background: rgba(255, 255, 255, 0.85);
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
-  border: 1px solid rgba(255, 255, 255, 0.9);
-  box-shadow: 0 10px 40px -10px rgba(15, 23, 42, 0.06);
+  border: 1px solid rgba(15, 23, 42, 0.05); /* Soft dark border */
+  box-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.03); /* Soft polymorphism shadow */
 }
 
-/* 3. Glass Cards - Added a subtle hover lift effect */
+/* 3. Glass Cards */
 .glass-card {
-  background: rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.6);
   backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.7);
-  box-shadow: 0 4px 12px -2px rgba(15, 23, 42, 0.04);
+  border: 1px solid rgba(15, 23, 42, 0.05);
+  box-shadow: 4px 4px 10px rgba(15, 23, 42, 0.02), -4px -4px 10px rgba(255, 255, 255, 0.8);
   transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 .glass-card:hover {
   transform: translateY(-2px);
-  box-shadow: 0 8px 16px -4px rgba(15, 23, 42, 0.08);
+  box-shadow: 0 8px 24px -4px rgba(15, 23, 42, 0.06);
 }
 
-/* 4. Inputs - Cleaner focus rings matching your Amber brand color */
+/* 4. Inputs */
 .glass-input {
-  background: rgba(255, 255, 255, 0.6);
+  background: rgba(255, 255, 255, 0.8);
   border: 1px solid rgba(15, 23, 42, 0.1);
   color: #0f172a;
-  transition: all 0.25s ease;
+  transition: all 0.2s ease-in;
 }
-.glass-input:not(:disabled):focus {
+.glass-input:focus {
   outline: none;
-  border-color: #f59e0b; 
+  border-color: #f59e0b; /* Amber focus */
   background: #ffffff;
   box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.15); 
 }
-.glass-input:disabled {
-  background: rgba(255, 255, 255, 0.3);
-  color: rgba(15, 23, 42, 0.4);
-  cursor: not-allowed;
-}
 
-/* 5. Toggles - Smoother sliding animation */
-.toggle-checkbox { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
-.toggle-checkbox:checked { right: 0; border-color: #10b981; }
-.toggle-checkbox:checked + .toggle-label { 
-  background-color: #10b981; 
-  transition: background-color 0.3s ease; 
-}
-
-/* 6. Modals - Fluid entrance animation */
+/* 5. Modals */
 .app-modal-backdrop {
   background: rgba(15, 23, 42, 0.4); 
   backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
 }
 .app-modal-card { 
-  /* Uses cubic-bezier for a more "snappy" but smooth pop-in */
-  animation: app-modal-in 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; 
+  animation: app-modal-in 0.3s ease-in forwards; 
 }
 
 @keyframes app-modal-in {
-  from { opacity: 0; transform: translateY(12px) scale(0.96); }
+  from { opacity: 0; transform: translateY(12px) scale(0.98); }
   to { opacity: 1; transform: translateY(0) scale(1); }
 }
