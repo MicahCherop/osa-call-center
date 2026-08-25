@@ -1,4 +1,17 @@
-﻿/* 1. Scrollbar - Softer, smoother hover states */
+﻿/* =========================================================
+   GLOBAL FONT & TYPOGRAPHY
+   ========================================================= */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+body {
+  font-family: 'Inter', sans-serif;
+  font-size: 14px; /* Matches Tailwind's text-sm */
+  color: #0f172a; /* Your brandDark color */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* 1. Scrollbar - Softer, smoother hover states */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { 

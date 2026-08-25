@@ -10,21 +10,6 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="icon" href="data:,">
   <script src="https://cdn.tailwindcss.com"></script>
-  
-  <!-- Fetch standard weights for Poppins -->
-  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-
-  <!-- Cleaned up Tailwind Config -->
-  <script>
-    tailwind.config = {
-      theme: {
-        extend: {
-          fontFamily: { sans: ['Poppins', 'sans-serif'] },
-          colors: { brandDark: '#0f172a', brandAmber: '#f59e0b' }
-        }
-      }
-    }
-  </script>
   <link rel="stylesheet" href="/callcenter.css">
 </head>
 
@@ -182,17 +167,15 @@
         <button class="text-brandDark/60 hover:text-brandDark transition"><i class="fa-regular fa-bell text-xl"></i></button>
         
         <div class="flex items-center gap-3 pl-4 border-l border-brandDark/20">
-          <!-- Clickable Profile Section -->
-          <div class="relative">
+        <div class="relative">
             <button onclick="toggleLogoutModal()" class="flex items-center gap-3 hover:bg-slate-100/50 p-1.5 rounded-lg transition text-left outline-none">
-              <!-- Avatar -->
               <div class="w-9 h-9 bg-slate-700 text-white rounded-full flex items-center justify-center">
                 <i class="fa-solid fa-user text-sm"></i>
               </div>
-              <!-- Dynamic Name & Role -->
               <div class="hidden sm:block">
-                <div id="header-user-name" class="text-sm font-medium text-slate-800">Loading...</div>
-                <div id="header-user-role" class="text-[11px] font-normal text-slate-500">Role</div>
+                <!-- FIX: Name font-normal, Role font-light -->
+                <div id="header-user-name" class="text-sm font-normal text-slate-800">Loading...</div>
+                <div id="header-user-role" class="text-[11px] font-light text-slate-500">Role</div>
               </div>
               <i class="fa-solid fa-chevron-down text-xs text-slate-400 ml-1"></i>
             </button>
@@ -200,8 +183,8 @@
             <!-- The Logout Modal -->
             <div id="logout-modal" class="hidden absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-xl border border-slate-100 z-50 overflow-hidden">
               <div class="p-4 border-b border-slate-50 bg-slate-50/50">
-                <p class="text-xs font-normal text-slate-500 mb-1">Signed in as</p>
-                <p id="modal-user-email" class="text-sm font-medium text-slate-800 truncate">email@loading.com</p>
+                <p class="text-xs font-light text-slate-500 mb-1">Signed in as</p>
+                <p id="modal-user-email" class="text-sm font-normal text-slate-800 truncate">email@loading.com</p>
               </div>
               <button onclick="logout()" class="w-full text-left px-4 py-3 text-sm font-medium text-red-600 hover:bg-red-50 transition flex items-center gap-2">
                 <i class="fa-solid fa-arrow-right-from-bracket"></i> Sign out
