@@ -16,6 +16,7 @@
     tailwind.config = {
       theme: {
         extend: {
+          fontFamily: { sans: ['Inter', 'sans-serif'] },
           colors: { brandDark: '#0f172a', brandAmber: '#f59e0b' }
         }
       }
@@ -24,32 +25,32 @@
   <link rel="stylesheet" href="/callcenter.css">
 </head>
 
-<!-- Added text-sm to proportionally scale down all text -->
-<body data-page="teamleader" class="text-brandDark font-sans font-normal text-sm h-screen overflow-hidden flex relative bg-slate-50">
+<!-- FIX: flex-col added for full-width header, bg-white for clean base -->
+<body data-page="teamleader" class="text-brandDark font-sans font-normal text-sm h-screen overflow-hidden flex flex-col relative bg-white">
   
-  <!-- BACKGROUND -->
-  <div class="absolute inset-0 z-0 overflow-hidden pointer-events-none">
-    <div class="absolute top-[-10%] left-[-10%] w-[40rem] h-[40rem] bg-amber-200 rounded-full mix-blend-multiply filter blur-3xl opacity-60 animate-blob"></div>
-    <div class="absolute top-[20%] right-[-10%] w-[35rem] h-[35rem] bg-blue-200 rounded-full mix-blend-multiply filter blur-3xl opacity-60 animate-blob" style="animation-delay: 2s"></div>
-    <div class="absolute bottom-[-20%] left-[20%] w-[45rem] h-[45rem] bg-indigo-200 rounded-full mix-blend-multiply filter blur-3xl opacity-60 animate-blob" style="animation-delay: 4s"></div>
+  <!-- BACKGROUND BLOBS -->
+  <div class="absolute inset-0 z-0 overflow-hidden pointer-events-none opacity-40">
+    <div class="absolute top-[-10%] left-[-10%] w-[40rem] h-[40rem] bg-amber-100 rounded-full mix-blend-multiply filter blur-3xl animate-blob"></div>
+    <div class="absolute top-[20%] right-[-10%] w-[35rem] h-[35rem] bg-blue-100 rounded-full mix-blend-multiply filter blur-3xl animate-blob" style="animation-delay: 2s"></div>
+    <div class="absolute bottom-[-20%] left-[20%] w-[45rem] h-[45rem] bg-indigo-100 rounded-full mix-blend-multiply filter blur-3xl animate-blob" style="animation-delay: 4s"></div>
   </div>
 
   <!-- ADD CAMPAIGN MODAL -->
-  <div id="add-campaign-modal-backdrop" class="fixed inset-0 bg-brandDark/40 backdrop-blur-sm z-50 hidden transition-opacity duration-300 opacity-0 flex items-center justify-center" onclick="closeAddCampaignModal(event)">
-    <div id="add-campaign-modal" class="glass-panel w-full max-w-2xl rounded-2xl p-6 transform scale-95 transition-transform duration-300 relative shadow-2xl flex flex-col max-h-[90vh]" onclick="event.stopPropagation()">
-      <div class="flex justify-between items-center mb-6 border-b border-brandDark/10 pb-4">
-        <h2 class="text-xl font-semibold flex items-center gap-2"><i class="fa-solid fa-bullhorn text-brandAmber"></i> Create New Campaign</h2>
-        <button onclick="closeAddCampaignModal()" class="text-brandDark/50 hover:text-red-500 transition"><i class="fa-solid fa-xmark text-2xl"></i></button>
+  <div id="add-campaign-modal-backdrop" class="fixed inset-0 app-modal-backdrop z-50 hidden transition-opacity duration-300 opacity-0 flex items-center justify-center" onclick="closeAddCampaignModal(event)">
+    <div id="add-campaign-modal" class="glass-panel w-full max-w-2xl rounded-2xl p-6 app-modal-card relative shadow-2xl flex flex-col max-h-[90vh]" onclick="event.stopPropagation()">
+      <div class="flex justify-between items-center mb-6 border-b border-brandDark/5 pb-4">
+        <h2 class="text-xl font-medium flex items-center gap-2"><i class="fa-solid fa-bullhorn text-brandAmber"></i> Create New Campaign</h2>
+        <button onclick="closeAddCampaignModal()" class="text-brandDark/50 hover:text-red-500 transition"><i class="fa-solid fa-xmark text-xl"></i></button>
       </div>
       <form id="add-campaign-form" onsubmit="submitAddCampaign(event)" class="overflow-y-auto pr-2 space-y-4">
         <div class="grid grid-cols-2 gap-4">
           <div class="col-span-2">
-            <label class="block text-[11px] font-bold text-brandDark/70 uppercase mb-1.5">Campaign Details *</label>
-            <input type="text" id="new-campaign-name" required placeholder="e.g. DD1-DD7 Collections Campaign" class="glass-input rounded-lg w-full px-3 py-2 text-sm font-medium">
+            <label class="block text-[11px] font-semibold text-brandDark/70 uppercase mb-1.5">Campaign Details *</label>
+            <input type="text" id="new-campaign-name" required placeholder="e.g. DD1-DD7 Collections Campaign" class="glass-input rounded-lg w-full px-3 py-2 text-sm font-normal">
           </div>
           <div>
-            <label class="block text-[11px] font-bold text-brandDark/70 uppercase mb-1.5">Campaign Type *</label>
-            <select required id="new-campaign-type" class="glass-input rounded-lg w-full px-3 py-2 text-sm font-medium">
+            <label class="block text-[11px] font-semibold text-brandDark/70 uppercase mb-1.5">Campaign Type *</label>
+            <select required id="new-campaign-type" class="glass-input rounded-lg w-full px-3 py-2 text-sm font-normal">
               <option value="">Select type...</option>
               <option value="active_no_loan">Active Customers - No Loan</option>
               <option value="dormant">Dormant Customers</option>
@@ -58,32 +59,31 @@
             </select>
           </div>
           <div>
-            <label class="block text-[11px] font-bold text-brandDark/70 uppercase mb-1.5">Priority</label>
-            <select class="glass-input rounded-lg w-full px-3 py-2 text-sm font-medium">
+            <label class="block text-[11px] font-semibold text-brandDark/70 uppercase mb-1.5">Priority</label>
+            <select class="glass-input rounded-lg w-full px-3 py-2 text-sm font-normal">
               <option value="high">High</option>
               <option value="medium" selected>Medium</option>
               <option value="low">Low</option>
             </select>
           </div>
           <div>
-            <label class="block text-[11px] font-bold text-brandDark/70 uppercase mb-1.5">Start Date *</label>
-            <input type="date" required class="glass-input rounded-lg w-full px-3 py-2 text-sm font-medium">
+            <label class="block text-[11px] font-semibold text-brandDark/70 uppercase mb-1.5">Start Date *</label>
+            <input type="date" required class="glass-input rounded-lg w-full px-3 py-2 text-sm font-normal">
           </div>
           <div>
-            <label class="block text-[11px] font-bold text-brandDark/70 uppercase mb-1.5">End Date *</label>
-            <input type="date" required class="glass-input rounded-lg w-full px-3 py-2 text-sm font-medium">
+            <label class="block text-[11px] font-semibold text-brandDark/70 uppercase mb-1.5">End Date *</label>
+            <input type="date" required class="glass-input rounded-lg w-full px-3 py-2 text-sm font-normal">
           </div>
-          <!-- CSV UPLOAD ZONE -->
           <div class="col-span-2 mt-2">
-            <label class="block text-[11px] font-bold text-brandDark/70 uppercase mb-1.5">Upload Target Audience (CSV) *</label>
-            <div class="border-2 border-dashed border-brandDark/20 rounded-xl p-6 flex flex-col items-center justify-center bg-white/20 hover:bg-white/40 transition cursor-pointer relative">
+            <label class="block text-[11px] font-semibold text-brandDark/70 uppercase mb-1.5">Upload Target Audience (CSV) *</label>
+            <div class="border-2 border-dashed border-brandDark/20 rounded-xl p-6 flex flex-col items-center justify-center bg-white/40 hover:bg-white/60 transition cursor-pointer relative">
               <input type="file" id="csv-file-input" required accept=".csv" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer" onchange="document.getElementById('csv-filename').innerText = this.files[0]?.name || 'No file selected'">
-              <div class="w-12 h-12 bg-white/50 rounded-full flex items-center justify-center mb-3 shadow-sm text-brandAmber">
-                <i class="fa-solid fa-file-csv text-2xl"></i>
+              <div class="w-12 h-12 bg-white/80 rounded-full flex items-center justify-center mb-3 shadow-sm text-brandAmber">
+                <i class="fa-solid fa-file-csv text-xl"></i>
               </div>
-              <span class="text-sm font-medium text-brandDark">Click or drag CSV file to upload customers</span>
+              <span class="text-sm font-medium text-brandDark">Click or drag CSV file to upload</span>
               <span class="text-xs text-brandDark/50 mt-1">Columns must include Name, Phone, and Branch</span>
-              <div id="csv-filename" class="mt-3 px-3 py-1 rounded bg-brandAmber/10 text-brandAmber text-xs font-semibold overflow-hidden text-ellipsis max-w-full">
+              <div id="csv-filename" class="mt-3 px-3 py-1 rounded bg-brandAmber/10 text-brandAmber text-xs font-medium overflow-hidden text-ellipsis max-w-full">
                 No file selected
               </div>
             </div>
@@ -91,7 +91,7 @@
         </div>
         <div class="flex justify-end gap-3 mt-6 pt-4 border-t border-brandDark/10">
           <button type="button" onclick="closeAddCampaignModal()" class="px-4 py-2 text-sm font-medium text-brandDark/70 hover:text-brandDark transition">Cancel</button>
-          <button type="submit" class="bg-gradient-to-br from-brandDark to-slate-800 hover:from-slate-800 hover:to-black text-white font-medium px-5 py-2 rounded-lg shadow-md transition transform hover:-translate-y-0.5 text-sm flex items-center gap-2">
+          <button type="submit" class="bg-brandAmber hover:bg-amber-600 text-white font-medium px-5 py-2 rounded-lg shadow-sm transition ease-in text-sm flex items-center gap-2">
             <i class="fa-solid fa-check"></i> Save Campaign
           </button>
         </div>
@@ -100,47 +100,47 @@
   </div>
 
   <!-- SLIDE-OUT CUSTOMER DRAWER -->
-  <div id="customer-drawer-backdrop" class="fixed inset-0 bg-brandDark/20 backdrop-blur-sm z-40 hidden transition-opacity opacity-0" onclick="closeCustomerDrawer()"></div>
+  <div id="customer-drawer-backdrop" class="fixed inset-0 app-modal-backdrop z-40 hidden transition-opacity opacity-0" onclick="closeCustomerDrawer()"></div>
   <div id="customer-drawer" class="fixed top-0 right-0 h-full w-full max-w-md glass-panel z-50 transform translate-x-full transition-transform duration-300 shadow-2xl flex flex-col">
-    <div class="p-6 border-b border-brandDark/10 flex justify-between items-center bg-white/40">
-      <h3 class="text-xl font-semibold flex items-center gap-2"><i class="fa-solid fa-address-card text-brandAmber"></i> Customer Profile</h3>
-      <button onclick="closeCustomerDrawer()" class="text-brandDark/50 hover:text-red-500 transition"><i class="fa-solid fa-xmark text-2xl"></i></button>
+    <div class="p-6 border-b border-brandDark/5 flex justify-between items-center bg-white/60">
+      <h3 class="text-xl font-medium flex items-center gap-2"><i class="fa-solid fa-address-card text-brandAmber"></i> Customer Profile</h3>
+      <button onclick="closeCustomerDrawer()" class="text-brandDark/50 hover:text-red-500 transition"><i class="fa-solid fa-xmark text-xl"></i></button>
     </div>
     <div class="p-6 flex-1 overflow-y-auto">
       <div class="flex items-center gap-4 mb-6">
-        <div class="w-16 h-16 rounded-full bg-brandAmber/20 flex items-center justify-center text-brandAmber text-2xl font-bold" id="drawer-initial">--</div>
+        <div class="w-14 h-14 rounded-full bg-brandAmber/10 flex items-center justify-center text-brandAmber text-xl font-medium" id="drawer-initial">--</div>
         <div>
-          <h2 class="text-2xl font-semibold leading-tight" id="drawer-name">Unknown</h2>
-          <p class="text-sm font-medium text-brandDark/60" id="drawer-phone">--</p>
+          <h2 class="text-xl font-medium leading-tight" id="drawer-name">Unknown</h2>
+          <p class="text-sm font-normal text-brandDark/60" id="drawer-phone">--</p>
         </div>
       </div>
-      <div class="flex gap-4 border-b border-brandDark/10 mb-6">
-        <button class="drawer-tab active text-sm font-bold text-brandAmber border-b-2 border-brandAmber pb-2 px-1 transition" onclick="switchDrawerTab('overview', this)">Overview</button>
-        <button class="drawer-tab text-sm font-bold text-brandDark/50 hover:text-brandDark border-b-2 border-transparent pb-2 px-1 transition" onclick="switchDrawerTab('profile', this)">Business Profile</button>
+      <div class="flex gap-4 border-b border-brandDark/5 mb-6">
+        <button class="drawer-tab active text-sm font-medium text-brandAmber border-b-2 border-brandAmber pb-2 px-1 transition" onclick="switchDrawerTab('overview', this)">Overview</button>
+        <button class="drawer-tab text-sm font-medium text-brandDark/50 hover:text-brandDark border-b-2 border-transparent pb-2 px-1 transition" onclick="switchDrawerTab('profile', this)">Business Profile</button>
       </div>
       <div class="space-y-4">
         <!-- Overview Tab -->
         <div id="drawer-overview" class="drawer-content space-y-4">
-          <div class="glass-card p-4 rounded-xl">
-            <h4 class="text-xs font-bold text-brandDark/50 uppercase mb-2">Financial Snapshot</h4>
-            <div class="flex justify-between mb-1"><span class="font-medium text-sm">Campaign</span> <span class="font-bold text-brandDark text-right" id="drawer-campaign">--</span></div>
-            <div class="flex justify-between mb-1"><span class="font-medium text-sm">Outstanding Balance</span> <span class="font-bold text-red-600" id="drawer-balance">0</span></div>
-            <div class="flex justify-between mb-1"><span class="font-medium text-sm">Agent</span> <span class="font-bold text-brandDark" id="drawer-agent">--</span></div>
-            <div class="flex justify-between mb-1"><span class="font-medium text-sm">Outcome</span> <span class="font-bold text-brandDark" id="drawer-outcome">--</span></div>
-            <div class="flex justify-between mb-1"><span class="font-medium text-sm">Status</span> <span class="font-bold text-brandDark text-right" id="drawer-status">--</span></div>
+          <div class="glass-card p-5 rounded-xl">
+            <h4 class="text-[11px] font-semibold text-brandDark/50 uppercase mb-3">Financial Snapshot</h4>
+            <div class="flex justify-between mb-2"><span class="font-normal text-sm text-brandDark/70">Campaign</span> <span class="font-medium text-brandDark text-right" id="drawer-campaign">--</span></div>
+            <div class="flex justify-between mb-2"><span class="font-normal text-sm text-brandDark/70">Outstanding Balance</span> <span class="font-medium text-red-600" id="drawer-balance">0</span></div>
+            <div class="flex justify-between mb-2"><span class="font-normal text-sm text-brandDark/70">Agent</span> <span class="font-medium text-brandDark" id="drawer-agent">--</span></div>
+            <div class="flex justify-between mb-2"><span class="font-normal text-sm text-brandDark/70">Outcome</span> <span class="font-medium text-brandDark" id="drawer-outcome">--</span></div>
+            <div class="flex justify-between mb-1"><span class="font-normal text-sm text-brandDark/70">Status</span> <span class="font-medium text-brandDark text-right" id="drawer-status">--</span></div>
           </div>
         </div>
         <!-- Business Profile Tab -->
         <div id="drawer-profile" class="drawer-content hidden space-y-4">
-          <div class="glass-card p-4 rounded-xl">
-            <h4 class="text-xs font-bold text-brandDark/50 uppercase mb-2">Business Details</h4>
-            <div class="flex justify-between mb-1"><span class="font-medium text-sm">Sector</span> <span class="font-bold text-brandDark" id="drawer-sector">--</span></div>
-            <div class="flex justify-between mb-1"><span class="font-medium text-sm">Location / Branch</span> <span class="font-bold text-brandDark" id="drawer-branch">--</span></div>
-            <div class="flex justify-between mb-1"><span class="font-medium text-sm">Pair</span> <span class="font-bold text-brandDark" id="drawer-pair">--</span></div>
-            <div class="flex justify-between mb-1"><span class="font-medium text-sm">Business Status</span> <span class="font-bold text-brandDark" id="drawer-business">--</span></div>
-            <div class="mt-3 pt-3 border-t border-brandDark/10">
-              <div class="text-xs font-bold text-brandDark/50 uppercase mb-1">Comments</div>
-              <p class="text-sm text-brandDark/70" id="drawer-comments">--</p>
+          <div class="glass-card p-5 rounded-xl">
+            <h4 class="text-[11px] font-semibold text-brandDark/50 uppercase mb-3">Business Details</h4>
+            <div class="flex justify-between mb-2"><span class="font-normal text-sm text-brandDark/70">Sector</span> <span class="font-medium text-brandDark" id="drawer-sector">--</span></div>
+            <div class="flex justify-between mb-2"><span class="font-normal text-sm text-brandDark/70">Location / Branch</span> <span class="font-medium text-brandDark" id="drawer-branch">--</span></div>
+            <div class="flex justify-between mb-2"><span class="font-normal text-sm text-brandDark/70">Pair</span> <span class="font-medium text-brandDark" id="drawer-pair">--</span></div>
+            <div class="flex justify-between mb-2"><span class="font-normal text-sm text-brandDark/70">Business Status</span> <span class="font-medium text-brandDark" id="drawer-business">--</span></div>
+            <div class="mt-4 pt-4 border-t border-brandDark/5">
+              <div class="text-[11px] font-semibold text-brandDark/50 uppercase mb-1">Comments</div>
+              <p class="text-sm font-normal text-brandDark/70" id="drawer-comments">--</p>
             </div>
           </div>
         </div>
@@ -148,210 +148,198 @@
     </div>
   </div>
 
-  <!-- SIDEBAR -->
-  <aside class="z-10 w-20 md:w-24 glass-panel border-r flex flex-col items-center py-6">
-    <a href="/workspace" data-page="workspace" class="nav-btn w-full py-4 flex flex-col items-center gap-1.5 text-[11px] font-semibold text-brandDark/70 hover:text-brandDark transition-colors relative">
-      <i class="fa-solid fa-headset text-[20px]"></i> Workspace
-      <div class="active-indicator absolute left-0 top-0 h-full w-1 bg-brandAmber hidden"></div>
-    </a>
-    <a href="/campaigns" data-page="campaigns" class="nav-btn w-full py-4 flex flex-col items-center gap-1.5 text-[11px] font-semibold text-brandDark/70 hover:text-brandDark transition-colors relative">
-      <i class="fa-solid fa-bullhorn text-[20px]"></i> Campaigns
-      <div class="active-indicator absolute left-0 top-0 h-full w-1 bg-brandAmber hidden"></div>
-    </a>
-    <a href="/teamleader" data-page="teamleader" class="nav-btn w-full py-4 flex flex-col items-center gap-1.5 text-[11px] font-semibold text-brandDark/70 hover:text-brandDark transition-colors relative bg-white/40">
-      <i class="fa-solid fa-user-tie text-[20px]"></i> Team Leader
-      <div class="active-indicator absolute left-0 top-0 h-full w-1 bg-brandAmber"></div>
-    </a>
-    <a href="/analytics" data-page="dashboard" class="nav-btn w-full py-4 flex flex-col items-center gap-1.5 text-[11px] font-semibold text-brandDark/70 hover:text-brandDark transition-colors relative">
-      <i class="fa-solid fa-chart-pie text-[20px]"></i> Analytics
-      <div class="active-indicator absolute left-0 top-0 h-full w-1 bg-brandAmber hidden"></div>
-    </a>
-  </aside>
-
-  <main class="z-10 flex-1 flex flex-col p-6 overflow-hidden">
-    <!-- TOP BAR -->
-    <header class="glass-panel rounded-2xl px-6 py-4 mb-6 flex justify-between items-center shrink-0">
-      <h1 class="text-2xl font-semibold tracking-tight flex items-center gap-3">
-        <i class="fa-solid fa-phone-volume text-brandAmber"></i> OSA Call Center
-      </h1>
-      <div class="flex items-center gap-5 text-sm">
-        <button class="text-brandDark/60 hover:text-brandDark transition"><i class="fa-regular fa-bell text-xl"></i></button>
-        
-        <div class="flex items-center gap-3 pl-4 border-l border-brandDark/20">
-          
-          <!-- Clickable Profile Section -->
+  <!-- 1. FULL WIDTH HEADER -->
+  <header class="w-full glass-panel border-b border-brandDark/5 px-6 py-3 flex justify-between items-center relative z-50 shrink-0">
+    <h1 class="text-xl font-medium tracking-tight flex items-center gap-3 text-brandDark">
+      <i class="fa-solid fa-phone-volume text-brandAmber"></i> OSA Call Center
+    </h1>
+    
+    <div class="flex items-center gap-5 text-sm">
+      <button class="text-brandDark/60 hover:text-brandAmber transition"><i class="fa-regular fa-bell text-lg"></i></button>
+      
+      <div class="flex items-center gap-3 pl-4 border-l border-brandDark/10">
+        <!-- Clickable Profile Section -->
         <div class="relative">
-            <button onclick="toggleLogoutModal()" class="flex items-center gap-3 hover:bg-slate-100/50 p-1.5 rounded-lg transition text-left outline-none">
-              <div class="w-9 h-9 bg-slate-700 text-white rounded-full flex items-center justify-center">
-                <i class="fa-solid fa-user text-sm"></i>
-              </div>
-              <div class="hidden sm:block">
-                <!-- FIX: Name font-normal, Role font-light -->
-                <div id="header-user-name" class="text-sm font-normal text-slate-800">Loading...</div>
-                <div id="header-user-role" class="text-[11px] font-light text-slate-500">Role</div>
-              </div>
-              <i class="fa-solid fa-chevron-down text-xs text-slate-400 ml-1"></i>
-            </button>
-
-            <!-- The Logout Modal -->
-            <div id="logout-modal" class="hidden absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-xl border border-slate-100 z-50 overflow-hidden">
-              <div class="p-4 border-b border-slate-50 bg-slate-50/50">
-                <p class="text-xs font-light text-slate-500 mb-1">Signed in as</p>
-                <p id="modal-user-email" class="text-sm font-normal text-slate-800 truncate">email@loading.com</p>
-              </div>
-              <button onclick="logout()" class="w-full text-left px-4 py-3 text-sm font-medium text-red-600 hover:bg-red-50 transition flex items-center gap-2">
-                <i class="fa-solid fa-arrow-right-from-bracket"></i> Sign out
-              </button>
+          <button onclick="toggleLogoutModal()" class="flex items-center gap-3 hover:bg-slate-50 p-1.5 rounded-lg transition text-left outline-none">
+            <div class="w-8 h-8 bg-brandDark text-white rounded-full flex items-center justify-center">
+              <i class="fa-solid fa-user text-xs"></i>
             </div>
+            <div class="hidden sm:block">
+              <div id="header-user-name" class="text-sm font-medium text-brandDark">Loading...</div>
+              <div id="header-user-role" class="text-xs font-normal text-brandDark/60">Role</div>
+            </div>
+            <i class="fa-solid fa-chevron-down text-xs text-brandDark/40 ml-1"></i>
+          </button>
+
+          <!-- The Logout Modal -->
+          <div id="logout-modal" class="hidden absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-lg border border-brandDark/5 z-50 overflow-hidden">
+            <div class="p-4 border-b border-brandDark/5 bg-slate-50/50">
+              <p class="text-xs font-normal text-brandDark/50 mb-1">Signed in as</p>
+              <p id="modal-user-email" class="text-sm font-medium text-brandDark truncate">email@loading.com</p>
+            </div>
+            <button onclick="logout()" class="w-full text-left px-4 py-3 text-sm font-medium text-red-600 hover:bg-red-50 transition ease-in flex items-center gap-2">
+              <i class="fa-solid fa-arrow-right-from-bracket"></i> Sign out
+            </button>
           </div>
-          
-          <div id="global-status-text" class="text-[11px] text-gray-500 font-medium flex items-center gap-1 uppercase transition-colors mt-1 pl-2 border-l border-brandDark/10">
-            <span id="global-status-dot" class="w-2 h-2 rounded-full bg-gray-400 transition-colors"></span> OFFLINE
-          </div>
-          
+        </div>
+        
+        <div id="global-status-text" class="text-[11px] text-brandDark/50 font-medium flex items-center gap-1 uppercase mt-1 pl-2 border-l border-brandDark/10">
+          <span id="global-status-dot" class="w-2 h-2 rounded-full bg-gray-300"></span> OFFLINE
         </div>
       </div>
-    </header>
+    </div>
+  </header>
 
-    <div class="flex-1 overflow-hidden">
+  <!-- BOTTOM SECTION (Sidebar + Main Content) -->
+  <div class="flex flex-1 overflow-hidden w-full relative z-10">
+    
+    <!-- 2. SIDEBAR -->
+    <aside class="w-60 glass-panel border-r border-brandDark/5 flex flex-col py-4 shrink-0 bg-white/60">
+      <a href="/workspace.html" data-page="workspace" class="flex items-center gap-4 px-6 py-3 text-sm font-normal text-brandDark/70 hover:bg-slate-50 hover:text-brandDark transition-colors">
+        <i class="fa-solid fa-headset w-5 text-center text-base"></i> Workspace
+      </a>
+      <a href="/campaigns.html" data-page="campaigns" class="flex items-center gap-4 px-6 py-3 text-sm font-normal text-brandDark/70 hover:bg-slate-50 hover:text-brandDark transition-colors">
+        <i class="fa-solid fa-bullhorn w-5 text-center text-base"></i> Campaigns
+      </a>
+      <a href="/teamleader.html" data-page="teamleader" class="flex items-center gap-4 px-6 py-3 text-sm font-medium text-brandAmber bg-brandAmber/10 border-r-2 border-brandAmber transition-colors">
+        <i class="fa-solid fa-user-tie w-5 text-center text-base"></i> Team Lead
+      </a>
+      <a href="/analytics.html" data-page="dashboard" class="flex items-center gap-4 px-6 py-3 text-sm font-normal text-brandDark/70 hover:bg-slate-50 hover:text-brandDark transition-colors">
+        <i class="fa-solid fa-chart-pie w-5 text-center text-base"></i> Analytics
+      </a>
+      <a href="admin.html" data-page="admin" class="flex items-center gap-4 px-6 py-3 text-sm font-normal text-brandDark/70 hover:bg-slate-50 hover:text-brandDark transition-colors mt-auto border-t border-brandDark/5">
+        <i class="fa-solid fa-shield-halved w-5 text-center text-base"></i> Admin
+      </a>
+    </aside>
+
+    <!-- 3. MAIN CONTENT (Page Transition applied) -->
+    <main class="flex-1 p-8 overflow-y-auto page-enter bg-slate-50/30">
       <!-- ========================================== -->
       <!-- VIEW 3: TEAM LEADER WORKSPACE -->
       <!-- ========================================== -->
-      <div id="view-teamleader" class="view h-full flex flex-col gap-6 overflow-hidden">
+      <div id="view-teamleader" class="h-full flex flex-col gap-6 overflow-hidden">
+        
         <div class="glass-panel rounded-2xl p-6 flex justify-between items-center shrink-0">
           <div>
-            <h2 class="text-xl font-semibold">Team Leader Workspace</h2>
-            <p class="text-sm text-brandDark/60 mt-1">Manage agent shifts and redistribute pending callbacks.</p>
+            <h2 class="text-xl font-medium text-brandDark">Team Leader Workspace</h2>
+            <p class="text-sm font-normal text-brandDark/60 mt-1">Manage agent shifts and redistribute pending callbacks.</p>
           </div>
-          <div class="flex gap-3 mb-6">
-            <button class="teamleader-tab-btn bg-brandDark text-white border border-transparent px-4 py-2 rounded-lg text-sm font-bold transition flex items-center gap-2" onclick="switchTeamLeaderTab('agents', this)">
+          <div class="flex gap-3">
+            <button class="teamleader-tab-btn bg-brandAmber text-white px-4 py-2 rounded-lg text-sm font-medium shadow-sm transition ease-in flex items-center gap-2" onclick="switchTeamLeaderTab('agents', this)">
               <i class="fa-solid fa-users-cog"></i> Agents
             </button>
-            <button class="teamleader-tab-btn bg-white border border-brandDark/20 text-brandDark/70 hover:text-brandDark hover:border-brandDark/40 px-4 py-2 rounded-lg text-sm font-bold transition flex items-center gap-2" onclick="switchTeamLeaderTab('customers', this); renderTLCustomers()">
+            <button class="teamleader-tab-btn bg-white border border-brandDark/10 text-brandDark/70 hover:text-brandDark px-4 py-2 rounded-lg text-sm font-medium transition ease-in flex items-center gap-2 shadow-sm" onclick="switchTeamLeaderTab('customers', this); renderTLCustomers()">
               All Customers
             </button>
-            <button class="teamleader-tab-btn bg-white border border-brandDark/20 text-brandDark/70 hover:text-brandDark hover:border-brandDark/40 px-4 py-2 rounded-lg text-sm font-bold transition flex items-center gap-2" onclick="switchTeamLeaderTab('pending', this); renderTLPending()">
+            <button class="teamleader-tab-btn bg-white border border-brandDark/10 text-brandDark/70 hover:text-brandDark px-4 py-2 rounded-lg text-sm font-medium transition ease-in flex items-center gap-2 shadow-sm" onclick="switchTeamLeaderTab('pending', this); renderTLPending()">
               <i class="fa-solid fa-clock-rotate-left"></i> Pending Callbacks
             </button>
           </div>
         </div>
-        <div class="flex-1 flex flex-col lg:flex-row gap-6 overflow-hidden">
+
+        <div class="flex-1 flex flex-col lg:flex-row gap-6 overflow-hidden min-h-[50vh]">
           
           <!-- Left: Roster Table -->
-          <div class="flex-[2] overflow-auto rounded-xl border border-brandDark/10 bg-white/30 backdrop-blur-sm shadow-inner relative">
+          <div class="flex-[2] overflow-auto rounded-2xl border border-brandDark/5 glass-card relative">
             <table class="w-full text-left border-collapse whitespace-nowrap">
-              <thead class="sticky top-0 bg-white/90 backdrop-blur-md z-10 shadow-sm">
-                <tr class="text-[11px] font-semibold uppercase tracking-wider text-brandDark/70 border-b border-brandDark/20">
-                  <th class="px-4 py-3">Agent Name</th>
-                  <th class="px-4 py-3">Team</th>
-                  <th class="px-4 py-3">Shift Status</th>
-                  <th class="px-4 py-3">Campaign</th>
-                  <th class="px-4 py-3">Queue</th>
+              <thead class="sticky top-0 bg-white/90 backdrop-blur-md z-10 border-b border-brandDark/5">
+                <tr class="text-[11px] font-semibold uppercase tracking-wider text-brandDark/50">
+                  <th class="px-5 py-4">Agent Name</th>
+                  <th class="px-5 py-4">Team</th>
+                  <th class="px-5 py-4">Shift Status</th>
+                  <th class="px-5 py-4">Campaign</th>
+                  <th class="px-5 py-4">Queue</th>
                 </tr>
               </thead>
-              <tbody class="text-[13px] font-medium" id="shift-manager-tbody">
+              <tbody class="text-[13px] font-normal" id="shift-manager-tbody">
                 <!-- Populated dynamically -->
               </tbody>
             </table>
           </div>
 
           <!-- Right: Add Control Agent Side-Panel -->
-          <div class="flex-1 glass-card rounded-xl p-5 border border-brandAmber/20 bg-brandAmber/5 flex flex-col h-fit">
-            <h3 class="font-bold text-[15px] uppercase text-brandDark/70 mb-4 border-b border-brandAmber/20 pb-2 flex items-center gap-2">
-              <i class="fa-solid fa-user-plus"></i> Add Control Agent
+          <div class="flex-1 glass-card rounded-2xl p-6 flex flex-col h-fit border border-brandDark/5">
+            <h3 class="font-medium text-base text-brandDark mb-4 border-b border-brandDark/5 pb-3 flex items-center gap-2">
+              <i class="fa-solid fa-user-plus text-brandAmber"></i> Add Control Agent
             </h3>
             <form onsubmit="createUser(event, 'tl')" class="flex flex-col gap-4">
               <div>
-                <label class="block text-[11px] font-bold text-brandDark/70 uppercase mb-1.5">Full Name</label>
-                <input type="text" id="tl-new-name" required class="glass-input rounded-lg w-full px-3 py-2 border border-brandDark/20 bg-white text-sm">
+                <label class="block text-[11px] font-semibold text-brandDark/50 uppercase mb-1.5">Full Name</label>
+                <input type="text" id="tl-new-name" required class="glass-input rounded-lg w-full px-3 py-2 text-sm font-normal">
               </div>
               <div>
-                <label class="block text-[11px] font-bold text-brandDark/70 uppercase mb-1.5">Email Address</label>
-                <input type="email" id="tl-new-email" required class="glass-input rounded-lg w-full px-3 py-2 border border-brandDark/20 bg-white text-sm">
+                <label class="block text-[11px] font-semibold text-brandDark/50 uppercase mb-1.5">Email Address</label>
+                <input type="email" id="tl-new-email" required class="glass-input rounded-lg w-full px-3 py-2 text-sm font-normal">
               </div>
-              <button type="submit" class="mt-2 w-full bg-brandDark hover:bg-slate-800 text-white font-bold py-3 rounded-lg shadow-md transition">
+              <button type="submit" class="mt-2 w-full bg-brandAmber hover:bg-amber-600 text-white font-medium py-2.5 rounded-lg shadow-sm transition ease-in">
                 Create Agent
               </button>
             </form>
           </div>
           
         </div>
+
         <!-- ALL CUSTOMERS TAB -->
-        <div id="tl-tab-customers" class="teamleader-tab-content hidden space-y-4">
-          <div class="glass-card p-6 rounded-xl flex flex-col h-[70vh]">
-            <div class="flex justify-between items-center mb-4">
-              <h3 class="font-bold text-lg">Customer Database Overview</h3>
-              <select id="tl-campaign-filter" onchange="renderTLCustomers()" class="glass-input rounded-lg px-3 py-2 text-sm font-medium border border-brandDark/20">
+        <div id="tl-tab-customers" class="teamleader-tab-content hidden h-full flex-col">
+          <div class="glass-card p-6 rounded-2xl flex flex-col flex-1 border border-brandDark/5">
+            <div class="flex justify-between items-center mb-5 border-b border-brandDark/5 pb-3">
+              <h3 class="font-medium text-lg text-brandDark">Customer Database Overview</h3>
+              <select id="tl-campaign-filter" onchange="renderTLCustomers()" class="glass-input rounded-lg px-3 py-2 text-sm font-normal w-48">
                 <option value="ALL">All Campaigns</option>
                 <!-- Populated dynamically -->
               </select>
             </div>
-            <div class="flex-1 overflow-auto rounded-xl border border-brandDark/10 bg-white/30 backdrop-blur-sm">
+            <div class="flex-1 overflow-auto rounded-xl border border-brandDark/5 bg-white/40">
               <table class="w-full text-left border-collapse whitespace-nowrap">
-                <thead class="sticky top-0 bg-white/90 backdrop-blur-md z-10 shadow-sm">
-                  <tr class="text-[11px] font-semibold uppercase tracking-wider text-brandDark/70 border-b border-brandDark/20">
-                    <th class="px-4 py-3">Customer Name</th>
-                    <th class="px-4 py-3">Phone</th>
-                    <th class="px-4 py-3">Campaign</th>
-                    <th class="px-4 py-3 text-amber-700">Assigned Agent</th>
-                    <th class="px-4 py-3">Outcome</th>
+                <thead class="sticky top-0 bg-white/90 backdrop-blur-md z-10 border-b border-brandDark/5">
+                  <tr class="text-[11px] font-semibold uppercase tracking-wider text-brandDark/50">
+                    <th class="px-5 py-4">Customer Name</th>
+                    <th class="px-5 py-4">Phone</th>
+                    <th class="px-5 py-4">Campaign</th>
+                    <th class="px-5 py-4 text-brandAmber">Assigned Agent</th>
+                    <th class="px-5 py-4">Outcome</th>
                   </tr>
                 </thead>
-                <tbody id="tl-customers-tbody" class="text-[13px] font-medium"></tbody>
+                <tbody id="tl-customers-tbody" class="text-[13px] font-normal"></tbody>
               </table>
             </div>
           </div>
         </div>
 
         <!-- PENDING CALLBACKS TAB -->
-        <div id="tl-tab-pending" class="teamleader-tab-content hidden space-y-4">
-          <div class="glass-card p-6 rounded-xl flex flex-col h-[70vh]">
-            <h3 class="font-bold text-lg mb-4 text-brandDark">Pending Callbacks (Unanswered)</h3>
-            <div class="flex-1 overflow-auto rounded-xl border border-brandDark/10 bg-white/30 backdrop-blur-sm">
+        <div id="tl-tab-pending" class="teamleader-tab-content hidden h-full flex-col">
+          <div class="glass-card p-6 rounded-2xl flex flex-col flex-1 border border-brandDark/5">
+            <div class="flex items-center justify-between gap-4 mb-5 border-b border-brandDark/5 pb-3">
+              <div>
+                <h3 class="font-medium text-lg text-brandDark">Pending Callbacks (Unanswered)</h3>
+                <p class="text-[11px] font-normal text-brandDark/50 mt-1">Only active agents with no current campaign are used for redistribution.</p>
+              </div>
+              <button onclick="redistributePendingCallbacks()" class="bg-brandAmber hover:bg-amber-600 text-white font-medium px-4 py-2.5 rounded-lg shadow-sm transition ease-in flex items-center gap-2 text-sm">
+                <i class="fa-solid fa-share-nodes"></i> Redistribute
+              </button>
+            </div>
+            <div class="flex-1 overflow-auto rounded-xl border border-brandDark/5 bg-white/40">
               <table class="w-full text-left border-collapse whitespace-nowrap">
-                <thead class="sticky top-0 bg-white/90 backdrop-blur-md z-10 shadow-sm">
-                  <tr class="text-[11px] font-semibold uppercase tracking-wider text-brandDark/70 border-b border-brandDark/20">
-                    <th class="px-4 py-3">Customer Name</th>
-                    <th class="px-4 py-3">Phone</th>
-                    <th class="px-4 py-3">Campaign</th>
-                    <th class="px-4 py-3">Outcome</th>
-                    <th class="px-4 py-3 text-amber-700">Agent Assigned</th>
+                <thead class="sticky top-0 bg-white/90 backdrop-blur-md z-10 border-b border-brandDark/5">
+                  <tr class="text-[11px] font-semibold uppercase tracking-wider text-brandDark/50">
+                    <th class="px-5 py-4">Customer Name</th>
+                    <th class="px-5 py-4">Phone</th>
+                    <th class="px-5 py-4">Campaign</th>
+                    <th class="px-5 py-4">Outcome</th>
+                    <th class="px-5 py-4 text-brandAmber">Agent Assigned</th>
+                    <th class="px-5 py-4">Comments</th>
                   </tr>
                 </thead>
-                <tbody id="tl-pending-tbody" class="text-[13px] font-medium"></tbody>
+                <tbody id="tl-pending-tbody" class="text-[13px] font-normal"></tbody>
               </table>
             </div>
           </div>
         </div>
-        <div id="tl-panel-pending" class="tl-panel hidden flex flex-1 glass-panel rounded-2xl p-5 overflow-hidden flex-col">
-          <div class="flex items-center justify-between gap-4 mb-4">
-            <div>
-              <h3 class="font-bold text-[15px] uppercase text-brandDark/70">All Pending Callbacks</h3>
-              <p class="text-xs text-brandDark/50 mt-1">Only active agents with no current campaign are used for redistribution.</p>
-            </div>
-            <button onclick="redistributePendingCallbacks()" class="bg-gradient-to-br from-brandDark to-slate-800 hover:from-slate-800 hover:to-black text-white font-bold px-4 py-2.5 rounded-xl shadow-md transition flex items-center gap-2">
-              <i class="fa-solid fa-share-nodes"></i> Redistribute
-            </button>
-          </div>
-          <div class="overflow-auto rounded-xl border border-brandDark/10 bg-white/30">
-            <table class="w-full text-left border-collapse whitespace-nowrap">
-              <thead class="sticky top-0 bg-white/90 z-10">
-                <tr class="text-[11px] font-semibold uppercase text-brandDark/70 border-b border-brandDark/20">
-                  <th class="px-4 py-3">Customer</th>
-                  <th class="px-4 py-3">Phone</th>
-                  <th class="px-4 py-3">Campaign</th>
-                  <th class="px-4 py-3">Previous Agent</th>
-                  <th class="px-4 py-3">Status</th>
-                  <th class="px-4 py-3">Comments</th>
-                </tr>
-              </thead>
-              <tbody id="tl-pending-tbody" class="text-[13px] font-medium"></tbody>
-            </table>
-          </div>
-        </div>
+
       </div>
-    </div>
-  </main>
+    </main>
+  </div>
+  
   <script src="/callcenter.js"></script>
 </body>
 </html>

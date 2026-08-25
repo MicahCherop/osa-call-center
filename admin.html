@@ -4,115 +4,122 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Admin - User Management</title>
+  
   <script src="https://cdn.tailwindcss.com"></script>
-
+  <link rel="icon" href="data:,">
+  
   <!-- Cleaned up Tailwind Config -->
   <script>
     tailwind.config = {
       theme: {
         extend: {
+          fontFamily: { sans: ['Inter', 'sans-serif'] },
           colors: { brandDark: '#0f172a', brandAmber: '#f59e0b' }
         }
       }
     }
   </script>
-  <link rel="icon" href="data:,">
+  
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <link rel="stylesheet" href="/callcenter.css">
 </head>
 
-<!-- FIX: Changed from font-normal to font-light for a thinner baseline text -->
-<body data-page="admin" class="text-brandDark font-sans font-light text-sm h-screen overflow-hidden flex relative bg-slate-50">
+<!-- FIX: flex-col added for full-width header, bg-white for clean base -->
+<body data-page="admin" class="text-brandDark font-sans font-normal text-sm h-screen overflow-hidden flex flex-col relative bg-white">
   
-  <!-- BACKGROUND -->
-  <div class="absolute inset-0 z-0 overflow-hidden pointer-events-none">
-    <div class="absolute top-[-10%] left-[-10%] w-[40rem] h-[40rem] bg-amber-200 rounded-full mix-blend-multiply filter blur-3xl opacity-60 animate-blob"></div>
-    <div class="absolute top-[20%] right-[-10%] w-[35rem] h-[35rem] bg-blue-200 rounded-full mix-blend-multiply filter blur-3xl opacity-60 animate-blob" style="animation-delay: 2s"></div>
-    <div class="absolute bottom-[-20%] left-[20%] w-[45rem] h-[45rem] bg-indigo-200 rounded-full mix-blend-multiply filter blur-3xl opacity-60 animate-blob" style="animation-delay: 4s"></div>
+  <!-- BACKGROUND BLOBS (Softened opacity) -->
+  <div class="absolute inset-0 z-0 overflow-hidden pointer-events-none opacity-40">
+    <div class="absolute top-[-10%] left-[-10%] w-[40rem] h-[40rem] bg-amber-100 rounded-full mix-blend-multiply filter blur-3xl animate-blob"></div>
+    <div class="absolute top-[20%] right-[-10%] w-[35rem] h-[35rem] bg-blue-100 rounded-full mix-blend-multiply filter blur-3xl animate-blob" style="animation-delay: 2s"></div>
+    <div class="absolute bottom-[-20%] left-[20%] w-[45rem] h-[45rem] bg-indigo-100 rounded-full mix-blend-multiply filter blur-3xl animate-blob" style="animation-delay: 4s"></div>
   </div>
 
-  <!-- SIDEBAR -->
-  <aside class="z-10 w-20 md:w-24 glass-panel border-r flex flex-col items-center py-6">
-    <a href="/workspace" data-page="workspace" class="nav-btn w-full py-4 flex flex-col items-center gap-1.5 text-[11px] font-medium text-brandDark/70 hover:text-brandDark transition-colors relative">
-      <i class="fa-solid fa-headset text-[20px]"></i> Workspace
-    </a>
-    <a href="/campaigns" data-page="campaigns" class="nav-btn w-full py-4 flex flex-col items-center gap-1.5 text-[11px] font-medium text-brandDark/70 hover:text-brandDark transition-colors relative">
-      <i class="fa-solid fa-bullhorn text-[20px]"></i> Campaigns
-    </a>
-    <a href="/teamleader" data-page="teamleader" class="nav-btn w-full py-4 flex flex-col items-center gap-1.5 text-[11px] font-medium text-brandDark/70 hover:text-brandDark transition-colors relative">
-      <i class="fa-solid fa-user-tie text-[20px]"></i> Team Lead
-    </a>
-    <a href="/analytics" data-page="dashboard" class="nav-btn w-full py-4 flex flex-col items-center gap-1.5 text-[11px] font-medium text-brandDark/70 hover:text-brandDark transition-colors relative">
-      <i class="fa-solid fa-chart-pie text-[20px]"></i> Analytics
-    </a>
-    <a href="/admin" data-page="admin" class="nav-btn w-full py-4 flex flex-col items-center gap-1.5 text-[11px] font-medium text-brandDark/70 hover:text-brandDark transition-colors relative bg-white/40">
-      <i class="fa-solid fa-shield-halved text-[20px]"></i> Admin
-      <div class="active-indicator absolute left-0 top-0 h-full w-1 bg-brandAmber"></div>
-    </a>
-  </aside>
-
-  <main class="z-10 flex-1 flex flex-col p-6 overflow-hidden">
-    <!-- FIX: Added "relative z-50" to the header so the dropdown renders on top of everything below it -->
-    <header class="glass-panel rounded-2xl px-6 py-4 mb-6 flex justify-between items-center shrink-0 relative z-50">
-      <!-- FIX: Dropped header weight to font-medium -->
-      <h1 class="text-2xl font-medium tracking-tight flex items-center gap-3">
-        <i class="fa-solid fa-shield-halved text-brandAmber"></i> Ops Manager Admin
-      </h1>
+  <!-- 1. FULL WIDTH HEADER -->
+  <header class="w-full glass-panel border-b border-brandDark/5 px-6 py-3 flex justify-between items-center relative z-50 shrink-0">
+    <h1 class="text-xl font-medium tracking-tight flex items-center gap-3 text-brandDark">
+      <i class="fa-solid fa-shield-halved text-brandAmber"></i> Ops Manager Admin
+    </h1>
+    
+    <div class="flex items-center gap-5 text-sm">
+      <button class="text-brandDark/60 hover:text-brandAmber transition"><i class="fa-regular fa-bell text-lg"></i></button>
       
-      <div class="flex items-center gap-5 text-sm">
-        <button class="text-brandDark/60 hover:text-brandDark transition"><i class="fa-regular fa-bell text-xl"></i></button>
-        
-        <div class="flex items-center gap-3 pl-4 border-l border-brandDark/20">
-          <div class="relative">
-            <button onclick="toggleLogoutModal()" class="flex items-center gap-3 hover:bg-slate-100/50 p-1.5 rounded-lg transition text-left outline-none">
-              <div class="w-9 h-9 bg-slate-700 text-white rounded-full flex items-center justify-center">
-                <i class="fa-solid fa-user text-sm"></i>
-              </div>
-              <div class="hidden sm:block">
-                <!-- FIX: Name font-normal, Role font-light -->
-                <div id="header-user-name" class="text-sm font-normal text-slate-800">Loading...</div>
-                <div id="header-user-role" class="text-[11px] font-light text-slate-500">Role</div>
-              </div>
-              <i class="fa-solid fa-chevron-down text-xs text-slate-400 ml-1"></i>
-            </button>
-
-            <!-- The Logout Modal -->
-            <div id="logout-modal" class="hidden absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-xl border border-slate-100 z-50 overflow-hidden">
-              <div class="p-4 border-b border-slate-50 bg-slate-50/50">
-                <p class="text-xs font-light text-slate-500 mb-1">Signed in as</p>
-                <p id="modal-user-email" class="text-sm font-normal text-slate-800 truncate">email@loading.com</p>
-              </div>
-              <button onclick="logout()" class="w-full text-left px-4 py-3 text-sm font-medium text-red-600 hover:bg-red-50 transition flex items-center gap-2">
-                <i class="fa-solid fa-arrow-right-from-bracket"></i> Sign out
-              </button>
+      <div class="flex items-center gap-3 pl-4 border-l border-brandDark/10">
+        <!-- Clickable Profile Section -->
+        <div class="relative">
+          <button onclick="toggleLogoutModal()" class="flex items-center gap-3 hover:bg-slate-50 p-1.5 rounded-lg transition text-left outline-none">
+            <div class="w-8 h-8 bg-brandDark text-white rounded-full flex items-center justify-center">
+              <i class="fa-solid fa-user text-xs"></i>
             </div>
+            <div class="hidden sm:block">
+              <div id="header-user-name" class="text-sm font-medium text-brandDark">Loading...</div>
+              <div id="header-user-role" class="text-xs font-normal text-brandDark/60">Role</div>
+            </div>
+            <i class="fa-solid fa-chevron-down text-xs text-brandDark/40 ml-1"></i>
+          </button>
+
+          <!-- The Logout Modal -->
+          <div id="logout-modal" class="hidden absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-lg border border-brandDark/5 z-50 overflow-hidden">
+            <div class="p-4 border-b border-brandDark/5 bg-slate-50/50">
+              <p class="text-xs font-normal text-brandDark/50 mb-1">Signed in as</p>
+              <p id="modal-user-email" class="text-sm font-medium text-brandDark truncate">email@loading.com</p>
+            </div>
+            <button onclick="logout()" class="w-full text-left px-4 py-3 text-sm font-medium text-red-600 hover:bg-red-50 transition ease-in flex items-center gap-2">
+              <i class="fa-solid fa-arrow-right-from-bracket"></i> Sign out
+            </button>
           </div>
-          
-          <div id="global-status-text" class="text-[11px] text-gray-500 font-medium flex items-center gap-1 uppercase transition-colors mt-1 pl-2 border-l border-brandDark/10">
-            <span id="global-status-dot" class="w-2 h-2 rounded-full bg-gray-400 transition-colors"></span> OFFLINE
-          </div>
-          
+        </div>
+        
+        <div id="global-status-text" class="text-[11px] text-brandDark/50 font-medium flex items-center gap-1 uppercase mt-1 pl-2 border-l border-brandDark/10">
+          <span id="global-status-dot" class="w-2 h-2 rounded-full bg-gray-300"></span> OFFLINE
         </div>
       </div>
-    </header>
+    </div>
+  </header>
 
-    <div class="flex-1 overflow-y-auto pr-2 pb-6">
+  <!-- BOTTOM SECTION (Sidebar + Main Content) -->
+  <div class="flex flex-1 overflow-hidden w-full relative z-10">
+    
+    <!-- 2. SIDEBAR -->
+    <aside class="w-60 glass-panel border-r border-brandDark/5 flex flex-col py-4 shrink-0 bg-white/60">
+      <a href="/workspace.html" data-page="workspace" class="flex items-center gap-4 px-6 py-3 text-sm font-normal text-brandDark/70 hover:bg-slate-50 hover:text-brandDark transition-colors">
+        <i class="fa-solid fa-headset w-5 text-center text-base"></i> Workspace
+      </a>
+      <a href="/campaigns.html" data-page="campaigns" class="flex items-center gap-4 px-6 py-3 text-sm font-normal text-brandDark/70 hover:bg-slate-50 hover:text-brandDark transition-colors">
+        <i class="fa-solid fa-bullhorn w-5 text-center text-base"></i> Campaigns
+      </a>
+      <a href="/teamleader.html" data-page="teamleader" class="flex items-center gap-4 px-6 py-3 text-sm font-normal text-brandDark/70 hover:bg-slate-50 hover:text-brandDark transition-colors">
+        <i class="fa-solid fa-user-tie w-5 text-center text-base"></i> Team Lead
+      </a>
+      <a href="/analytics.html" data-page="dashboard" class="flex items-center gap-4 px-6 py-3 text-sm font-normal text-brandDark/70 hover:bg-slate-50 hover:text-brandDark transition-colors">
+        <i class="fa-solid fa-chart-pie w-5 text-center text-base"></i> Analytics
+      </a>
+      <!-- Active Tab -->
+      <a href="admin.html" data-page="admin" class="flex items-center gap-4 px-6 py-3 text-sm font-medium text-brandAmber bg-brandAmber/10 border-r-2 border-brandAmber transition-colors mt-auto border-t border-brandDark/5">
+        <i class="fa-solid fa-shield-halved w-5 text-center text-base"></i> Admin
+      </a>
+    </aside>
+
+    <!-- 3. MAIN CONTENT (Page Transition applied) -->
+    <main class="flex-1 p-8 overflow-y-auto page-enter bg-slate-50/30">
+      
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div class="glass-panel p-6 rounded-2xl bg-white/80 shadow-md border border-brandDark/10 h-fit">
-          <h2 class="text-lg font-medium mb-4 border-b border-brandDark/10 pb-2">Add Leadership Role</h2>
+        <!-- Create Managers Form -->
+        <div class="glass-card p-6 rounded-2xl border border-brandDark/5 h-fit">
+          <h2 class="text-lg font-medium mb-5 border-b border-brandDark/5 pb-3">Add Leadership Role</h2>
           <form onsubmit="createUser(event, 'admin')" class="space-y-4">
             <div>
-              <label class="block text-[11px] font-medium text-brandDark/70 uppercase mb-1">Full Name</label>
-              <input type="text" id="new-agent-name" required placeholder="Jane Doe" class="glass-input rounded-lg w-full px-3 py-2 text-sm border border-brandDark/20 bg-white/50">
+              <label class="block text-[11px] font-semibold text-brandDark/60 uppercase mb-1.5">Full Name</label>
+              <input type="text" id="new-agent-name" required placeholder="Jane Doe" class="glass-input rounded-lg w-full px-3 py-2 text-sm font-normal">
             </div>
             
             <div>
-              <label class="block text-[11px] font-medium text-brandDark/70 uppercase mb-1">Email Address</label>
-              <input type="email" id="new-agent-email" required placeholder="jane@4g-capital.com" class="glass-input rounded-lg w-full px-3 py-2 text-sm border border-brandDark/20 bg-white/50">
+              <label class="block text-[11px] font-semibold text-brandDark/60 uppercase mb-1.5">Email Address</label>
+              <input type="email" id="new-agent-email" required placeholder="jane@company.com" class="glass-input rounded-lg w-full px-3 py-2 text-sm font-normal">
             </div>
             
             <div>
-              <label class="block text-[11px] font-medium text-brandDark/70 uppercase mb-1">Role</label>
-              <select id="new-agent-role" required class="glass-input rounded-lg w-full px-3 py-2 text-sm border border-brandDark/20 bg-white/50">
+              <label class="block text-[11px] font-semibold text-brandDark/60 uppercase mb-1.5">Role</label>
+              <select id="new-agent-role" required class="glass-input rounded-lg w-full px-3 py-2 text-sm font-normal">
                 <option value="Control Agent">Control Agent</option>
                 <option value="Team Leader">Team Leader</option>
                 <option value="Ops Manager">Ops Manager</option>
@@ -120,33 +127,36 @@
               </select>
             </div>
             
-            <button type="submit" class="w-full bg-brandDark hover:bg-slate-800 text-white font-medium py-2.5 rounded-lg shadow-md transition text-sm mt-2">
+            <!-- FIX: Amber Button -->
+            <button type="submit" class="w-full bg-brandAmber hover:bg-amber-600 text-white font-medium py-2.5 rounded-lg shadow-sm transition ease-in text-sm mt-3">
               Create User
             </button>
           </form>        
         </div>
 
-        <div class="glass-panel p-6 rounded-2xl bg-white/80 shadow-md border border-brandDark/10 lg:col-span-2">
-          <h2 class="text-lg font-medium mb-4 border-b border-brandDark/10 pb-2">All System Users</h2>
-          <div class="overflow-x-auto rounded-xl border border-brandDark/10 bg-white/50">
+        <!-- System Users List -->
+        <div class="glass-card p-6 rounded-2xl border border-brandDark/5 lg:col-span-2">
+          <h2 class="text-lg font-medium mb-5 border-b border-brandDark/5 pb-3">All System Users</h2>
+          <div class="overflow-x-auto rounded-xl border border-brandDark/5 bg-white/50">
             <table class="w-full text-left border-collapse whitespace-nowrap">
-              <thead class="bg-brandDark/5">
-                <tr class="text-[11px] font-medium uppercase tracking-wider text-brandDark/70 border-b border-brandDark/10">
-                  <th class="px-4 py-3">Name</th>
-                  <th class="px-4 py-3">Email</th>
-                  <th class="px-4 py-3">Role</th>
-                  <th class="px-4 py-3">Status</th>
+              <thead class="bg-white/80">
+                <tr class="text-[11px] font-semibold uppercase tracking-wider text-brandDark/50 border-b border-brandDark/5">
+                  <th class="px-5 py-4">Name</th>
+                  <th class="px-5 py-4">Email</th>
+                  <th class="px-5 py-4">Role</th>
+                  <th class="px-5 py-4">Status</th>
                 </tr>
               </thead>
-              <tbody id="admin-users-tbody" class="text-[13px] font-normal bg-transparent">
+              <tbody id="admin-users-tbody" class="text-[13px] font-normal bg-transparent text-brandDark/80">
                 <!-- Dynamically Populated -->
               </tbody>
             </table>
           </div>
         </div>
       </div>
-    </div>
-  </main>
+      
+    </main>
+  </div>
   
   <script src="/callcenter.js"></script>
 </body>

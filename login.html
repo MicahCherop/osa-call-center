@@ -4,41 +4,47 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Login - OSA Call Center</title>
-  <!-- Cleaned up Tailwind Config -->
-    <script src="https://cdn.tailwindcss.com"></script>
- 
+  
+  <script src="https://cdn.tailwindcss.com"></script>
+  
   <script>
     tailwind.config = {
       theme: {
         extend: {
+          fontFamily: { sans: ['Inter', 'sans-serif'] },
           colors: { brandDark: '#0f172a', brandAmber: '#f59e0b' }
         }
       }
     }
   </script>
+  
   <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <link rel="stylesheet" href="/callcenter.css">
 </head>
-<body data-page="login" class="h-screen bg-slate-50 flex items-center justify-center relative overflow-hidden">
+
+<!-- Applied global text sizes, fonts, pure white background, and flex alignment -->
+<body data-page="login" class="text-brandDark font-sans font-normal text-sm h-screen overflow-hidden flex items-center justify-center relative bg-white">
   
-  <div class="absolute inset-0 z-0 overflow-hidden pointer-events-none">
-    <div class="absolute top-[-10%] left-[-10%] w-[40rem] h-[40rem] bg-amber-200 rounded-full mix-blend-multiply filter blur-3xl opacity-60"></div>
+  <!-- BACKGROUND BLOBS (Softened opacity for better contrast) -->
+  <div class="absolute inset-0 z-0 overflow-hidden pointer-events-none opacity-40">
+    <div class="absolute top-[-10%] left-[-10%] w-[40rem] h-[40rem] bg-amber-100 rounded-full mix-blend-multiply filter blur-3xl animate-blob"></div>
+    <div class="absolute bottom-[-20%] right-[-10%] w-[45rem] h-[45rem] bg-slate-100 rounded-full mix-blend-multiply filter blur-3xl animate-blob"></div>
   </div>
   
-  <div class="glass-panel p-8 rounded-2xl w-full max-w-md relative z-10 shadow-2xl bg-white/90 backdrop-blur-md border border-brandDark/10 text-center">
+  <!-- LOGIN MODAL (Added page-enter animation) -->
+  <div class="glass-panel p-10 rounded-2xl w-full max-w-md relative z-10 shadow-2xl text-center page-enter">
     
-    <!-- Changed from font-bold to font-semibold for a cleaner look -->
-    <h1 class="text-3xl font-semibold text-brandDark mb-2">OSA Call Center</h1>
-    <p class="text-brandDark/60 text-sm mb-8">Sign in securely with your company account</p>
+    <h1 class="text-3xl font-medium text-brandDark mb-2">OSA Call Center</h1>
+    <p class="text-brandDark/60 text-sm font-normal mb-8">Sign in securely with your company account</p>
     
     <div id="google-btn-container" class="flex justify-center mb-4">
-      <!-- Added font-medium to make the button text crisp but not heavy -->
-      <button onclick="redirectToGoogle()" class="w-full bg-brandDark hover:bg-slate-800 text-white py-3 rounded-lg shadow-md transition flex items-center justify-center gap-3 font-medium">
-        <i class="fa-brands fa-google text-brandAmber text-lg"></i> Continue with Google
+      <!-- Button updated to Amber styling with ease-in transition -->
+      <button onclick="redirectToGoogle()" class="w-full bg-brandAmber hover:bg-amber-600 text-white py-3 rounded-lg shadow-sm transition ease-in flex items-center justify-center gap-3 font-medium">
+        <i class="fa-brands fa-google text-white text-lg"></i> Continue with Google
       </button>
     </div>
     
-    <!-- Changed font-bold to font-medium for the status text -->
     <div id="login-status" class="text-brandAmber text-sm mt-3 font-medium hidden flex items-center justify-center gap-2">
       <i class="fa-solid fa-circle-notch fa-spin"></i> Verifying authorization...
     </div>
@@ -51,14 +57,13 @@
     const CLIENT_ID = "106325673835-4moq7op50u80oet78ln84t241a88a200.apps.googleusercontent.com";
     
     function redirectToGoogle() {
-    // Smart Redirect: Detects if you are testing locally or on the live site
-    const isLocalhost = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
-    const redirectUri = isLocalhost 
-        ? window.location.origin + "/login" 
-        : "https://osa-call-center.vercel.app/login";
-      
-  const oauth2Endpoint = "https://accounts.google.com/o/oauth2/v2/auth";
-  // ...
+      // Smart Redirect: Automatically adds .html locally so Google doesn't throw a mismatch error
+      const isLocalhost = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+      const redirectUri = isLocalhost 
+          ? window.location.origin + "/login.html" 
+          : "https://osa-call-center.vercel.app/login";
+        
+      const oauth2Endpoint = "https://accounts.google.com/o/oauth2/v2/auth";
       
       const form = document.createElement("form");
       form.setAttribute("method", "GET");
@@ -71,7 +76,7 @@
         scope: "email profile",
         include_granted_scopes: "true",
         state: "pass-through value",
-        prompt: "select_account" // This forces the account chooser screen!
+        prompt: "select_account"
       };
 
       for (let p in params) {
@@ -86,24 +91,19 @@
       form.submit();
     }
 
-    // 2. Intercept the URL when Google sends them back
     window.onload = async function() {
       const hash = window.location.hash;
       
       if (hash && hash.includes("access_token")) {
-        // We have returned from Google!
         document.getElementById('login-status').classList.remove('hidden');
         document.getElementById('google-btn-container').classList.add('hidden');
         
-        // Parse the token from the URL
         const params = new URLSearchParams(hash.substring(1));
         const accessToken = params.get("access_token");
 
-        // Clean up the URL so it looks nice
         window.history.replaceState(null, null, window.location.pathname);
 
         try {
-          // Exchange the token for the user's email
           const res = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
             headers: { Authorization: `Bearer ${accessToken}` }
           });
@@ -111,7 +111,6 @@
           
           if (!userInfo.email) throw new Error("Could not retrieve email from Google.");
 
-          // Send the email to our FastAPI backend
           const backendRes = await fetch('/api/login', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -121,13 +120,18 @@
           const data = await backendRes.json();
           if (!backendRes.ok) throw new Error(data.detail || "Database verification failed.");
 
-          // Fix: Mapped directly to data instead of data.user
           localStorage.setItem('USER_EMAIL', data.email);
           localStorage.setItem('USER_ROLE', data.role);
           localStorage.setItem('LOGGED_IN_AGENT', data.name);
           
-          // Fix: Removed .html extension 
-          window.location.replace('/workspace');
+          // Using .html ensures redirect works perfectly on localhost and Vercel
+          if(data.role === "Admin") {
+            window.location.replace('/admin.html');
+          } else if(data.role === "Team Leader" || data.role === "Ops Manager") {
+            window.location.replace('/teamleader.html');
+          } else {
+            window.location.replace('/workspace.html');
+          }
 
         } catch (err) {
           document.getElementById('login-status').classList.add('hidden');
@@ -136,7 +140,6 @@
           document.getElementById('google-btn-container').classList.remove('hidden');
         }
       } else {
-        // Normal page load, check standard RBAC
         if (typeof enforceSecurity === 'function') enforceSecurity();
       }
     };
