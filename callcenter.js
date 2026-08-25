@@ -73,7 +73,7 @@ window.onload = async () => {
 };
 // --- USER PROFILE & LOGOUT LOGIC ---
 
-// 1. Populate the header with the logged-in user's details
+// Populate the header with the logged-in user's details
 function loadUserProfile() {
     const name = localStorage.getItem('LOGGED_IN_AGENT') || 'Unknown User';
     const role = localStorage.getItem('USER_ROLE') || 'Agent';
@@ -82,10 +82,20 @@ function loadUserProfile() {
     const nameEl = document.getElementById('header-user-name');
     const roleEl = document.getElementById('header-user-role');
     const emailEl = document.getElementById('modal-user-email');
+    const statusIndicator = document.getElementById('global-status-text');
 
     if (nameEl) nameEl.innerText = name;
     if (roleEl) roleEl.innerText = role;
     if (emailEl) emailEl.innerText = email;
+
+    // FIX: Only show the Offline/Online status for Control Agents
+    if (statusIndicator) {
+        if (role === 'Control Agent') {
+            statusIndicator.style.display = 'flex'; // Show it
+        } else {
+            statusIndicator.style.display = 'none'; // Hide it for Admins/TLs
+        }
+    }
 }
 
 // 2. Toggle the logout dropdown modal
@@ -577,7 +587,8 @@ window.renderAdminUserList = function() {
     tbody.innerHTML = '';
     
     if (!agents || agents.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="4" class="px-4 py-8 text-center text-brandDark/50 italic">No users found in database.</td></tr>';
+        // FIX: Changed colspan to 5 to account for the new Actions column
+        tbody.innerHTML = '<tr><td colspan="5" class="px-5 py-8 text-center text-brandDark/50 italic">No users found in database.</td></tr>';
         return;
     }
 
@@ -592,16 +603,95 @@ window.renderAdminUserList = function() {
         if(role === 'Ops Manager') badgeColor = 'bg-purple-100 text-purple-800';
         if(role === 'Admin') badgeColor = 'bg-red-100 text-red-800';
         
+        // FIX: Adjusted padding to px-5 py-4, softened font-bold to font-medium, and appended the Actions column
         tbody.innerHTML += `
-            <tr class="border-b border-brandDark/5">
-                <td class="px-4 py-3 font-bold text-brandDark">${escapeHtml(name)}</td>
-                <td class="px-4 py-3">${escapeHtml(email)}</td>
-                <td class="px-4 py-3"><span class="px-2 py-1 rounded text-[11px] font-bold ${badgeColor}">${escapeHtml(role)}</span></td>
-                <td class="px-4 py-3 font-bold ${status === 'Active' ? 'text-green-600' : 'text-gray-500'}">${escapeHtml(status)}</td>
+            <tr class="border-b border-brandDark/5 hover:bg-white/40 transition">
+                <td class="px-5 py-4 font-medium text-brandDark">${escapeHtml(name)}</td>
+                <td class="px-5 py-4 text-brandDark/80">${escapeHtml(email)}</td>
+                <td class="px-5 py-4"><span class="px-2.5 py-1 rounded-md text-[11px] font-medium ${badgeColor}">${escapeHtml(role)}</span></td>
+                <td class="px-5 py-4 font-medium ${status === 'Active' ? 'text-green-600' : 'text-gray-500'}">${escapeHtml(status)}</td>
+                <td class="px-5 py-4 text-right">
+                    <button onclick="openEditUserModal('${escapeHtml(email)}', '${escapeHtml(name)}', '${escapeHtml(role)}')" class="text-brandDark/40 hover:text-brandAmber transition px-2" title="Edit User">
+                        <i class="fa-solid fa-pen"></i>
+                    </button>
+                    <button onclick="deleteUserAction('${escapeHtml(email)}')" class="text-brandDark/40 hover:text-red-600 transition px-2" title="Delete User">
+                        <i class="fa-solid fa-trash"></i>
+                    </button>
+                </td>
             </tr>
         `;
     });
 };
+// ==========================================
+// USER MANAGEMENT: EDIT & DELETE
+// ==========================================
+
+function openEditUserModal(email, name, role) {
+    document.getElementById('edit-user-email').value = email;
+    document.getElementById('edit-user-name').value = name;
+    document.getElementById('edit-user-role').value = role;
+
+    const backdrop = document.getElementById('edit-user-modal-backdrop');
+    backdrop.classList.remove('hidden');
+    setTimeout(() => backdrop.classList.remove('opacity-0'), 10);
+}
+
+function closeEditUserModal(e) {
+    if (e && e.target !== e.currentTarget) return;
+    const backdrop = document.getElementById('edit-user-modal-backdrop');
+    backdrop.classList.add('opacity-0');
+    setTimeout(() => backdrop.classList.add('hidden'), 300);
+}
+
+async function submitEditUser(e) {
+    e.preventDefault();
+    const email = document.getElementById('edit-user-email').value;
+    const name = document.getElementById('edit-user-name').value;
+    const role = document.getElementById('edit-user-role').value;
+
+    try {
+        // Adjust this endpoint to match your Python FastAPI route
+        const res = await fetch('/api/users/edit', { 
+            method: 'POST', // or PUT depending on your backend
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, name, role })
+        });
+        
+        if (res.ok) {
+            closeEditUserModal();
+            location.reload(); // Refresh the page to see changes
+        } else {
+            const data = await res.json();
+            alert(data.detail || 'Failed to update user.');
+        }
+    } catch (err) {
+        console.error(err);
+        alert('Error communicating with the server.');
+    }
+}
+
+async function deleteUserAction(email) {
+    if (!confirm(`Are you absolutely sure you want to completely remove ${email} from the system? This action cannot be undone.`)) return;
+    
+    try {
+        // Adjust this endpoint to match your Python FastAPI route
+        const res = await fetch(`/api/users/delete`, { 
+            method: 'POST', // or DELETE depending on your backend
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email })
+        });
+        
+        if (res.ok) {
+            location.reload(); // Refresh the page to see changes
+        } else {
+             const data = await res.json();
+             alert(data.detail || 'Failed to delete user.');
+        }
+    } catch (err) {
+        console.error(err);
+        alert('Error communicating with the server.');
+    }
+}
 
 window.renderShiftManager = function() {
     const tbody = document.getElementById('shift-manager-tbody');

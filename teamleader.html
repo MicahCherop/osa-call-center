@@ -11,7 +11,6 @@
   <link rel="icon" href="data:,">
   <script src="https://cdn.tailwindcss.com"></script>
 
-  <!-- Cleaned up Tailwind Config -->
   <script>
     tailwind.config = {
       theme: {
@@ -25,7 +24,6 @@
   <link rel="stylesheet" href="/callcenter.css">
 </head>
 
-<!-- FIX: flex-col added for full-width header, bg-white for clean base -->
 <body data-page="teamleader" class="text-brandDark font-sans font-normal text-sm h-screen overflow-hidden flex flex-col relative bg-white">
   
   <!-- BACKGROUND BLOBS -->
@@ -90,7 +88,7 @@
           </div>
         </div>
         <div class="flex justify-end gap-3 mt-6 pt-4 border-t border-brandDark/10">
-          <button type="button" onclick="closeAddCampaignModal()" class="px-4 py-2 text-sm font-medium text-brandDark/70 hover:text-brandDark transition">Cancel</button>
+          <button type="button" onclick="closeAddCampaignModal()" class="px-4 py-2 text-sm font-medium text-brandDark/70 hover:text-brandDark transition ease-in">Cancel</button>
           <button type="submit" class="bg-brandAmber hover:bg-amber-600 text-white font-medium px-5 py-2 rounded-lg shadow-sm transition ease-in text-sm flex items-center gap-2">
             <i class="fa-solid fa-check"></i> Save Campaign
           </button>
@@ -237,7 +235,9 @@
           </div>
         </div>
 
-        <div class="flex-1 flex flex-col lg:flex-row gap-6 overflow-hidden min-h-[50vh]">
+        <!-- FIX: Added IDs and classes so this tab toggles properly -->
+        <!-- AGENTS TAB -->
+        <div id="tl-tab-agents" class="teamleader-tab-content flex flex-col lg:flex-row gap-6 overflow-hidden min-h-[50vh] flex-1">
           
           <!-- Left: Roster Table -->
           <div class="flex-[2] overflow-auto rounded-2xl border border-brandDark/5 glass-card relative">
@@ -276,7 +276,6 @@
               </button>
             </form>
           </div>
-          
         </div>
 
         <!-- ALL CUSTOMERS TAB -->

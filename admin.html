@@ -8,7 +8,6 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="icon" href="data:,">
   
-  <!-- Cleaned up Tailwind Config -->
   <script>
     tailwind.config = {
       theme: {
@@ -24,17 +23,50 @@
   <link rel="stylesheet" href="/callcenter.css">
 </head>
 
-<!-- FIX: flex-col added for full-width header, bg-white for clean base -->
 <body data-page="admin" class="text-brandDark font-sans font-normal text-sm h-screen overflow-hidden flex flex-col relative bg-white">
   
-  <!-- BACKGROUND BLOBS (Softened opacity) -->
+  <!-- BACKGROUND BLOBS -->
   <div class="absolute inset-0 z-0 overflow-hidden pointer-events-none opacity-40">
     <div class="absolute top-[-10%] left-[-10%] w-[40rem] h-[40rem] bg-amber-100 rounded-full mix-blend-multiply filter blur-3xl animate-blob"></div>
     <div class="absolute top-[20%] right-[-10%] w-[35rem] h-[35rem] bg-blue-100 rounded-full mix-blend-multiply filter blur-3xl animate-blob" style="animation-delay: 2s"></div>
     <div class="absolute bottom-[-20%] left-[20%] w-[45rem] h-[45rem] bg-indigo-100 rounded-full mix-blend-multiply filter blur-3xl animate-blob" style="animation-delay: 4s"></div>
   </div>
 
-  <!-- 1. FULL WIDTH HEADER -->
+  <!-- EDIT USER MODAL -->
+  <div id="edit-user-modal-backdrop" class="fixed inset-0 app-modal-backdrop z-50 hidden transition-opacity duration-300 opacity-0 flex items-center justify-center" onclick="closeEditUserModal(event)">
+    <div id="edit-user-modal" class="glass-panel w-full max-w-md rounded-2xl p-6 app-modal-card relative shadow-2xl flex flex-col" onclick="event.stopPropagation()">
+      <div class="flex justify-between items-center mb-6 border-b border-brandDark/5 pb-4">
+        <h2 class="text-xl font-medium flex items-center gap-2"><i class="fa-solid fa-user-pen text-brandAmber"></i> Edit User</h2>
+        <button onclick="closeEditUserModal()" class="text-brandDark/50 hover:text-red-500 transition"><i class="fa-solid fa-xmark text-xl"></i></button>
+      </div>
+      <form onsubmit="submitEditUser(event)" class="space-y-4">
+        <div>
+          <label class="block text-[11px] font-semibold text-brandDark/70 uppercase mb-1.5">Email Address</label>
+          <input type="email" id="edit-user-email" readonly class="glass-input rounded-lg w-full px-3 py-2 text-sm font-medium bg-slate-100/50 cursor-not-allowed text-brandDark/50">
+        </div>
+        <div>
+          <label class="block text-[11px] font-semibold text-brandDark/70 uppercase mb-1.5">Full Name</label>
+          <input type="text" id="edit-user-name" required class="glass-input rounded-lg w-full px-3 py-2 text-sm font-normal">
+        </div>
+        <div>
+          <label class="block text-[11px] font-semibold text-brandDark/70 uppercase mb-1.5">Role</label>
+          <select id="edit-user-role" required class="glass-input rounded-lg w-full px-3 py-2 text-sm font-normal">
+            <option value="Control Agent">Control Agent</option>
+            <option value="Team Leader">Team Leader</option>
+            <option value="Ops Manager">Ops Manager</option>
+            <option value="Admin">Admin</option>
+          </select>
+        </div>
+        <div class="flex justify-end gap-3 mt-6 pt-4 border-t border-brandDark/10">
+          <button type="button" onclick="closeEditUserModal()" class="px-4 py-2 text-sm font-medium text-brandDark/70 hover:text-brandDark transition ease-in">Cancel</button>
+          <button type="submit" class="bg-brandAmber hover:bg-amber-600 text-white font-medium px-5 py-2 rounded-lg shadow-sm transition ease-in text-sm flex items-center gap-2">
+            <i class="fa-solid fa-check"></i> Save Changes
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <header class="w-full glass-panel border-b border-brandDark/5 px-6 py-3 flex justify-between items-center relative z-50 shrink-0">
     <h1 class="text-xl font-medium tracking-tight flex items-center gap-3 text-brandDark">
       <i class="fa-solid fa-shield-halved text-brandAmber"></i> Ops Manager Admin
@@ -44,7 +76,6 @@
       <button class="text-brandDark/60 hover:text-brandAmber transition"><i class="fa-regular fa-bell text-lg"></i></button>
       
       <div class="flex items-center gap-3 pl-4 border-l border-brandDark/10">
-        <!-- Clickable Profile Section -->
         <div class="relative">
           <button onclick="toggleLogoutModal()" class="flex items-center gap-3 hover:bg-slate-50 p-1.5 rounded-lg transition text-left outline-none">
             <div class="w-8 h-8 bg-brandDark text-white rounded-full flex items-center justify-center">
@@ -57,7 +88,6 @@
             <i class="fa-solid fa-chevron-down text-xs text-brandDark/40 ml-1"></i>
           </button>
 
-          <!-- The Logout Modal -->
           <div id="logout-modal" class="hidden absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-lg border border-brandDark/5 z-50 overflow-hidden">
             <div class="p-4 border-b border-brandDark/5 bg-slate-50/50">
               <p class="text-xs font-normal text-brandDark/50 mb-1">Signed in as</p>
@@ -76,10 +106,7 @@
     </div>
   </header>
 
-  <!-- BOTTOM SECTION (Sidebar + Main Content) -->
   <div class="flex flex-1 overflow-hidden w-full relative z-10">
-    
-    <!-- 2. SIDEBAR -->
     <aside class="w-60 glass-panel border-r border-brandDark/5 flex flex-col py-4 shrink-0 bg-white/60">
       <a href="/workspace.html" data-page="workspace" class="flex items-center gap-4 px-6 py-3 text-sm font-normal text-brandDark/70 hover:bg-slate-50 hover:text-brandDark transition-colors">
         <i class="fa-solid fa-headset w-5 text-center text-base"></i> Workspace
@@ -93,17 +120,13 @@
       <a href="/analytics.html" data-page="dashboard" class="flex items-center gap-4 px-6 py-3 text-sm font-normal text-brandDark/70 hover:bg-slate-50 hover:text-brandDark transition-colors">
         <i class="fa-solid fa-chart-pie w-5 text-center text-base"></i> Analytics
       </a>
-      <!-- Active Tab -->
       <a href="admin.html" data-page="admin" class="flex items-center gap-4 px-6 py-3 text-sm font-medium text-brandAmber bg-brandAmber/10 border-r-2 border-brandAmber transition-colors mt-auto border-t border-brandDark/5">
         <i class="fa-solid fa-shield-halved w-5 text-center text-base"></i> Admin
       </a>
     </aside>
 
-    <!-- 3. MAIN CONTENT (Page Transition applied) -->
     <main class="flex-1 p-8 overflow-y-auto page-enter bg-slate-50/30">
-      
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <!-- Create Managers Form -->
         <div class="glass-card p-6 rounded-2xl border border-brandDark/5 h-fit">
           <h2 class="text-lg font-medium mb-5 border-b border-brandDark/5 pb-3">Add Leadership Role</h2>
           <form onsubmit="createUser(event, 'admin')" class="space-y-4">
@@ -127,14 +150,12 @@
               </select>
             </div>
             
-            <!-- FIX: Amber Button -->
             <button type="submit" class="w-full bg-brandAmber hover:bg-amber-600 text-white font-medium py-2.5 rounded-lg shadow-sm transition ease-in text-sm mt-3">
               Create User
             </button>
           </form>        
         </div>
 
-        <!-- System Users List -->
         <div class="glass-card p-6 rounded-2xl border border-brandDark/5 lg:col-span-2">
           <h2 class="text-lg font-medium mb-5 border-b border-brandDark/5 pb-3">All System Users</h2>
           <div class="overflow-x-auto rounded-xl border border-brandDark/5 bg-white/50">
@@ -145,6 +166,8 @@
                   <th class="px-5 py-4">Email</th>
                   <th class="px-5 py-4">Role</th>
                   <th class="px-5 py-4">Status</th>
+                  <!-- NEW ACTIONS COLUMN -->
+                  <th class="px-5 py-4 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody id="admin-users-tbody" class="text-[13px] font-normal bg-transparent text-brandDark/80">
@@ -154,7 +177,6 @@
           </div>
         </div>
       </div>
-      
     </main>
   </div>
   

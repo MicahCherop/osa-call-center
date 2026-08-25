@@ -237,13 +237,17 @@
               </div>
             </div>
             
-            <div class="flex items-center gap-3">
+          <div class="flex items-center gap-6">
+            <div class="flex items-center gap-3 bg-white px-4 py-2 rounded-lg border border-brandDark/5 shadow-sm">
               <span class="font-normal text-sm text-brandDark/70" id="clock-status-label">Clocked Out</span>
-              <div class="relative inline-block w-10 mr-2 align-middle select-none transition duration-200 ease-in">
-                <input type="checkbox" name="toggle" id="clock-in-toggle" onchange="toggleAgentStatus(this)" class="toggle-checkbox absolute block w-5 h-5 rounded-full bg-white border-4 border-gray-300 appearance-none cursor-pointer transition-all duration-300 z-10"/>
-                <label for="clock-in-toggle" class="toggle-label block overflow-hidden h-5 rounded-full bg-gray-300 cursor-pointer transition-colors duration-300"></label>
-              </div>
+              <!-- PURE TAILWIND TOGGLE -->
+              <label class="relative inline-flex items-center cursor-pointer ml-1">
+                <input type="checkbox" id="clock-in-toggle" class="sr-only peer" onchange="toggleAgentStatus(this)">
+                <div class="w-11 h-6 bg-gray-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-500"></div>
+              </label>
+              
             </div>
+          </div>            
           </div>
         </div>
 
