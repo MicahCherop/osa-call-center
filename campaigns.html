@@ -9,49 +9,20 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="icon" href="data:,">
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- 1. Fetch Poppins from Google Fonts -->
-  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@200;300;400&display=swap" rel="stylesheet">
-  
-  <!-- 2. Force Tailwind to use Poppins and keep weights light -->
-  <script>
-    tailwind.config = {
-      theme: {
-        extend: {
-          fontFamily: { sans: ['Poppins', 'sans-serif'] },
-          // Maps standard bold classes to lighter Poppins weights for a neat look
-          fontWeight: {
-            black: '300', 
-            extrabold: '300', 
-            bold: '300', 
-            semibold: '300',
-            medium: '300', 
-            normal: '300', 
-            light: '200',
-            extralight: '200',
-            thin: '200'
-          },
-          colors: {
-            brandDark: '#0f172a',
-            brandAmber: '#f59e0b',
-            glass: 'rgba(255, 255, 255, 0.65)',
-            glassDarker: 'rgba(255, 255, 255, 0.8)',
-          },
-          animation: {
-            blob: "blob 10s infinite",
-            pulseSlow: "pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite",
-          },
-          keyframes: {
-            blob: {
-              "0%": { transform: "translate(0px, 0px) scale(1)" },
-              "33%": { transform: "translate(30px, -50px) scale(1.1)" },
-              "66%": { transform: "translate(-20px, 20px) scale(0.9)" },
-              "100%": { transform: "translate(0px, 0px) scale(1)" }
-            }
-          }
-        }
+  <!-- Fetch standard weights for Poppins -->
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+<!-- Cleaned up Tailwind Config -->
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        fontFamily: { sans: ['Poppins', 'sans-serif'] },
+        colors: { brandDark: '#0f172a', brandAmber: '#f59e0b' }
       }
     }
-  </script>
+  }
+</script>
   <link rel="stylesheet" href="/callcenter.css">
 </head>
 <body data-page="campaigns" class="text-brandDark font-sans font-normal h-screen overflow-hidden flex relative bg-slate-50">
