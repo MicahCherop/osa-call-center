@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Overview - Pulse CX</title>
+  
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="icon" type="image/png" href="https://cdn.brandfetch.io/idkNTof4f-/w/400/h/400/theme/dark/icon.jpeg?c=1dxbfHSJFAPEGdCLU4o5B">
+  
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Inter', 'sans-serif'] },
+          colors: { brandDark: '#0f172a', brandAmber: '#f59e0b' }
+        }
+      }
+    }
+  </script>
+  
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="/callcenter.css">
+</head>
+
+<body data-page="overview" class="text-brandDark font-sans font-normal text-sm h-screen overflow-hidden flex flex-col relative bg-white">
+  
+  <!-- BACKGROUND BLOBS -->
+  <div class="absolute inset-0 z-0 overflow-hidden pointer-events-none opacity-40">
+    <div class="absolute top-[-10%] left-[-10%] w-[40rem] h-[40rem] bg-amber-100 rounded-full mix-blend-multiply filter blur-3xl animate-blob"></div>
+    <div class="absolute top-[20%] right-[-10%] w-[35rem] h-[35rem] bg-blue-100 rounded-full mix-blend-multiply filter blur-3xl animate-blob" style="animation-delay: 2s"></div>
+    <div class="absolute bottom-[-20%] left-[20%] w-[45rem] h-[45rem] bg-indigo-100 rounded-full mix-blend-multiply filter blur-3xl animate-blob" style="animation-delay: 4s"></div>
+  </div>
+
+  <!-- FULL WIDTH HEADER -->
+  <header class="w-full glass-panel border-b border-brandDark/5 px-6 py-3 flex justify-between items-center relative z-50 shrink-0">
+    <h1 class="text-xl font-medium tracking-tight flex items-center gap-3 text-brandDark">
+      <i class="fa-solid fa-bolt text-brandAmber"></i> Pulse CX Command Center
+    </h1>
+    
+    <div class="flex items-center gap-5 text-sm">
+      <button class="text-brandDark/60 hover:text-brandAmber transition"><i class="fa-regular fa-bell text-lg"></i></button>
+      
+      <div class="flex items-center gap-3 pl-4 border-l border-brandDark/10">
+        <div class="relative">
+          <button onclick="toggleLogoutModal()" class="flex items-center gap-3 hover:bg-slate-50 p-1.5 rounded-lg transition text-left outline-none">
+            <div class="w-8 h-8 bg-brandDark text-white rounded-full flex items-center justify-center">
+              <i class="fa-solid fa-user text-xs"></i>
+            </div>
+            <div class="hidden sm:block">
+              <div id="header-user-name" class="text-sm font-medium text-brandDark">Loading...</div>
+              <div id="header-user-role" class="text-xs font-normal text-brandDark/60">Role</div>
+            </div>
+            <i class="fa-solid fa-chevron-down text-xs text-brandDark/40 ml-1"></i>
+          </button>
+
+          <div id="logout-modal" class="hidden absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-lg border border-brandDark/5 z-50 overflow-hidden">
+            <div class="p-4 border-b border-brandDark/5 bg-slate-50/50">
+              <p class="text-xs font-normal text-brandDark/50 mb-1">Signed in as</p>
+              <p id="modal-user-email" class="text-sm font-medium text-brandDark truncate">email@loading.com</p>
+            </div>
+            <button onclick="logout()" class="w-full text-left px-4 py-3 text-sm font-medium text-red-600 hover:bg-red-50 transition ease-in flex items-center gap-2">
+              <i class="fa-solid fa-arrow-right-from-bracket"></i> Sign out
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <div class="flex flex-1 overflow-hidden w-full relative z-10">
+    
+    <!-- SIDEBAR -->
+    <aside class="w-48 glass-panel border-r border-brandDark/5 flex flex-col py-4 shrink-0 bg-white/60">
+      <!-- NEW ACTIVE OVERVIEW TAB -->
+      <a href="/overview.html" data-page="overview" class="flex items-center gap-3 px-5 py-3 text-sm font-medium text-brandAmber bg-brandAmber/10 border-r-2 border-brandAmber transition-colors">
+        <i class="fa-solid fa-house-pulse w-5 text-center text-base"></i> Overview
+      </a>
+      <a href="/workspace.html" data-page="workspace" class="flex items-center gap-3 px-5 py-3 text-sm font-normal text-brandDark/70 hover:bg-slate-50 hover:text-brandDark transition-colors">
+        <i class="fa-solid fa-headset w-5 text-center text-base"></i> Workspace
+      </a>
+      <a href="/campaigns.html" data-page="campaigns" class="flex items-center gap-3 px-5 py-3 text-sm font-normal text-brandDark/70 hover:bg-slate-50 hover:text-brandDark transition-colors">
+        <i class="fa-solid fa-bullhorn w-5 text-center text-base"></i> Campaigns
+      </a>
+      <a href="/teamleader.html" data-page="teamleader" class="flex items-center gap-3 px-5 py-3 text-sm font-normal text-brandDark/70 hover:bg-slate-50 hover:text-brandDark transition-colors">
+        <i class="fa-solid fa-user-tie w-5 text-center text-base"></i> Team Lead
+      </a>
+      <a href="/analytics.html" data-page="dashboard" class="flex items-center gap-3 px-5 py-3 text-sm font-normal text-brandDark/70 hover:bg-slate-50 hover:text-brandDark transition-colors">
+        <i class="fa-solid fa-chart-pie w-5 text-center text-base"></i> Analytics
+      </a>
+      <a href="/admin.html" data-page="admin" class="flex items-center gap-3 px-5 py-3 text-sm font-normal text-brandDark/70 hover:bg-slate-50 hover:text-brandDark transition-colors mt-auto border-t border-brandDark/5">
+        <i class="fa-solid fa-shield-halved w-5 text-center text-base"></i> Admin
+      </a>
+    </aside>
+
+    <main class="flex-1 p-8 overflow-y-auto page-enter bg-slate-50/30">
+      <div class="flex flex-col gap-6 max-w-7xl mx-auto pb-8">
+        
+        <!-- HEADER & QUICK ACTIONS -->
+        <div class="flex justify-between items-end">
+          <div>
+            <h2 class="text-2xl font-medium text-brandDark mb-1">Live Floor Overview</h2>
+            <p class="text-sm font-normal text-brandDark/60">Real-time tracking of team performance and campaign health.</p>
+          </div>
+          <div class="flex gap-3">
+            <button onclick="window.location.href='/campaigns.html'" class="bg-white border border-brandDark/10 text-brandDark/70 hover:text-brandDark px-4 py-2.5 rounded-lg text-sm font-medium transition ease-in shadow-sm flex items-center gap-2">
+              <i class="fa-solid fa-plus"></i> New Campaign
+            </button>
+            <button onclick="window.location.href='/teamleader.html'" class="bg-brandAmber hover:bg-amber-600 text-white px-4 py-2.5 rounded-lg text-sm font-medium transition ease-in shadow-sm flex items-center gap-2">
+              <i class="fa-solid fa-share-nodes"></i> Redistribute Leads
+            </button>
+          </div>
+        </div>
+
+        <!-- ROW 1: FINANCIALS & GLOBAL METRICS -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <!-- Daily Target Burn-up -->
+          <div class="glass-card p-6 rounded-2xl border border-brandDark/5 md:col-span-2 relative overflow-hidden flex flex-col justify-center">
+            <div class="flex justify-between items-end mb-3">
+              <div>
+                <h3 class="text-[11px] font-semibold uppercase tracking-wider text-brandDark/50 mb-1">Daily Recovery Target</h3>
+                <div class="text-3xl font-medium text-brandDark"><span class="text-brandDark/40 font-normal">Sh</span> 850,000 <span class="text-sm text-brandDark/40 font-normal">/ 1,200,000</span></div>
+              </div>
+              <div class="text-right">
+                <div class="text-2xl font-medium text-green-600">70%</div>
+              </div>
+            </div>
+            <!-- Progress Bar -->
+            <div class="w-full bg-slate-100 rounded-full h-3 mb-1">
+              <div class="bg-green-500 h-3 rounded-full" style="width: 70%"></div>
+            </div>
+            <p class="text-xs text-brandDark/50 mt-2 font-medium">Tracking <span class="text-green-600">+5% ahead</span> of expected schedule.</p>
+          </div>
+
+          <!-- Global Connection Rate -->
+          <div class="glass-card p-6 rounded-2xl border border-brandDark/5 relative overflow-hidden">
+             <h3 class="text-[11px] font-semibold uppercase tracking-wider text-brandDark/50 mb-2">Live Connection Rate</h3>
+             <div class="text-4xl font-medium text-brandDark mb-2">42.8%</div>
+             <p class="text-xs text-brandDark/50 font-medium">Last hour: <span class="text-red-500">-2.1%</span></p>
+             <i class="fa-solid fa-tower-broadcast absolute -bottom-4 -right-4 text-7xl text-brandDark opacity-5"></i>
+          </div>
+        </div>
+
+        <!-- ROW 2: BOTTLENECKS & ALERTS -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div class="bg-red-50 border border-red-200 rounded-2xl p-5 flex items-start gap-4 shadow-sm">
+            <div class="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center shrink-0">
+              <i class="fa-solid fa-triangle-exclamation text-red-600 text-lg"></i>
+            </div>
+            <div>
+              <h4 class="text-base font-medium text-red-900 mb-1">Unassigned High-Priority Leads</h4>
+              <p class="text-sm text-red-700/80 mb-3">There are 24 pending callbacks in the Defaulted queue with no agent assigned.</p>
+              <button class="text-xs font-medium bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded transition">Assign Now</button>
+            </div>
+          </div>
+
+          <div class="bg-amber-50 border border-amber-200 rounded-2xl p-5 flex items-start gap-4 shadow-sm">
+            <div class="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center shrink-0">
+              <i class="fa-solid fa-user-clock text-amber-600 text-lg"></i>
+            </div>
+            <div>
+              <h4 class="text-base font-medium text-amber-900 mb-1">Idle Agents Detected</h4>
+              <p class="text-sm text-amber-800/80 mb-3">3 agents are currently online but have exhausted their active queue.</p>
+              <button class="text-xs font-medium bg-amber-500 hover:bg-amber-600 text-white px-3 py-1.5 rounded transition">View Agents</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- ROW 3: FLOOR PULSE & CAMPAIGNS -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          
+          <!-- Live Agent Pulse -->
+          <div class="glass-card p-6 rounded-2xl border border-brandDark/5">
+            <h3 class="text-[13px] font-semibold uppercase tracking-wider text-brandDark/50 mb-5 border-b border-brandDark/5 pb-3">Floor Pulse</h3>
+            
+            <div class="space-y-5">
+              <div class="flex justify-between items-center">
+                <div class="flex items-center gap-3">
+                  <div class="w-2.5 h-2.5 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]"></div>
+                  <span class="text-sm font-medium text-brandDark">Online (On Call)</span>
+                </div>
+                <span class="text-lg font-medium text-brandDark">18</span>
+              </div>
+              
+              <div class="flex justify-between items-center">
+                <div class="flex items-center gap-3">
+                  <div class="w-2.5 h-2.5 rounded-full bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.6)]"></div>
+                  <span class="text-sm font-medium text-brandDark">Idle (Waiting)</span>
+                </div>
+                <span class="text-lg font-medium text-brandDark">3</span>
+              </div>
+              
+              <div class="flex justify-between items-center">
+                <div class="flex items-center gap-3">
+                  <div class="w-2.5 h-2.5 rounded-full bg-gray-300"></div>
+                  <span class="text-sm font-medium text-brandDark/60">Offline</span>
+                </div>
+                <span class="text-lg font-medium text-brandDark/60">5</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Active Campaigns Burn-down -->
+          <div class="glass-card p-6 rounded-2xl border border-brandDark/5 lg:col-span-2">
+            <h3 class="text-[13px] font-semibold uppercase tracking-wider text-brandDark/50 mb-5 border-b border-brandDark/5 pb-3">Active Campaigns Burn-down</h3>
+            
+            <div class="space-y-6">
+              <!-- Campaign 1 -->
+              <div>
+                <div class="flex justify-between text-sm mb-2">
+                  <span class="font-medium text-brandDark">DD1-DD7 Collections (Priority)</span>
+                  <span class="font-medium text-brandDark/60">850 / 1,000 Contacted</span>
+                </div>
+                <div class="w-full bg-slate-100 rounded-full h-2">
+                  <div class="bg-brandAmber h-2 rounded-full" style="width: 85%"></div>
+                </div>
+              </div>
+              
+              <!-- Campaign 2 -->
+              <div>
+                <div class="flex justify-between text-sm mb-2">
+                  <span class="font-medium text-brandDark">Dormant Customer Reactivation</span>
+                  <span class="font-medium text-brandDark/60">240 / 800 Contacted</span>
+                </div>
+                <div class="w-full bg-slate-100 rounded-full h-2">
+                  <div class="bg-blue-500 h-2 rounded-full" style="width: 30%"></div>
+                </div>
+              </div>
+              
+              <!-- Campaign 3 -->
+              <div>
+                <div class="flex justify-between text-sm mb-2">
+                  <span class="font-medium text-brandDark">Active No Loan Outreach</span>
+                  <span class="font-medium text-brandDark/60">1,900 / 2,000 Contacted</span>
+                </div>
+                <div class="w-full bg-slate-100 rounded-full h-2">
+                  <div class="bg-green-500 h-2 rounded-full" style="width: 95%"></div>
+                </div>
+              </div>
+            </div>
+            
+          </div>
+        </div>
+
+      </div>
+    </main>
+  </div>
+  
+  <script src="/callcenter.js"></script>
+</body>
+</html>

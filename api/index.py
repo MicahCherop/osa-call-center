@@ -85,23 +85,29 @@ def health_check():
 @app.post("/api/login")
 def login(creds: LoginModel):
     try:
-        # Require company email domain
-        if not creds.email.endswith("@4g-capital.com"):
-            raise HTTPException(status_code=403, detail="Invalid domain. Must use a @4g-capital.com email.")
+        email_lower = creds.email.lower().strip()
+        
+        # 1. DOMAIN FIREWALL: Require company email domain
+        if not email_lower.endswith("@4g-capital.com"):
+            raise HTTPException(status_code=403, detail="Unauthorized network. Only corporate @4g-capital.com accounts are permitted.")
             
         sheet = get_google_sheet().worksheet("Agents")
         agents = sheet.get_all_records()
         
-        # Check if user exists in the Agents sheet
-        user = next((a for a in agents if str(a.get("Email", a.get("email", ""))).lower() == creds.email.lower()), None)
+        # 2. DATABASE CHECK: Does this exact email exist in the sheet?
+        user = next((a for a in agents if str(a.get("Email", a.get("email", ""))).lower().strip() == email_lower), None)
         
-        if user:
-            role = user.get("Role", user.get("role", "Control Agent"))
-            name = user.get("Name", user.get("name", "Unknown"))
-        else:
-            # Default fallback for new valid domain users
-            role = "Control Agent"
-            name = creds.email.split("@")[0].replace(".", " ").title()
+        # 3. STRICT BLOCK: Not in the database
+        if not user:
+            raise HTTPException(status_code=403, detail="ACCESS DENIED: Your email is not registered in the active users database. Contact your Ops Manager.")
+            
+        # 4. ACTIVE STATUS CHECK: Ensure they haven't been deactivated
+        status = str(user.get("Status", user.get("status", "Active"))).strip().lower()
+        if status == "inactive":
+             raise HTTPException(status_code=403, detail="ACCOUNT SUSPENDED: Your access to the system has been revoked.")
+
+        role = user.get("Role", user.get("role", "Control Agent"))
+        name = user.get("Name", user.get("name", "Unknown"))
 
         return {
             "success": True,
@@ -109,14 +115,14 @@ def login(creds: LoginModel):
             "role": role,
             "name": name
         }
+        
+    except HTTPException:
+        # Re-raise our custom 403 blocks so FastAPI sends them to the frontend
+        raise
     except Exception as e:
-        # Fallback to ensure UI doesn't break if Google Sheets fails during login
-        return {
-            "success": True,
-            "email": creds.email,
-            "role": "Control Agent",
-            "name": creds.email.split("@")[0].title()
-        }
+        # 5. NO FALLBACKS: If the DB crashes, do NOT let them in.
+        print(f"Database Login Error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Secure database connection failed. Please try again later.")
 
 @app.get("/agents")
 @app.get("/api/agents")

@@ -53,7 +53,22 @@
         Sign in with Google
       </button>
     </div>
-    <div id="login-error" class="text-red-500 text-sm mt-4 hidden font-medium"></div>
+    <!-- THE SERIOUS SECURITY BLOCKER -->
+    <div id="login-error" class="bg-red-50 border-2 border-red-500 text-red-700 p-5 rounded-xl mt-5 hidden flex-col items-center gap-2 shadow-sm">
+      <i class="fa-solid fa-shield-virus text-4xl mb-1 text-red-600"></i>
+      <h3 class="font-bold text-lg uppercase tracking-wider text-red-800">Security Breach Blocked</h3>
+      <span id="login-error-text" class="font-medium text-sm text-center"></span>
+    </div>
+  </div>
+
+  <!-- REDIRECTING / LOADING MODAL -->
+  <div id="loading-overlay" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 hidden opacity-0 transition-opacity duration-300 flex items-center justify-center">
+    <div class="bg-white p-8 rounded-2xl shadow-2xl flex flex-col items-center max-w-sm w-full mx-4 transform scale-95 transition-transform duration-300" id="loading-modal-card">
+      <div class="w-12 h-12 border-4 border-brandAmber border-t-transparent rounded-full animate-spin mb-4"></div>
+      <h3 class="text-lg font-medium text-brandDark" id="loading-title">Redirecting...</h3>
+      <p class="text-sm text-brandDark/50 mt-1 text-center" id="loading-text">Connecting securely to Google.</p>
+    </div>
+  </div>
   </div>
 
   <!-- REDIRECTING / LOADING MODAL -->
@@ -76,6 +91,10 @@
       
       document.getElementById('loading-title').innerText = "Redirecting...";
       document.getElementById('loading-text').innerText = "Connecting securely to Google.";
+      
+      // Hide any previous errors
+      document.getElementById('login-error').classList.add('hidden');
+      document.getElementById('login-error').classList.remove('flex');
       
       overlay.classList.remove('hidden');
       setTimeout(() => {
@@ -129,8 +148,8 @@
         const overlay = document.getElementById('loading-overlay');
         const card = document.getElementById('loading-modal-card');
         
-        document.getElementById('loading-title').innerText = "Verifying...";
-        document.getElementById('loading-text').innerText = "Checking authorization securely.";
+        document.getElementById('loading-title').innerText = "Verifying Identity...";
+        document.getElementById('loading-text').innerText = "Checking authorization protocols.";
         document.getElementById('google-btn-container').classList.add('hidden');
         
         overlay.classList.remove('hidden');
@@ -152,6 +171,13 @@
           
           if (!userInfo.email) throw new Error("Could not retrieve email from Google.");
 
+          // LAYER 1: STRICT DOMAIN FIREWALL
+          const allowedDomain = "@4g-capital.com";
+          if (!userInfo.email.toLowerCase().endsWith(allowedDomain)) {
+              throw new Error(`Unauthorized network. Only corporate ${allowedDomain} accounts are permitted to access this system.`);
+          }
+
+          // LAYER 2: DATABASE VERIFICATION
           const backendRes = await fetch('/api/login', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -159,7 +185,10 @@
           });
           
           const data = await backendRes.json();
-          if (!backendRes.ok) throw new Error(data.detail || "Database verification failed.");
+          
+          if (!backendRes.ok) {
+              throw new Error("ACCESS DENIED: Your email is not registered in the active users database. Contact your Ops Manager.");
+          }
 
           localStorage.setItem('USER_EMAIL', data.email);
           localStorage.setItem('USER_ROLE', data.role);
@@ -177,8 +206,10 @@
           overlay.classList.add('opacity-0');
           setTimeout(() => overlay.classList.add('hidden'), 300);
           
-          document.getElementById('login-error').innerText = err.message;
+          // TRIGGER THE SERIOUS BLOCKER
+          document.getElementById('login-error-text').innerText = err.message;
           document.getElementById('login-error').classList.remove('hidden');
+          document.getElementById('login-error').classList.add('flex');
           document.getElementById('google-btn-container').classList.remove('hidden');
         }
       } else {
