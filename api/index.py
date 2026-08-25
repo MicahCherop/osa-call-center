@@ -1,7 +1,9 @@
+
 import os
 import json
 from typing import List, Optional
 from fastapi import FastAPI, HTTPException, Body
+from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import gspread
@@ -265,3 +267,8 @@ def submit_disposition(disp: DispositionModel):
         pass
         
     return {"status": "success"}
+
+# --- LOCALHOST STATIC FILE SERVING ---
+# This serves your HTML/JS/CSS locally, but gets out of the way on Vercel's live servers
+if os.getenv("VERCEL") is None:
+    app.mount("/", StaticFiles(directory=".", html=True), name="static")
