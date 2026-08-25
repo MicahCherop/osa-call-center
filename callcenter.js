@@ -300,14 +300,17 @@ function saveAppState() {
 }
 
 function initCurrentPage() {
-    // These run on all applicable pages
     if (typeof updateCampaignDropdowns === 'function') updateCampaignDropdowns();
     if (typeof updateAnalyticsUI === 'function') updateAnalyticsUI();
     if (typeof renderCampaignList === 'function') renderCampaignList();
     if (typeof renderAgentQueue === 'function') renderAgentQueue();
     if (typeof setActiveNavLink === 'function') setActiveNavLink();
 
-    // Fix: Trigger specific lists based on what page you are currently viewing
+    // ADDED OVERVIEW LOGIC HERE
+    if (currentPage === 'overview' && typeof renderOverviewData === 'function') {
+        renderOverviewData();
+    }
+
     if (currentPage === 'admin' && typeof renderAdminUserList === 'function') {
         renderAdminUserList();
     }
@@ -562,31 +565,6 @@ window.switchTeamLeaderTab = function(tabName, element) {
     element.className = "teamleader-tab-btn bg-brandDark text-white border border-transparent px-4 py-2 rounded-lg text-sm font-bold transition flex items-center gap-2";
   }
 };
-window.renderTLPending = function() {
-    const tbody = document.getElementById('tl-pending-tbody');
-    if (!tbody) return;
-    tbody.innerHTML = '';
-
-    // Filter for outcomes that exist but are NOT 'Answered'
-    const pendingCustomers = mockCustomers.filter(c => c.outcome && c.outcome !== 'Answered');
-
-    if (pendingCustomers.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="5" class="px-4 py-8 text-center text-brandDark/50 italic font-medium">No pending callbacks found.</td></tr>`;
-        return;
-    }
-
-    pendingCustomers.forEach(c => {
-        tbody.innerHTML += `
-            <tr class="border-b border-brandDark/5 hover:bg-white/40 transition">
-                <td class="px-4 py-3 font-bold cursor-pointer hover:text-brandAmber" onclick="openCustomerDrawer(${c.id})">${escapeHtml(c.name)}</td>
-                <td class="px-4 py-3">${escapeHtml(c.phone)}</td>
-                <td class="px-4 py-3 text-brandDark/70">${escapeHtml(c.campaign)}</td>
-                <td class="px-4 py-3 font-bold text-red-600">${escapeHtml(c.outcome)}</td>
-                <td class="px-4 py-3 text-amber-700 font-bold">${escapeHtml(c.agentId || 'Unassigned')}</td>
-            </tr>
-        `;
-    });
-};
 window.parseCSV = function(text) {
   const lines = text.split(/\r\n|\n/);
   if (lines.length === 0) return [];
@@ -728,35 +706,7 @@ async function deleteUserAction(email) {
     }
 }
 
-window.renderShiftManager = function() {
-    const tbody = document.getElementById('shift-manager-tbody');
-    if (!tbody) return;
-    tbody.innerHTML = '';
-    
-    // Safely extract Control Agents
-    const controlAgents = agents.filter(a => (a.Role || a.role) === 'Control Agent');
-    
-    if (controlAgents.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="5" class="px-4 py-8 text-center text-brandDark/50 italic">No Control Agents found in database.</td></tr>';
-        return;
-    }
 
-    controlAgents.forEach(a => {
-        const name = a.Name || a.name || 'Unknown';
-        const status = a.Status || a.status || 'Offline';
-        const team = a.Team || a.team || 'General';
-        
-        tbody.innerHTML += `
-            <tr class="border-b border-brandDark/5">
-                <td class="px-4 py-3 font-bold">${escapeHtml(name)}</td>
-                <td class="px-4 py-3 text-brandDark/70">${escapeHtml(team)}</td>
-                <td class="px-4 py-3 font-bold ${status === 'Clocked In' ? 'text-green-600' : 'text-gray-500'}">${escapeHtml(status)}</td>
-                <td class="px-4 py-3 text-brandDark/50">--</td>
-                <td class="px-4 py-3 text-brandDark/50">--</td>
-            </tr>
-        `;
-    });
-};
 
 window.createUser = async function(event, context) {
     event.preventDefault();
@@ -1396,45 +1346,7 @@ function updateAnalyticsUI() {
       }
     }
 }
-window.renderTLCustomers = function() {
-    const tbody = document.getElementById('tl-customers-tbody');
-    const filterSelect = document.getElementById('tl-campaign-filter');
-    if (!tbody || !filterSelect) return;
 
-    // Populate filter dropdown if empty
-    if (filterSelect.options.length <= 1) {
-        const campaigns = Object.keys(campaignConfigs);
-        campaigns.forEach(c => {
-            filterSelect.innerHTML += `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`;
-        });
-    }
-
-    const selectedCampaign = filterSelect.value;
-    tbody.innerHTML = '';
-
-    // Filter customers
-    const filtered = mockCustomers.filter(c => selectedCampaign === 'ALL' || c.campaign === selectedCampaign);
-
-    if (filtered.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="5" class="px-4 py-8 text-center text-brandDark/50 italic">No customers found for this criteria.</td></tr>`;
-        return;
-    }
-
-    // Render table
-    filtered.forEach(c => {
-        tbody.innerHTML += `
-            <tr class="border-b border-brandDark/5 hover:bg-white/40 transition">
-                <td class="px-4 py-3 font-bold cursor-pointer hover:text-brandAmber" onclick="openCustomerDrawer(${c.id})">${escapeHtml(c.name)}</td>
-                <td class="px-4 py-3">${escapeHtml(c.phone)}</td>
-                <td class="px-4 py-3 text-brandDark/70">${escapeHtml(c.campaign)}</td>
-                <td class="px-4 py-3 font-bold text-amber-700">${escapeHtml(c.agentId || 'Unassigned')}</td>
-                <td class="px-4 py-3">
-                    <span class="px-2 py-1 bg-brandDark/5 rounded text-xs font-bold">${escapeHtml(c.outcome || 'Pending')}</span>
-                </td>
-            </tr>
-        `;
-    });
-};
 window.switchAnalyticsTab = function(tabName) {
     // Hide all panels
     document.querySelectorAll('.analytics-panel').forEach(panel => panel.classList.add('hidden'));
@@ -1640,3 +1552,155 @@ document.addEventListener('DOMContentLoaded', () => {
         if (typeof fetchWorkspaceCustomers === 'function') fetchWorkspaceCustomers();
     }
 });
+// ==========================================
+// DATA RENDERING & OVERVIEW LOGIC
+// ==========================================
+
+// Helper to prevent HTML injection crashes
+const escapeHtml = (str) => {
+    if (!str) return '--';
+    return str.toString().replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+};
+
+window.renderTLCustomers = function() {
+    const tbody = document.getElementById('tl-customers-tbody');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+
+    if (!mockCustomers || mockCustomers.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="px-5 py-4 text-center text-brandDark/50">No customers found.</td></tr>';
+        return;
+    }
+
+    mockCustomers.forEach(c => {
+        const name = c.name || c.Name || 'Unknown';
+        const phone = c.phone || c.Phone || '--';
+        const campaign = c.campaign || c.Campaign || '--';
+        const agent = c.agentId || c.AgentId || c.AgentName || 'Unassigned';
+        const outcome = c.outcome || c.Outcome || 'Pending';
+
+        tbody.innerHTML += `
+            <tr class="border-b border-brandDark/5 hover:bg-slate-50/50 transition">
+                <td class="px-5 py-4 font-medium">${escapeHtml(name)}</td>
+                <td class="px-5 py-4 text-brandDark/70">${escapeHtml(phone)}</td>
+                <td class="px-5 py-4 text-brandDark/70">${escapeHtml(campaign)}</td>
+                <td class="px-5 py-4 font-medium ${agent === 'Unassigned' ? 'text-red-500' : 'text-brandAmber'}">${escapeHtml(agent)}</td>
+                <td class="px-5 py-4 text-brandDark/70">${escapeHtml(outcome)}</td>
+            </tr>
+        `;
+    });
+};
+
+window.renderShiftManager = function() {
+    const tbody = document.getElementById('shift-manager-tbody');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+
+    if (!agents || agents.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="px-5 py-4 text-center text-brandDark/50">No agents found.</td></tr>';
+        return;
+    }
+
+    agents.forEach(a => {
+        const name = a.name || a.Name || 'Unknown';
+        const role = a.role || a.Role || '--';
+        const status = a.status || a.Status || 'Offline';
+        const campaign = a.campaign || a.Campaign || 'None';
+        
+        let statusColor = status.toLowerCase() === 'active' ? 'text-green-500' : 'text-gray-400';
+
+        tbody.innerHTML += `
+            <tr class="border-b border-brandDark/5 hover:bg-slate-50/50 transition">
+                <td class="px-5 py-4 font-medium">${escapeHtml(name)}</td>
+                <td class="px-5 py-4 text-brandDark/70">${escapeHtml(role)}</td>
+                <td class="px-5 py-4 font-medium ${statusColor}"><i class="fa-solid fa-circle text-[8px] mr-2"></i>${escapeHtml(status)}</td>
+                <td class="px-5 py-4 text-brandDark/70">${escapeHtml(campaign)}</td>
+                <td class="px-5 py-4 text-brandDark/70">--</td>
+            </tr>
+        `;
+    });
+};
+
+
+// --- TEAM LEADER: PENDING CALLBACKS ---
+window.renderTLPending = function() {
+    const tbody = document.getElementById('tl-pending-tbody');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+
+    const pending = window.customers.filter(c => {
+        const worked = String(c.Worked || c.worked || 'FALSE').toUpperCase();
+        return worked !== 'TRUE';
+    });
+
+    if (pending.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="px-5 py-4 text-center text-brandDark/50">No pending callbacks.</td></tr>';
+        return;
+    }
+
+    pending.forEach(c => {
+        const name = c.Name || c.name || 'Unknown';
+        const phone = c.Phone || c.phone || '--';
+        const campaign = c.Campaign || c.campaign || '--';
+        const outcome = c.Outcome || c.outcome || '--';
+        const agent = c.AgentId || c.agentId || 'Unassigned';
+
+        tbody.innerHTML += `
+            <tr class="border-b border-brandDark/5 hover:bg-slate-50/50 transition">
+                <td class="px-5 py-4 font-medium">${escapeHtml(name)}</td>
+                <td class="px-5 py-4 text-brandDark/70">${escapeHtml(phone)}</td>
+                <td class="px-5 py-4 text-brandDark/70">${escapeHtml(campaign)}</td>
+                <td class="px-5 py-4 text-brandDark/70">${escapeHtml(outcome)}</td>
+                <td class="px-5 py-4 font-medium text-brandAmber">${escapeHtml(agent)}</td>
+                <td class="px-5 py-4 text-brandDark/70">--</td>
+            </tr>
+        `;
+    });
+};
+
+window.renderOverviewData = function() {
+    if (currentPage !== 'overview') return;
+
+    // Pulse: Count active agents
+    const activeAgents = (agents || []).filter(a => String(a.Status || a.status).toLowerCase() === 'active');
+    const onlineEl = document.getElementById('ov-online-count');
+    if (onlineEl) onlineEl.innerText = activeAgents.length;
+
+    // Bottlenecks: Count unassigned leads
+    const unassigned = (mockCustomers || []).filter(c => {
+        const worked = String(c.worked || c.Worked || 'FALSE').toUpperCase();
+        const agent = c.agentId || c.AgentId || '';
+        return worked !== 'TRUE' && (!agent || agent.trim() === '');
+    });
+    
+    const unassignedEl = document.getElementById('ov-unassigned-count');
+    if (unassignedEl) unassignedEl.innerText = unassigned.length;
+};
+
+// Make sure to call these in your data fetch callbacks!
+const originalFetchAgents = window.fetchAgentsData;
+window.fetchAgentsData = async function() {
+    await originalFetchAgents();
+    renderOverviewData();
+};
+
+const originalFetchCustomers = window.fetchCustomersData;
+window.fetchCustomersData = async function() {
+    await originalFetchCustomers();
+    renderOverviewData();
+};
+// Auto-apply Dark Mode on load
+if (localStorage.getItem('theme') === 'dark' || (!localStorage.getItem('theme') && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+    document.documentElement.classList.add('dark');
+}
+
+window.toggleDarkMode = function() {
+    const htmlEl = document.documentElement;
+    if (htmlEl.classList.contains('dark')) {
+        htmlEl.classList.remove('dark');
+        localStorage.setItem('theme', 'light');
+    } else {
+        htmlEl.classList.add('dark');
+        localStorage.setItem('theme', 'dark');
+    }
+};

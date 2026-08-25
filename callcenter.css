@@ -76,3 +76,48 @@ body {
   from { opacity: 0; transform: translateY(12px) scale(0.98); }
   to { opacity: 1; transform: translateY(0) scale(1); }
 }
+/* --- DARK MODE OVERRIDES --- */
+html.dark body {
+    background-color: #0f172a; /* brandDark */
+    color: #f8fafc;
+}
+
+html.dark .glass-panel,
+html.dark .glass-card {
+    background-color: rgba(30, 41, 59, 0.7); /* dark slate */
+    border-color: rgba(255, 255, 255, 0.1);
+    color: #f8fafc;
+}
+
+html.dark .bg-white,
+html.dark .bg-white\/60,
+html.dark .bg-white\/80,
+html.dark .bg-white\/90 {
+    background-color: #1e293b !important;
+}
+
+html.dark .text-brandDark {
+    color: #f8fafc !important;
+}
+
+html.dark .text-brandDark\/70,
+html.dark .text-brandDark\/60,
+html.dark .text-brandDark\/50 {
+    color: #94a3b8 !important; /* slate-400 */
+}
+
+html.dark .border-brandDark\/5,
+html.dark .border-brandDark\/10 {
+    border-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+html.dark .glass-input {
+    background-color: rgba(15, 23, 42, 0.5) !important;
+    color: #f8fafc !important;
+    border-color: rgba(255, 255, 255, 0.2) !important;
+}
+
+html.dark table thead tr {
+    background-color: rgba(30, 41, 59, 0.9) !important;
+    color: #cbd5e1 !important;
+}
