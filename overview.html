@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Overview - Pulse CX</title>
+  <title>Overview - Call Center Campaigns</title>
   
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="icon" type="image/png" href="https://cdn.brandfetch.io/idkNTof4f-/w/400/h/400/theme/dark/icon.jpeg?c=1dxbfHSJFAPEGdCLU4o5B">
@@ -40,9 +40,9 @@
     
     <div class="flex items-center gap-5 text-sm">
       <button class="text-brandDark/60 hover:text-brandAmber transition"><i class="fa-regular fa-bell text-lg"></i></button>
-    <button onclick="toggleDarkMode()" class="text-brandDark/60 hover:text-brandAmber transition ml-3" title="Toggle Dark Mode">
-        <i class="fa-solid fa-moon text-lg"></i>
-    </button>      
+      <button onclick="toggleDarkMode()" class="text-brandDark/60 hover:text-brandAmber transition ml-3" title="Toggle Dark Mode">
+          <i class="fa-solid fa-moon text-lg"></i>
+      </button>      
       <div class="flex items-center gap-3 pl-4 border-l border-brandDark/10">
         <div class="relative">
           <button onclick="toggleLogoutModal()" class="flex items-center gap-3 hover:bg-slate-50 p-1.5 rounded-lg transition text-left outline-none">
@@ -74,7 +74,6 @@
     
     <!-- SIDEBAR -->
     <aside class="w-48 glass-panel border-r border-brandDark/5 flex flex-col py-4 shrink-0 bg-white/60">
-      <!-- NEW ACTIVE OVERVIEW TAB -->
       <a href="/overview.html" data-page="overview" class="flex items-center gap-3 px-5 py-3 text-sm font-medium text-brandAmber bg-brandAmber/10 border-r-2 border-brandAmber transition-colors">
         <i class="fa-solid fa-house-pulse w-5 text-center text-base"></i> Overview
       </a>
@@ -121,49 +120,49 @@
             <div class="flex justify-between items-end mb-3">
               <div>
                 <h3 class="text-[11px] font-semibold uppercase tracking-wider text-brandDark/50 mb-1">Daily Recovery Target</h3>
-                <div class="text-3xl font-medium text-brandDark"><span class="text-brandDark/40 font-normal">Sh</span> 850,000 <span class="text-sm text-brandDark/40 font-normal">/ 1,200,000</span></div>
+                <div class="text-3xl font-medium text-brandDark"><span class="text-brandDark/40 font-normal">Sh</span> <span id="ov-target-amount">0</span> <span class="text-sm text-brandDark/40 font-normal">/ --</span></div>
               </div>
               <div class="text-right">
-                <div class="text-2xl font-medium text-green-600">70%</div>
+                <div id="ov-target-progress" class="text-2xl font-medium text-green-600">0%</div>
               </div>
             </div>
             <!-- Progress Bar -->
             <div class="w-full bg-slate-100 rounded-full h-3 mb-1">
-              <div class="bg-green-500 h-3 rounded-full" style="width: 70%"></div>
+              <div id="ov-target-bar" class="bg-green-500 h-3 rounded-full transition-all duration-500" style="width: 0%"></div>
             </div>
-            <p class="text-xs text-brandDark/50 mt-2 font-medium">Tracking <span class="text-green-600">+5% ahead</span> of expected schedule.</p>
+            <p class="text-xs text-brandDark/50 mt-2 font-medium" id="ov-target-status">Awaiting data...</p>
           </div>
 
           <!-- Global Connection Rate -->
           <div class="glass-card p-6 rounded-2xl border border-brandDark/5 relative overflow-hidden">
              <h3 class="text-[11px] font-semibold uppercase tracking-wider text-brandDark/50 mb-2">Live Connection Rate</h3>
-             <div class="text-4xl font-medium text-brandDark mb-2">42.8%</div>
-             <p class="text-xs text-brandDark/50 font-medium">Last hour: <span class="text-red-500">-2.1%</span></p>
+             <div id="ov-connection-rate" class="text-4xl font-medium text-brandDark mb-2">0%</div>
+             <p class="text-xs text-brandDark/50 font-medium">Tracking across all agents.</p>
              <i class="fa-solid fa-tower-broadcast absolute -bottom-4 -right-4 text-7xl text-brandDark opacity-5"></i>
           </div>
         </div>
 
         <!-- ROW 2: BOTTLENECKS & ALERTS -->
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div class="bg-red-50 border border-red-200 rounded-2xl p-5 flex items-start gap-4 shadow-sm">
-            <div class="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center shrink-0">
-              <i class="fa-solid fa-triangle-exclamation text-red-600 text-lg"></i>
+          <div class="bg-red-50 border border-red-200 rounded-2xl p-5 flex items-start gap-4 shadow-sm dark:bg-red-900/20 dark:border-red-900/50">
+            <div class="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center shrink-0 dark:bg-red-900/50">
+              <i class="fa-solid fa-triangle-exclamation text-red-600 text-lg dark:text-red-400"></i>
             </div>
             <div>
-              <h4 class="text-base font-medium text-red-900 mb-1">Unassigned High-Priority Leads</h4>
-              <p class="text-sm text-red-700/80 mb-3">There are 24 pending callbacks in the Defaulted queue with no agent assigned.</p>
-              <button class="text-xs font-medium bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded transition">Assign Now</button>
+              <h4 class="text-base font-medium text-red-900 mb-1 dark:text-red-400">Unassigned Leads</h4>
+              <p class="text-sm text-red-700/80 mb-3 dark:text-red-300/80">There are <span id="ov-unassigned-count" class="font-bold text-lg">0</span> pending callbacks in the system with no agent assigned.</p>
+              <button onclick="window.location.href='/teamleader.html'" class="text-xs font-medium bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded transition">Assign Now</button>
             </div>
           </div>
 
-          <div class="bg-amber-50 border border-amber-200 rounded-2xl p-5 flex items-start gap-4 shadow-sm">
-            <div class="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center shrink-0">
-              <i class="fa-solid fa-user-clock text-amber-600 text-lg"></i>
+          <div class="bg-amber-50 border border-amber-200 rounded-2xl p-5 flex items-start gap-4 shadow-sm dark:bg-amber-900/20 dark:border-amber-900/50">
+            <div class="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center shrink-0 dark:bg-amber-900/50">
+              <i class="fa-solid fa-user-clock text-amber-600 text-lg dark:text-amber-400"></i>
             </div>
             <div>
-              <h4 class="text-base font-medium text-amber-900 mb-1">Idle Agents Detected</h4>
-              <p class="text-sm text-amber-800/80 mb-3">3 agents are currently online but have exhausted their active queue.</p>
-              <button class="text-xs font-medium bg-amber-500 hover:bg-amber-600 text-white px-3 py-1.5 rounded transition">View Agents</button>
+              <h4 class="text-base font-medium text-amber-900 mb-1 dark:text-amber-400">Agent Utilization</h4>
+              <p class="text-sm text-amber-800/80 mb-3 dark:text-amber-300/80"><span id="ov-idle-count" class="font-bold text-lg">0</span> agents are currently tracking as Idle or Offline.</p>
+              <button onclick="window.location.href='/teamleader.html'" class="text-xs font-medium bg-amber-500 hover:bg-amber-600 text-white px-3 py-1.5 rounded transition">View Agents</button>
             </div>
           </div>
         </div>
@@ -181,7 +180,7 @@
                   <div class="w-2.5 h-2.5 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]"></div>
                   <span class="text-sm font-medium text-brandDark">Online (On Call)</span>
                 </div>
-                <span class="text-lg font-medium text-brandDark">18</span>
+                <span id="ov-online-count" class="text-lg font-medium text-brandDark">0</span>
               </div>
               
               <div class="flex justify-between items-center">
@@ -189,7 +188,7 @@
                   <div class="w-2.5 h-2.5 rounded-full bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.6)]"></div>
                   <span class="text-sm font-medium text-brandDark">Idle (Waiting)</span>
                 </div>
-                <span class="text-lg font-medium text-brandDark">3</span>
+                <span id="ov-idle-pulse-count" class="text-lg font-medium text-brandDark">0</span>
               </div>
               
               <div class="flex justify-between items-center">
@@ -197,7 +196,7 @@
                   <div class="w-2.5 h-2.5 rounded-full bg-gray-300"></div>
                   <span class="text-sm font-medium text-brandDark/60">Offline</span>
                 </div>
-                <span class="text-lg font-medium text-brandDark/60">5</span>
+                <span id="ov-offline-count" class="text-lg font-medium text-brandDark/60">0</span>
               </div>
             </div>
           </div>
@@ -206,39 +205,9 @@
           <div class="glass-card p-6 rounded-2xl border border-brandDark/5 lg:col-span-2">
             <h3 class="text-[13px] font-semibold uppercase tracking-wider text-brandDark/50 mb-5 border-b border-brandDark/5 pb-3">Active Campaigns Burn-down</h3>
             
-            <div class="space-y-6">
-              <!-- Campaign 1 -->
-              <div>
-                <div class="flex justify-between text-sm mb-2">
-                  <span class="font-medium text-brandDark">DD1-DD7 Collections (Priority)</span>
-                  <span class="font-medium text-brandDark/60">850 / 1,000 Contacted</span>
-                </div>
-                <div class="w-full bg-slate-100 rounded-full h-2">
-                  <div class="bg-brandAmber h-2 rounded-full" style="width: 85%"></div>
-                </div>
-              </div>
-              
-              <!-- Campaign 2 -->
-              <div>
-                <div class="flex justify-between text-sm mb-2">
-                  <span class="font-medium text-brandDark">Dormant Customer Reactivation</span>
-                  <span class="font-medium text-brandDark/60">240 / 800 Contacted</span>
-                </div>
-                <div class="w-full bg-slate-100 rounded-full h-2">
-                  <div class="bg-blue-500 h-2 rounded-full" style="width: 30%"></div>
-                </div>
-              </div>
-              
-              <!-- Campaign 3 -->
-              <div>
-                <div class="flex justify-between text-sm mb-2">
-                  <span class="font-medium text-brandDark">Active No Loan Outreach</span>
-                  <span class="font-medium text-brandDark/60">1,900 / 2,000 Contacted</span>
-                </div>
-                <div class="w-full bg-slate-100 rounded-full h-2">
-                  <div class="bg-green-500 h-2 rounded-full" style="width: 95%"></div>
-                </div>
-              </div>
+            <div id="ov-campaigns-list" class="space-y-6">
+              <!-- Dynamically populated by JavaScript -->
+              <p class="text-sm text-brandDark/50 italic py-2">Loading active campaigns...</p>
             </div>
             
           </div>
