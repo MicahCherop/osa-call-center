@@ -250,7 +250,10 @@ async function fetchAllData() {
         const resAgents = await fetch(`${API_BASE}/agents`);
         if (!resAgents.ok) throw new Error(`API Error: ${resAgents.status}`);
         const agentsData = await resAgents.json();
-        agents = Array.isArray(agentsData) ? agentsData : [];
+        
+        // FIX: Sync both variables
+        window.agents = Array.isArray(agentsData) ? agentsData : [];
+        agents = window.agents; 
 
         // Fetch Campaigns
         const resCamps = await fetch(`${API_BASE}/campaigns`);
@@ -266,7 +269,10 @@ async function fetchAllData() {
         const resCust = await fetch(`${API_BASE}/customers`);
         if (!resCust.ok) throw new Error(`API Error: ${resCust.status}`);
         const custData = await resCust.json();
-        mockCustomers = Array.isArray(custData) ? custData : [];
+        
+        // FIX: Sync both variables
+        window.customers = Array.isArray(custData) ? custData : [];
+        mockCustomers = window.customers;
 
         recalculateGlobalStats();
     } catch (err) {
@@ -1696,7 +1702,9 @@ window.toggleDarkMode = function() {
     }
 };
 
-// Auto-apply Dark Mode on load
-if (localStorage.getItem('theme') === 'dark' || (!localStorage.getItem('theme') && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+// ONLY apply Dark Mode if the user specifically clicked the toggle previously
+if (localStorage.getItem('theme') === 'dark') {
     document.documentElement.classList.add('dark');
+} else {
+    document.documentElement.classList.remove('dark'); // Forces Light Mode by default
 }

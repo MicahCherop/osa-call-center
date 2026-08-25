@@ -76,48 +76,78 @@ body {
   from { opacity: 0; transform: translateY(12px) scale(0.98); }
   to { opacity: 1; transform: translateY(0) scale(1); }
 }
-/* --- DARK MODE OVERRIDES --- */
-html.dark body {
-    background-color: #0f172a; /* brandDark */
-    color: #f8fafc;
+/* ==========================================
+   DARK MODE OVERRIDES (Strict Enforcement)
+   ========================================== */
+
+/* 1. Global Background & Text */
+html.dark body { 
+    background-color: #0f172a !important; /* Deep Slate */
+    color: #f8fafc !important; 
 }
 
-html.dark .glass-panel,
-html.dark .glass-card {
-    background-color: rgba(30, 41, 59, 0.7); /* dark slate */
-    border-color: rgba(255, 255, 255, 0.1);
-    color: #f8fafc;
+/* 2. Kill the Background Blobs Glare */
+html.dark .animate-blob {
+    opacity: 0.03 !important; /* Dims them so they don't wash out text */
+    mix-blend-mode: normal !important;
 }
 
-html.dark .bg-white,
-html.dark .bg-white\/60,
-html.dark .bg-white\/80,
-html.dark .bg-white\/90 {
-    background-color: #1e293b !important;
-}
-
-html.dark .text-brandDark {
+/* 3. Cards & Panels (Kill the white shadow, use true dark glass) */
+html.dark .glass-panel, 
+html.dark .glass-card { 
+    background-color: #1e293b !important; /* Dark Slate */
+    border-color: rgba(255, 255, 255, 0.05) !important;
     color: #f8fafc !important;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5), 0 4px 6px -4px rgba(0, 0, 0, 0.5) !important; /* Replaces white glow with dark shadow */
 }
 
-html.dark .text-brandDark\/70,
-html.dark .text-brandDark\/60,
-html.dark .text-brandDark\/50 {
-    color: #94a3b8 !important; /* slate-400 */
+/* 4. Fix White Backgrounds & Inputs */
+html.dark .bg-white, 
+html.dark .bg-slate-50\/30,
+html.dark .bg-white\/60, 
+html.dark .bg-white\/80, 
+html.dark .bg-white\/90 { 
+    background-color: #0f172a !important; 
 }
 
-html.dark .border-brandDark\/5,
-html.dark .border-brandDark\/10 {
-    border-color: rgba(255, 255, 255, 0.1) !important;
+html.dark .glass-input { 
+    background-color: rgba(15, 23, 42, 0.8) !important; 
+    color: #f8fafc !important; 
+    border-color: rgba(255, 255, 255, 0.1) !important; 
 }
 
-html.dark .glass-input {
-    background-color: rgba(15, 23, 42, 0.5) !important;
-    color: #f8fafc !important;
-    border-color: rgba(255, 255, 255, 0.2) !important;
+/* 5. Fix Subtitles and Faded Text Contrast */
+html.dark .text-brandDark { color: #f8fafc !important; }
+html.dark .text-brandDark\/80,
+html.dark .text-brandDark\/70, 
+html.dark .text-brandDark\/60, 
+html.dark .text-brandDark\/50 { 
+    color: #94a3b8 !important; /* Slate-400 for highly readable contrast */
 }
 
-html.dark table thead tr {
-    background-color: rgba(30, 41, 59, 0.9) !important;
-    color: #cbd5e1 !important;
+/* 6. Fix Borders & Tables */
+html.dark .border-brandDark\/5, 
+html.dark .border-brandDark\/10,
+html.dark .border-brandDark\/20 { 
+    border-color: rgba(255, 255, 255, 0.1) !important; 
 }
+
+html.dark table thead tr { 
+    background-color: rgba(30, 41, 59, 0.9) !important; 
+    color: #cbd5e1 !important; 
+}
+
+/* 7. Fix Alert Cards (Red & Amber contrast) */
+html.dark .bg-red-50 {
+    background-color: rgba(127, 29, 29, 0.3) !important;
+    border-color: rgba(248, 113, 113, 0.2) !important;
+}
+html.dark .bg-red-100 { background-color: rgba(127, 29, 29, 0.5) !important; }
+html.dark .text-red-900, html.dark .text-red-700\/80 { color: #fca5a5 !important; } /* Bright red text */
+
+html.dark .bg-amber-50 {
+    background-color: rgba(120, 53, 15, 0.3) !important;
+    border-color: rgba(251, 191, 36, 0.2) !important;
+}
+html.dark .bg-amber-100 { background-color: rgba(120, 53, 15, 0.5) !important; }
+html.dark .text-amber-900, html.dark .text-amber-800\/80 { color: #fcd34d !important; } /* Bright amber text */
