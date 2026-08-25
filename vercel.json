@@ -1,4 +1,5 @@
 {
+  "cleanUrls": true,
   "builds": [
     {
       "src": "api/index.py",
@@ -9,15 +10,10 @@
       "use": "@vercel/static"
     }
   ],
-  "routes": [
+  "rewrites": [
     {
-      "src": "/api/(.*)",
-      "dest": "/api/index.py"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "/$1",
-      "cleanUrls": true
+      "source": "/api/(.*)",
+      "destination": "/api/index.py"
     }
   ]
 }
