@@ -246,35 +246,48 @@ window.renderCampaignAgentSelector = function() {
 
 async function fetchAllData() {
     try {
-        // Fetch Agents
+        // 1. Fetch Agents
         const resAgents = await fetch(`${API_BASE}/agents`);
         if (!resAgents.ok) throw new Error(`API Error: ${resAgents.status}`);
         const agentsData = await resAgents.json();
         
-        // FIX: Sync both variables
-        window.agents = Array.isArray(agentsData) ? agentsData : [];
-        agents = window.agents; 
+        // SAFE PARSING: Look for array directly, or inside "agents" or "data" keys
+        window.agents = Array.isArray(agentsData) 
+            ? agentsData 
+            : (agentsData.agents || agentsData.data || []);
+        agents = window.agents;
+        
+        console.log("DEBUG: Agents fetched from API:", agents); // <-- Check your browser console!
 
-        // Fetch Campaigns
+        // 2. Fetch Campaigns
         const resCamps = await fetch(`${API_BASE}/campaigns`);
         if (!resCamps.ok) throw new Error(`API Error: ${resCamps.status}`);
         const campaigns = await resCamps.json();
-        if (Array.isArray(campaigns)) {
-            campaigns.forEach(c => {
-                campaignConfigs[c.name] = c.type;
-            });
-        }
+        
+        const parsedCampaigns = Array.isArray(campaigns) 
+            ? campaigns 
+            : (campaigns.campaigns || campaigns.data || []);
+            
+        parsedCampaigns.forEach(c => {
+            if (c && c.name) campaignConfigs[c.name] = c.type;
+        });
 
-        // Fetch Customers
+        // 3. Fetch Customers
         const resCust = await fetch(`${API_BASE}/customers`);
         if (!resCust.ok) throw new Error(`API Error: ${resCust.status}`);
         const custData = await resCust.json();
         
-        // FIX: Sync both variables
-        window.customers = Array.isArray(custData) ? custData : [];
+        // SAFE PARSING: Apply the exact same safety net for customers
+        window.customers = Array.isArray(custData) 
+            ? custData 
+            : (custData.customers || custData.data || []);
         mockCustomers = window.customers;
+        
+        console.log("DEBUG: Customers fetched from API:", mockCustomers); // <-- Check your browser console!
 
+        // 4. Calculate Stats
         recalculateGlobalStats();
+        
     } catch (err) {
         console.error("API Error - Could not fetch data:", err);
         agents = []; 

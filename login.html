@@ -7,7 +7,6 @@
   <link rel="stylesheet" href="/callcenter-tailwind.css">
   <link rel="icon" type="image/png" href="https://cdn.brandfetch.io/idkNTof4f-/w/400/h/400/theme/dark/icon.jpeg?c=1dxbfHSJFAPEGdCLU4o5B">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  <link rel="stylesheet" href="/callcenter.css">
 </head>
 
 <body data-page="login" class="text-brandDark font-sans font-normal text-sm h-screen overflow-hidden flex items-center justify-center relative bg-white">
@@ -161,7 +160,7 @@
           if (!userInfo.email) throw new Error("Could not retrieve email from Google.");
 
           // LAYER 1: STRICT DOMAIN FIREWALL
-          const allowedDomain = "@4g-capital.com";
+          const allowedDomain = "@osa.com";
           if (!userInfo.email.toLowerCase().endsWith(allowedDomain)) {
               throw new Error(`Unauthorized network. Only corporate ${allowedDomain} accounts are permitted to access this system.`);
           }

@@ -24,7 +24,6 @@ SCOPE = [
     "https://www.googleapis.com/auth/drive"
 ]
 
-
 def get_google_sheet():
     creds_json = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")
     
@@ -43,13 +42,11 @@ def get_google_sheet():
         raise HTTPException(status_code=500, detail=f"Failed to open sheet: {str(e)}")
 
 # --- PYDANTIC SCHEMAS ---
-
 class UserCreateModel(BaseModel):
     name: str
     email: str
     role: str
     status: str = "Active"
-    # No password required!
 
 class UserEditModel(BaseModel):
     email: str
@@ -79,6 +76,34 @@ class CustomerUploadModel(BaseModel):
     campaign: str
 
 
+# ==========================================
+# MOCK DEMO DATA
+# ==========================================
+demo_agents = [
+    {"name": "Joseph Cherop", "email": "joseph@osa.com", "role": "Ops Manager", "status": "Active", "campaign": "All", "callsMade": 0, "connected": 0, "conversion": 0},
+    {"name": "Sarah Wanjiku", "email": "sarah@osa.com", "role": "Team Leader", "status": "Active", "campaign": "All", "callsMade": 0, "connected": 0, "conversion": 0},
+    {"name": "David Ochieng", "email": "david@osa.com", "role": "Control Agent", "status": "Clocked In", "campaign": "DD1-DD7 Collections", "callsMade": 45, "connected": 18, "conversion": 150000},
+    {"name": "Mercy Mutisya", "email": "mercy@osa.com", "role": "Control Agent", "status": "Idle", "campaign": "Dormant Reactivation", "callsMade": 32, "connected": 8, "conversion": 45000},
+    {"name": "Brian Kipkorir", "email": "brian@osa.com", "role": "Control Agent", "status": "Offline", "campaign": "Active No Loan", "callsMade": 0, "connected": 0, "conversion": 0},
+    {"name": "Grace Achieng", "email": "grace@osa.com", "role": "Control Agent", "status": "Clocked In", "campaign": "DD1-DD7 Collections", "callsMade": 55, "connected": 22, "conversion": 210000},
+]
+
+demo_campaigns = [
+    {"name": "DD1-DD7 Collections", "type": "defaulted", "priority": "high", "startDate": "2026-08-01", "endDate": "2026-08-31"},
+    {"name": "Dormant Reactivation", "type": "dormant", "priority": "medium", "startDate": "2026-08-15", "endDate": "2026-09-15"},
+    {"name": "Active No Loan", "type": "active_no_loan", "priority": "low", "startDate": "2026-08-20", "endDate": "2026-09-20"}
+]
+
+demo_customers = [
+    {"id": 1, "name": "John Ndungu", "phone": "0712345678", "campaign": "DD1-DD7 Collections", "agentId": "David Ochieng", "outcome": "Answered", "status": "Promise to Pay (PTP)", "balance": "45000", "branch": "Nairobi CBD", "sector": "Retail", "worked": "TRUE", "pendingReschedule": False},
+    {"id": 2, "name": "Alice Njoroge", "phone": "0723456789", "campaign": "Dormant Reactivation", "agentId": "Mercy Mutisya", "outcome": "Unanswered", "status": "Pending Callback", "balance": "0", "branch": "Westlands", "sector": "Tech", "worked": "TRUE", "pendingReschedule": False},
+    {"id": 3, "name": "Peter Kamau", "phone": "0734567890", "campaign": "DD1-DD7 Collections", "agentId": "David Ochieng", "outcome": "", "status": "", "balance": "12500", "branch": "Mombasa", "sector": "Transport", "worked": "FALSE", "pendingReschedule": False},
+    {"id": 4, "name": "Lucy Atieno", "phone": "0745678901", "campaign": "DD1-DD7 Collections", "agentId": "David Ochieng", "outcome": "", "status": "", "balance": "80000", "branch": "Kisumu", "sector": "Agriculture", "worked": "FALSE", "pendingReschedule": True}, 
+    {"id": 5, "name": "Kevin Mbugua", "phone": "0756789012", "campaign": "Active No Loan", "agentId": "", "outcome": "", "status": "", "balance": "0", "branch": "Nakuru", "sector": "Education", "worked": "FALSE", "pendingReschedule": False},
+    {"id": 6, "name": "Faith Wanjala", "phone": "0767890123", "campaign": "DD1-DD7 Collections", "agentId": "", "outcome": "", "status": "", "balance": "35000", "branch": "Eldoret", "sector": "Wholesale", "worked": "FALSE", "pendingReschedule": False},
+    {"id": 7, "name": "Samuel Omondi", "phone": "0778901234", "campaign": "Dormant Reactivation", "agentId": "", "outcome": "", "status": "", "balance": "0", "branch": "Nairobi CBD", "sector": "Retail", "worked": "FALSE", "pendingReschedule": False}
+]
+
 # --- ROOT & HEALTH ENDPOINTS ---
 @app.get("/")
 @app.get("/api")
@@ -98,21 +123,19 @@ def login(creds: LoginModel):
     try:
         email_lower = creds.email.lower().strip()
         
-        # 1. DOMAIN FIREWALL: Require company email domain
+        # 1. DOMAIN FIREWALL
         if not email_lower.endswith("@4g-capital.com"):
             raise HTTPException(status_code=403, detail="Unauthorized network. Only corporate @4g-capital.com accounts are permitted.")
             
         sheet = get_google_sheet().worksheet("Agents")
         agents = sheet.get_all_records()
         
-        # 2. DATABASE CHECK: Does this exact email exist in the sheet?
+        # 2. DATABASE CHECK
         user = next((a for a in agents if str(a.get("Email", a.get("email", ""))).lower().strip() == email_lower), None)
         
-        # 3. STRICT BLOCK: Not in the database
         if not user:
             raise HTTPException(status_code=403, detail="ACCESS DENIED: Your email is not registered in the active users database. Contact your Ops Manager.")
             
-        # 4. ACTIVE STATUS CHECK: Ensure they haven't been deactivated
         status = str(user.get("Status", user.get("status", "Active"))).strip().lower()
         if status == "inactive":
              raise HTTPException(status_code=403, detail="ACCOUNT SUSPENDED: Your access to the system has been revoked.")
@@ -134,30 +157,35 @@ def login(creds: LoginModel):
         raise HTTPException(status_code=500, detail="Secure database connection failed. Please try again later.")
 
 
-# --- USER MANAGEMENT (ADMIN ENDPOINTS) ---
-
-@app.get("/agents")
+# --- GET DATA (USING MOCK DATA FOR DEMO) ---
 @app.get("/api/agents")
-def get_agents():
-    sheet = get_google_sheet().worksheet("Agents")
-    return sheet.get_all_records()
+@app.get("/agents")
+async def get_agents():
+    return {"data": demo_agents}
 
+@app.get("/api/campaigns")
+@app.get("/campaigns")
+async def get_campaigns():
+    return {"data": demo_campaigns}
+
+@app.get("/api/customers")
+@app.get("/customers")
+async def get_customers():
+    return {"data": demo_customers}
+
+
+# --- USER MANAGEMENT (ADMIN ENDPOINTS) ---
 @app.post("/api/users/add")
 def add_user(user: UserCreateModel):
     try:
         sheet = get_google_sheet().worksheet("Agents")
-        
-        # Check if user already exists
         existing_users = sheet.get_all_records()
         for u in existing_users:
             if str(u.get("Email", "")).lower().strip() == user.email.lower().strip():
                 raise HTTPException(status_code=400, detail="A user with this email already exists.")
         
-        # Get headers to ensure we map correctly, or just append standard columns
-        # Structure assuming: Status | Name | Email | Role
         row_data = [user.status, user.name, user.email, user.role]
         sheet.append_row(row_data)
-        
         return {"status": "success", "message": f"User {user.name} created successfully"}
     except HTTPException:
         raise
@@ -173,21 +201,18 @@ def edit_user(user: UserEditModel):
         row_idx = None
         for idx, record in enumerate(records):
             if str(record.get("Email", record.get("email", ""))).lower().strip() == user.email.lower().strip():
-                row_idx = idx + 2  # +2 because header is row 1, and index starts at 0
+                row_idx = idx + 2  
                 break
                 
         if not row_idx:
             raise HTTPException(status_code=404, detail="User not found in database.")
             
-        # Dynamically find column numbers based on headers
         headers = sheet.row_values(1)
         name_col = headers.index("Name") + 1 if "Name" in headers else 2
         role_col = headers.index("Role") + 1 if "Role" in headers else 4
         
-        # Update specific cells
         sheet.update_cell(row_idx, name_col, user.name)
         sheet.update_cell(row_idx, role_col, user.role)
-        
         return {"success": True}
     except HTTPException:
         raise
@@ -224,20 +249,13 @@ def update_agent_status(name: str = Body(...), status: str = Body(...)):
         cell = sheet.find(name)
         if not cell:
             raise HTTPException(status_code=404, detail="Agent not found")
-        # Ensure your status column is correctly mapped (using Col 1 as standard, change if your sheet differs)
         sheet.update_cell(cell.row, 1, status) 
         return {"status": "success"}
     except gspread.exceptions.CellNotFound:
         raise HTTPException(status_code=404, detail="Agent not found in database")
 
 
-# --- CAMPAIGNS & CUSTOMERS ---
-@app.get("/campaigns")
-@app.get("/api/campaigns")
-def get_campaigns():
-    sheet = get_google_sheet().worksheet("Campaigns")
-    return sheet.get_all_records()
-
+# --- CAMPAIGNS POST ROUTE ---
 @app.post("/campaigns")
 @app.post("/api/campaigns")
 def create_campaign(
@@ -250,11 +268,9 @@ def create_campaign(
 ):
     sh = get_google_sheet()
     
-    # Save campaign metadata
     camp_sheet = sh.worksheet("Campaigns")
     camp_sheet.append_row([name, type, priority, startDate, endDate])
     
-    # Save imported customers
     cust_sheet = sh.worksheet("Customers")
     rows = []
     for c in customers:
@@ -262,18 +278,6 @@ def create_campaign(
     cust_sheet.append_rows(rows)
     
     return {"status": "success", "imported": len(customers)}
-
-@app.get("/customers")
-@app.get("/api/customers")
-def get_customers(agentName: Optional[str] = None):
-    sheet = get_google_sheet().worksheet("Customers")
-    records = sheet.get_all_records()
-    if agentName:
-        records = [
-            r for r in records 
-            if str(r.get("agentId")) == agentName and str(r.get("worked")).upper() != "TRUE"
-        ]
-    return records
 
 
 # --- ALLOCATION ENGINE ---
@@ -307,12 +311,11 @@ def distribute_customers(campaign: str = Body(...)):
     
     for row_idx in unassigned:
         assigned_agent = agents[agent_idx].get("Name", agents[agent_idx].get("name"))
-        cells_to_update.append(gspread.Cell(row_idx, 8, assigned_agent))  # Col 8 = agentId
+        cells_to_update.append(gspread.Cell(row_idx, 8, assigned_agent))  
         assigned_count += 1
         agent_idx = (agent_idx + 1) % len(agents)
         
     cust_sheet.update_cells(cells_to_update)
-        
     return {"status": "success", "assignedCount": assigned_count}
 
 
@@ -324,20 +327,18 @@ def submit_disposition(disp: DispositionModel):
     cust_sheet = sh.worksheet("Customers")
     agent_sheet = sh.worksheet("Agents")
     
-    # 1. Update Customer Record
     try:
         cust_cell = cust_sheet.find(str(disp.customerId))
         r = cust_cell.row
         customer_updates = [
-            gspread.Cell(r, 9, "TRUE"),        # worked
-            gspread.Cell(r, 10, disp.outcome), # outcome
-            gspread.Cell(r, 11, disp.status)   # status
+            gspread.Cell(r, 9, "TRUE"),        
+            gspread.Cell(r, 10, disp.outcome), 
+            gspread.Cell(r, 11, disp.status)   
         ]
         cust_sheet.update_cells(customer_updates)
     except gspread.exceptions.CellNotFound:
         pass
         
-    # 2. Update Agent Metrics
     try:
         agent_cell = agent_sheet.find(disp.agentName)
         ar = agent_cell.row
