@@ -3,3 +3,4 @@ uvicorn
 pydantic
 gspread
 google-auth
+python-dotenv

@@ -1,5 +1,5 @@
 ﻿// --- FRONTEND API INTEGRATION ---
-const API_BASE = 'https://osa-call-center.vercel.app/api';
+const API_BASE = `${window.location.origin}/api`;
 
 // Persistent Local UI States
 let activeCustomerId = null;
@@ -256,7 +256,7 @@ async function fetchAllData() {
             }
         };
 
-        const customerPages = new Set(['workspace', 'teamleader', 'campaigns']);
+        const customerPages = new Set(['workspace', 'teamleader', 'campaigns', 'overview', 'dashboard']);
         const [agentsData, campaigns, custData] = await Promise.all([
             fetchJson(`${API_BASE}/agents`),
             fetchJson(`${API_BASE}/campaigns`),
@@ -571,11 +571,17 @@ window.switchDrawerTab = function(tabName, element) {
 window.switchTeamLeaderTab = function(tabName, element) {
   // Hide all tab contents
   const tabs = document.querySelectorAll('.teamleader-tab-content');
-  tabs.forEach(tab => tab.classList.add('hidden'));
+    tabs.forEach(tab => {
+        tab.classList.add('hidden');
+        tab.classList.remove('flex');
+    });
 
   // Show selected tab content
   const selectedTab = document.getElementById(`tl-tab-${tabName}`);
-  if (selectedTab) selectedTab.classList.remove('hidden');
+    if (selectedTab) {
+        selectedTab.classList.remove('hidden');
+        selectedTab.classList.add('flex');
+    }
 
   // Reset all buttons to inactive (white with border)
   const buttons = document.querySelectorAll('.teamleader-tab-btn');
@@ -957,12 +963,19 @@ async function submitAddCampaign(e) {
     // Capture CSV columns dynamically
     const formattedCustomers = rawCustomers.map((row, index) => {
         const customer = { ...row }; 
+        const csvValue = (...keys) => keys.map(key => row[key] || row[key.toLowerCase()]).find(value => value !== undefined) || '';
         customer.id = parseInt(row.id) || (index + 1);
         customer.name = row.name || row.Name || row.NAME || "Unknown";
-        customer.phone = String(row.phone || row.Phone || row.PHONE || "");
+        customer.phone = String(row.phone || row.Phone || row.PHONE || row['mobile no'] || row['Mobile No'] || "");
         customer.branch = row.branch || row.Branch || row.BRANCH || "Not Specified";
         customer.sector = row.sector || row.Sector || row.SECTOR || "Not Specified";
         customer.balance = String(row.balance || row.Balance || row.BALANCE || "0");
+        customer.dueDate = String(csvValue('dueDate', 'due_date', 'Due Date', 'duedate'));
+        customer.station = String(csvValue('station', 'Station'));
+        customer.stations = String(csvValue('stations', 'Stations'));
+        customer.pair = String(csvValue('pair', 'Pair'));
+        customer.disbAmount = String(csvValue('disbAmount', 'disb_amount', 'Disb Amount', 'disbursedAmount'));
+        customer.totalPaid = String(csvValue('totalPaid', 'total_paid', 'Total Paid'));
         customer.campaign = campaignName;
         return customer;
     });
@@ -1258,9 +1271,15 @@ window.renderTLPending = function() {
         const worked = String(c.Worked || c.worked || 'FALSE').toUpperCase();
         return worked !== 'TRUE';
     });
+    const columns = customerColumns(pending[0]);
+    const table = tbody.closest('table');
+    const thead = table?.querySelector('thead');
+    if (thead) {
+        thead.innerHTML = `<tr class="text-[11px] font-semibold uppercase tracking-wider text-brandDark/50">${columns.map(([, label]) => `<th class="px-5 py-4">${escapeHtml(label)}</th>`).join('')}</tr>`;
+    }
 
     if (pending.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="${CUSTOMER_DISPLAY_COLUMNS.length}" class="px-5 py-4 text-center text-brandDark/50">No pending callbacks.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="${columns.length}" class="px-5 py-4 text-center text-brandDark/50">No pending callbacks.</td></tr>`;
         return;
     }
 
@@ -1269,7 +1288,7 @@ window.renderTLPending = function() {
     pending.slice(0, 200).forEach(c => {
         htmlString += `
             <tr class="border-b border-brandDark/5 hover:bg-slate-50/50 transition">
-                ${CUSTOMER_DISPLAY_COLUMNS.map(([key]) => `<td class="px-5 py-4 ${key === 'agentId' ? 'font-medium text-brandAmber' : 'text-brandDark/70'}">${escapeHtml(displayValue(c[key]))}</td>`).join('')}
+                ${columns.map(([key]) => `<td class="px-5 py-4 ${key === 'agentId' ? 'font-medium text-brandAmber' : 'text-brandDark/70'}">${escapeHtml(displayValue(c[key]))}</td>`).join('')}
             </tr>
         `;
     });
@@ -1286,21 +1305,34 @@ window.renderTLCustomers = function() {
     const table = tbody.closest('table');
 
     if (!mockCustomers || mockCustomers.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="10" class="px-5 py-4 text-center text-brandDark/50">No customers found in the database.</td></tr>';
+        tbody.innerHTML = `<tr><td colspan="${CUSTOMER_DISPLAY_COLUMNS.length}" class="px-5 py-4 text-center text-brandDark/50">No customers found in the database.</td></tr>`;
         return;
     }
 
+    const selectedCampaign = document.getElementById('tl-campaign-filter')?.value || 'ALL';
+    const campaignFilter = document.getElementById('tl-campaign-filter');
+    if (campaignFilter && campaignFilter.options.length <= 1) {
+        Object.keys(campaignConfigs).forEach(campaign => {
+            campaignFilter.insertAdjacentHTML('beforeend', `<option value="${escapeHtml(campaign)}">${escapeHtml(campaign)}</option>`);
+        });
+    }
+    const visibleCustomers = selectedCampaign === 'ALL'
+        ? mockCustomers
+        : mockCustomers.filter(customer => customer.campaign === selectedCampaign);
+    const columns = selectedCampaign === 'ALL'
+        ? CUSTOMER_DISPLAY_COLUMNS
+        : customerColumns(visibleCustomers[0]);
     let theadHTML = `<tr class="text-[11px] font-semibold uppercase text-brandDark/70 bg-white/90 sticky top-0 border-b border-brandDark/10">`;
-    CUSTOMER_DISPLAY_COLUMNS.forEach(([, label]) => {
+    columns.forEach(([, label]) => {
         theadHTML += `<th class="px-5 py-3 text-left whitespace-nowrap">${escapeHtml(label)}</th>`;
     });
     theadHTML += `</tr>`;
 
     // FAST RENDER: Only render the first 200 items in the DOM
     let tbodyHTML = '';
-    mockCustomers.slice(0, 200).forEach(c => {
+    visibleCustomers.slice(0, 200).forEach(c => {
         tbodyHTML += `<tr class="border-b border-brandDark/5 hover:bg-slate-50/50 transition">`;
-        CUSTOMER_DISPLAY_COLUMNS.forEach(([key]) => {
+        columns.forEach(([key]) => {
             const colorClass = key === 'agentId' ? 'font-medium text-brandAmber' : 'text-brandDark/80';
             tbodyHTML += `<td class="px-5 py-4 whitespace-nowrap text-sm ${colorClass}">${escapeHtml(displayValue(c[key]))}</td>`;
         });
@@ -1769,4 +1801,16 @@ const CUSTOMER_DISPLAY_COLUMNS = [
 
 function displayValue(value) {
     return value === 0 || value === false ? String(value) : (value || '--');
+}
+
+const CATEGORY_DISPLAY_COLUMNS = {
+    defaulted: [['name', 'Name'], ['phone', 'Mobile No'], ['dueDate', 'Due Date'], ['station', 'Station'], ['stations', 'Stations'], ['pair', 'Pair'], ['sector', 'Sector'], ['disbAmount', 'Disb Amount'], ['totalPaid', 'Total Paid'], ['balance', 'Balance']],
+    upcoming_dues: [['name', 'Name'], ['phone', 'Mobile No'], ['dueDate', 'Due Date'], ['station', 'Station'], ['stations', 'Stations'], ['pair', 'Pair'], ['sector', 'Sector'], ['disbAmount', 'Disb Amount'], ['totalPaid', 'Total Paid'], ['balance', 'Balance']],
+    active_no_loan: [['name', 'Name'], ['phone', 'Mobile No'], ['dueDate', 'Due Date'], ['station', 'Station'], ['stations', 'Stations'], ['pair', 'Pair'], ['sector', 'Sector'], ['disbAmount', 'Disb Amount']],
+    dormant: [['name', 'Name'], ['phone', 'Mobile No'], ['dueDate', 'Due Date'], ['station', 'Station'], ['stations', 'Stations'], ['pair', 'Pair'], ['sector', 'Sector'], ['disbAmount', 'Disb Amount']]
+};
+
+function customerColumns(customer) {
+    const type = String(campaignConfigs[customer?.campaign] || '').toLowerCase();
+    return CATEGORY_DISPLAY_COLUMNS[type] || CUSTOMER_DISPLAY_COLUMNS;
 }

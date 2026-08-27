@@ -96,8 +96,16 @@ def column_letter(number: int) -> str:
 
 CUSTOMER_HEADERS = [
     "id", "name", "phone", "branch", "sector", "balance", "campaign",
-    "agentId", "worked", "outcome", "status"
+    "agentId", "worked", "outcome", "status", "dueDate", "station", "stations",
+    "pair", "disbAmount", "totalPaid"
 ]
+
+CATEGORY_HEADERS = {
+    "Defaulted": ["Name", "Mobile No", "Due Date", "Station", "Stations", "Pair", "Sector", "Disb Amount", "Total Paid", "Balance"],
+    "Upcoming Dues": ["Name", "Mobile No", "Due Date", "Station", "Stations", "Pair", "Sector", "Disb Amount", "Total Paid", "Balance"],
+    "Active No Loan": ["Name", "Mobile No", "Due Date", "Station", "Stations", "Pair", "Sector", "Disb Amount"],
+    "Dormant": ["Name", "Mobile No", "Due Date", "Station", "Stations", "Pair", "Sector", "Disb Amount"],
+}
 
 
 def category_sheet_name(category: str) -> str:
@@ -110,20 +118,34 @@ def category_sheet_name(category: str) -> str:
 
 def get_or_create_category_sheet(spreadsheet, category: str):
     title = category_sheet_name(category)
+    headers = CATEGORY_HEADERS.get(title, CUSTOMER_HEADERS)
     try:
-        return spreadsheet.worksheet(title)
+        worksheet = spreadsheet.worksheet(title)
+        if worksheet.row_values(1) != headers:
+            worksheet.update("A1", [headers])
+        return worksheet
     except gspread.exceptions.WorksheetNotFound:
         with _category_sheet_lock:
             try:
-                return spreadsheet.worksheet(title)
+                worksheet = spreadsheet.worksheet(title)
+                if worksheet.row_values(1) != headers:
+                    worksheet.update("A1", [headers])
+                return worksheet
             except gspread.exceptions.WorksheetNotFound:
                 worksheet = spreadsheet.add_worksheet(
                     title=title,
                     rows=1000,
-                    cols=len(CUSTOMER_HEADERS),
+                    cols=len(headers),
                 )
-                worksheet.append_row(CUSTOMER_HEADERS)
+                worksheet.append_row(headers)
                 return worksheet
+
+
+def ensure_customer_headers(worksheet) -> None:
+    headers = worksheet.row_values(1)
+    missing = [header for header in CUSTOMER_HEADERS if header not in headers]
+    for index, header in enumerate(missing, start=len(headers) + 1):
+        worksheet.update_cell(1, index, header)
 
 # --- PYDANTIC SCHEMAS ---
 
@@ -160,6 +182,32 @@ class CustomerUploadModel(BaseModel):
     sector: str
     balance: str
     campaign: str
+    dueDate: str = ""
+    station: str = ""
+    stations: str = ""
+    pair: str = ""
+    disbAmount: str = ""
+    totalPaid: str = ""
+
+    class Config:
+        extra = "allow"
+
+
+def category_row(customer: CustomerUploadModel, category: str) -> List[Any]:
+    values = {
+        "Name": customer.name,
+        "Mobile No": customer.phone,
+        "Due Date": customer.dueDate,
+        "Station": customer.station,
+        "Stations": customer.stations,
+        "Pair": customer.pair,
+        "Sector": customer.sector,
+        "Disb Amount": customer.disbAmount,
+        "Total Paid": customer.totalPaid,
+        "Balance": customer.balance,
+    }
+    headers = CATEGORY_HEADERS.get(category_sheet_name(category), CUSTOMER_HEADERS)
+    return [values.get(header, "") for header in headers]
 
 
 # --- ROOT & HEALTH ENDPOINTS ---
@@ -350,14 +398,18 @@ def create_campaign(
     
     # 2. Append the chunk of customers
     cust_sheet = sh.worksheet("Customers")
+    ensure_customer_headers(cust_sheet)
     rows = []
     for c in customers:
-        rows.append([c.id, c.name, c.phone, c.branch, c.sector, c.balance, name, "", "FALSE", "", ""])
+        rows.append([
+            c.id, c.name, c.phone, c.branch, c.sector, c.balance, name, "", "FALSE", "", "",
+            c.dueDate, c.station, c.stations, c.pair, c.disbAmount, c.totalPaid,
+        ])
     
     if rows:
         cust_sheet.append_rows(rows)
         category_sheet = get_or_create_category_sheet(sh, type)
-        category_sheet.append_rows(rows)
+        category_sheet.append_rows([category_row(customer, type) for customer in customers])
     
     return {
         "status": "success",
