@@ -70,6 +70,8 @@ def normalize_record(record: Dict[str, Any]) -> Dict[str, Any]:
                 "campaignname": "campaign", "assignedagent": "agentId", "agent": "agentId",
                 "agentid": "agentId", "isworked": "worked", "accountstatus": "status",
                 "campaignpriority": "priority", "startdate": "startDate", "enddate": "endDate",
+                "callsmade": "callsMade", "calls": "callsMade", "connectedcalls": "connected",
+                "amountrecovered": "conversion", "recovered": "conversion",
             }
             if compact_key in aliases:
                 normalized[aliases[compact_key]] = value
@@ -397,35 +399,38 @@ def create_campaign(
     endDate: str = Body(...), 
     customers: List[CustomerUploadModel] = Body(...)
 ):
-    sh = get_google_sheet()
-    
-    # 1. Check if campaign already exists before creating it
-    camp_sheet = sh.worksheet("Campaigns")
-    existing_campaigns = camp_sheet.col_values(1) # Gets all campaign names in Col A
-    
-    if name not in existing_campaigns:
-        camp_sheet.append_row([name, type, priority, startDate, endDate])
-    
-    # 2. Append the chunk of customers
-    cust_sheet = sh.worksheet("Customers")
-    ensure_customer_headers(cust_sheet)
-    rows = []
-    for c in customers:
-        rows.append([
+    try:
+        sh = get_google_sheet()
+        camp_sheet = sh.worksheet("Campaigns")
+        existing_campaigns = camp_sheet.col_values(1)
+
+        if name not in existing_campaigns:
+            camp_sheet.append_row([name, type, priority, startDate, endDate])
+
+        cust_sheet = sh.worksheet("Customers")
+        ensure_customer_headers(cust_sheet)
+        rows = [[
             c.id, c.name, c.phone, c.branch, c.sector, c.balance, name, "", "FALSE", "", "",
             c.dueDate, c.station, c.stations, c.pair, c.disbAmount, c.totalPaid,
-        ])
-    
-    if rows:
-        cust_sheet.append_rows(rows)
-        category_sheet = get_or_create_category_sheet(sh, type)
-        category_sheet.append_rows([category_row(customer, type) for customer in customers])
-    
-    return {
-        "status": "success",
-        "imported": len(customers),
-        "categorySheet": category_sheet_name(type),
-    }
+        ] for c in customers]
+
+        if rows:
+            cust_sheet.append_rows(rows)
+            category_sheet = get_or_create_category_sheet(sh, type)
+            category_sheet.append_rows([category_row(customer, type) for customer in customers])
+
+        return {
+            "status": "success",
+            "imported": len(customers),
+            "categorySheet": category_sheet_name(type),
+        }
+    except HTTPException:
+        raise
+    except gspread.exceptions.WorksheetNotFound as error:
+        raise HTTPException(status_code=503, detail=f"Required Google worksheet was not found: {error}")
+    except Exception as error:
+        print(f"Campaign upload failed: {error}")
+        raise HTTPException(status_code=503, detail="Google Sheets upload failed. Check API logs and spreadsheet permissions.")
 
 @app.get("/customers")
 @app.get("/api/customers")

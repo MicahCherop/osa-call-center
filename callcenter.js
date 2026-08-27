@@ -5,7 +5,7 @@ const API_BASE = `${window.location.origin}/api`;
 let activeCustomerId = null;
 let activeWorkspaceQueueTab = 'active';
 let activeAppModal = null;
-let isClockedIn = false;
+let isClockedIn = localStorage.getItem('IS_CLOCKED_IN') === 'true';
 
 // Dynamic Data States
 let mockCustomers = [];
@@ -334,6 +334,24 @@ function initCurrentPage() {
         renderShiftManager();
         if (typeof renderTLCustomers === 'function') renderTLCustomers();
     }
+    if (currentPage === 'workspace' && isClockedIn) {
+        restoreClockedInWorkspace();
+    }
+}
+
+function restoreClockedInWorkspace() {
+    const toggle = document.getElementById('clock-in-toggle');
+    if (!toggle || !LOGGED_IN_AGENT) return;
+    toggle.checked = true;
+    const label = document.getElementById('clock-status-label');
+    const idleMsg = document.getElementById('idle-overlay');
+    const queuePanel = document.getElementById('workspace-queue');
+    const emptyState = document.getElementById('empty-call-state');
+    if (label) { label.innerText = 'Clocked In'; label.classList.add('text-green-600'); }
+    if (idleMsg) idleMsg.classList.add('hidden');
+    if (queuePanel) { queuePanel.classList.remove('hidden'); queuePanel.classList.add('flex'); }
+    if (emptyState) { emptyState.classList.remove('hidden'); emptyState.classList.add('flex'); }
+    renderAgentQueue();
 }
 
 function setActiveNavLink() {
@@ -1008,7 +1026,17 @@ async function submitAddCampaign(e) {
                 body: JSON.stringify(payload)
             });
 
-            if (!res.ok) throw new Error(`Status ${res.status}`);
+            if (!res.ok) {
+                const errorText = await res.text();
+                let errorMessage = `Status ${res.status}`;
+                try {
+                    const errorData = JSON.parse(errorText);
+                    errorMessage = errorData.detail || errorMessage;
+                } catch {
+                    if (errorText) errorMessage = `${errorMessage}: ${errorText.slice(0, 160)}`;
+                }
+                throw new Error(errorMessage);
+            }
             
             // Update the button text to show progress for massive files
             submitBtn.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin"></i> Uploading ${Math.min(i + CHUNK_SIZE, formattedCustomers.length)} of ${formattedCustomers.length}...`;
@@ -1030,7 +1058,7 @@ async function submitAddCampaign(e) {
     } catch (err) {
         submitBtn.innerHTML = originalText;
         console.error("Campaign Creation Error:", err);
-        showAppAlert("Failed to create campaign or upload all customers. Please check the console.", "Error");
+        showAppAlert(err.message || "Failed to create campaign or upload all customers.", "Upload Error");
     }
   };
   
@@ -1187,6 +1215,7 @@ function switchWorkspaceQueueTab(tab) {
 
 function toggleAgentStatus(checkbox) {
   isClockedIn = checkbox.checked;
+    localStorage.setItem('IS_CLOCKED_IN', String(isClockedIn));
   const label = document.getElementById('clock-status-label');
   const globalText = document.getElementById('global-status-text');
   const idleMsg = document.getElementById('idle-overlay');
@@ -1731,12 +1760,17 @@ window.renderShiftManager = function() {
     if (!tbody) return;
     tbody.innerHTML = '';
 
-    if (!agents || agents.length === 0) {
+    const visibleAgents = (agents || []).filter(agent => {
+        const role = String(agent.role || agent.Role || '').trim().toLowerCase();
+        return role === 'control agent' || role === 'admin';
+    });
+
+    if (visibleAgents.length === 0) {
         tbody.innerHTML = '<tr><td colspan="5" class="px-5 py-4 text-center text-brandDark/50">No agents found.</td></tr>';
         return;
     }
 
-    agents.forEach(a => {
+    visibleAgents.forEach(a => {
         const name = a.name || a.Name || 'Unknown';
         const role = a.role || a.Role || '--';
         const status = a.status || a.Status || 'Offline';
@@ -1774,6 +1808,33 @@ window.renderOverviewData = function() {
     
     const unassignedEl = document.getElementById('ov-unassigned-count');
     if (unassignedEl) unassignedEl.innerText = unassigned.length;
+
+    const productivityBody = document.getElementById('ov-agent-productivity');
+    if (productivityBody) {
+        if (!agents || agents.length === 0) {
+            productivityBody.innerHTML = '<tr><td colspan="7" class="px-6 py-8 text-center text-brandDark/50 italic">No agents found.</td></tr>';
+            return;
+        }
+        productivityBody.innerHTML = agents.map(agent => {
+            const name = agent.name || agent.Name || 'Unknown';
+            const role = agent.role || agent.Role || '--';
+            const status = agent.status || agent.Status || 'Offline';
+            const calls = Number(agent.callsMade || agent.CallsMade || 0);
+            const connected = Number(agent.connected || agent.Connected || 0);
+            const recovered = Number(agent.conversion || agent.Conversion || 0);
+            const rate = calls ? Math.round((connected / calls) * 100) : 0;
+            const statusClass = status.toLowerCase() === 'active' || status.toLowerCase() === 'clocked in' ? 'text-green-600' : 'text-brandDark/50';
+            return `<tr class="border-b border-brandDark/5 hover:bg-white/40 transition">
+                <td class="px-6 py-4 font-medium">${escapeHtml(name)}</td>
+                <td class="px-6 py-4">${escapeHtml(role)}</td>
+                <td class="px-6 py-4 font-medium ${statusClass}">${escapeHtml(status)}</td>
+                <td class="px-6 py-4 text-right">${calls}</td>
+                <td class="px-6 py-4 text-right">${connected}</td>
+                <td class="px-6 py-4 text-right">${rate}%</td>
+                <td class="px-6 py-4 text-right font-medium">${recovered.toLocaleString()}</td>
+            </tr>`;
+        }).join('');
+    }
 };
 
 // Make sure to call these in your data fetch callbacks!
