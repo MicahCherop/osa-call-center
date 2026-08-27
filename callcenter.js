@@ -11,6 +11,7 @@ let isClockedIn = false;
 let mockCustomers = [];
 let campaignConfigs = {};
 let agents = [];
+let campaignRecords = [];
 let globalStats = { totalCalls: 0, connected: 0, recovered: 0, outcomes: {} };
 
 // --- RBAC: SECURITY & ENFORCEMENT ---
@@ -212,26 +213,23 @@ window.updateCampaignDropdowns = function() {
 
 
 window.renderCampaignList = function() {
-    const listDiv = document.getElementById('campaign-list-container');
-    if (!listDiv) return;
+    const listBody = document.getElementById('campaign-list-tbody');
+    if (!listBody) return;
     
-    const camps = Object.keys(campaignConfigs);
-    if (camps.length === 0) {
-        listDiv.innerHTML = '<p class="text-brandDark/50 italic p-4">No campaigns found. Create one to get started.</p>';
+    if (campaignRecords.length === 0) {
+        listBody.innerHTML = '<tr><td colspan="5" class="px-5 py-8 text-center text-brandDark/50 italic">No campaigns found. Create one to get started.</td></tr>';
         return;
     }
-    
-    // Renders the list of campaigns dynamically
-    listDiv.innerHTML = camps.map(c => `
-        <div class="glass-card p-4 rounded-xl mb-3 border border-brandDark/10 hover:border-brandAmber/50 transition">
-            <div class="flex justify-between items-center">
-                <div>
-                    <h3 class="font-bold text-lg text-brandDark">${escapeHtml(c)}</h3>
-                    <span class="text-xs font-bold text-brandDark/50 uppercase">${escapeHtml(campaignConfigs[c])}</span>
-                </div>
-                <i class="fa-solid fa-bullhorn text-brandAmber text-xl opacity-50"></i>
-            </div>
-        </div>
+
+    listBody.innerHTML = campaignRecords.map(c => `
+        <tr class="border-b border-brandDark/5 hover:bg-white/40 transition">
+            <td class="px-5 py-4"><i class="fa-solid fa-bullhorn text-brandAmber"></i></td>
+            <td class="px-5 py-4 font-medium">${escapeHtml(displayValue(c.name))}</td>
+            <td class="px-5 py-4">${escapeHtml(displayValue(c.type))}</td>
+            <td class="px-5 py-4">${escapeHtml(displayValue(c.priority))}</td>
+            <td class="px-5 py-4">${escapeHtml(displayValue(c.startDate))}</td>
+            <td class="px-5 py-4">${escapeHtml(displayValue(c.endDate))}</td>
+        </tr>
     `).join('');
 };
 
@@ -274,7 +272,8 @@ async function fetchAllData() {
         const parsedCampaigns = Array.isArray(campaigns) 
             ? campaigns 
             : (campaigns.campaigns || campaigns.data || []);
-            
+        campaignRecords = parsedCampaigns;
+        campaignConfigs = {};
         parsedCampaigns.forEach(c => {
             if (c && c.name) campaignConfigs[c.name] = c.type;
         });
@@ -436,6 +435,7 @@ window.openAddCampaignModal = function(e) {
   const modal = document.getElementById('add-campaign-modal');
   if (backdrop && modal) {
     backdrop.classList.remove('hidden');
+        backdrop.classList.add('flex');
     setTimeout(() => {
       backdrop.classList.remove('opacity-0');
       modal.classList.remove('scale-95');
@@ -449,6 +449,7 @@ window.closeAddCampaignModal = function(e) {
   const modal = document.getElementById('add-campaign-modal');
   if (backdrop && modal) {
     backdrop.classList.add('opacity-0');
+        backdrop.classList.remove('flex');
     modal.classList.add('scale-95');
     setTimeout(() => backdrop.classList.add('hidden'), 300);
   }
@@ -467,6 +468,7 @@ window.openShiftManager = function(e) {
     listState.classList.add('hidden');
     // Show the shift manager allocation screen
     shiftState.classList.remove('hidden');
+    shiftState.classList.add('flex');
     
     // Refresh the dropdowns when the screen opens
     if (typeof renderShiftManager === 'function') {
@@ -484,7 +486,11 @@ window.closeSecondaryState = function(e) {
   
   // Hide all secondary screens
   if (shiftState) shiftState.classList.add('hidden');
-  if (detailsState) detailsState.classList.add('hidden');
+    if (shiftState) shiftState.classList.remove('flex');
+    if (detailsState) {
+        detailsState.classList.add('hidden');
+        detailsState.classList.remove('flex');
+    }
   
   // Bring back the main campaign list
   if (listState) listState.classList.remove('hidden');
@@ -910,13 +916,23 @@ async function submitDisposition(e) {
 // CAMPAIGNS & ALLOCATION
 // ----------------------------------------------------------------------
 
+function toggleCustomCategory(select) {
+    const customInput = document.getElementById('new-campaign-custom-type');
+    if (!customInput) return;
+    const isCustom = select.value === 'custom';
+    customInput.classList.toggle('hidden', !isCustom);
+    customInput.required = isCustom;
+}
+
 async function submitAddCampaign(e) {
   e.preventDefault();
   const submitBtn = e.target.querySelector('button[type="submit"]');
   const originalText = submitBtn.innerHTML;
   
   const campaignName = document.getElementById('new-campaign-name').value.trim(); 
-  const campaignType = document.getElementById('new-campaign-type').value; 
+    const typeSelect = document.getElementById('new-campaign-type');
+    const customType = document.getElementById('new-campaign-custom-type');
+    const campaignType = typeSelect.value === 'custom' ? customType.value.trim() : typeSelect.value;
   const priority = document.getElementById('new-campaign-priority')?.value || 'medium'; 
   const startDate = document.getElementById('new-campaign-start')?.value || ''; 
   const endDate = document.getElementById('new-campaign-end')?.value || ''; 
@@ -1244,27 +1260,16 @@ window.renderTLPending = function() {
     });
 
     if (pending.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="6" class="px-5 py-4 text-center text-brandDark/50">No pending callbacks.</td></tr>';
+        tbody.innerHTML = `<tr><td colspan="${CUSTOMER_DISPLAY_COLUMNS.length}" class="px-5 py-4 text-center text-brandDark/50">No pending callbacks.</td></tr>`;
         return;
     }
 
     // FAST RENDER: Build string first, only render top 200
     let htmlString = '';
     pending.slice(0, 200).forEach(c => {
-        const name = c.Name || c.name || 'Unknown';
-        const phone = c.Phone || c.phone || '--';
-        const campaign = c.Campaign || c.campaign || '--';
-        const outcome = c.Outcome || c.outcome || '--';
-        const agent = c.AgentId || c.agentId || 'Unassigned';
-
         htmlString += `
             <tr class="border-b border-brandDark/5 hover:bg-slate-50/50 transition">
-                <td class="px-5 py-4 font-medium">${escapeHtml(name)}</td>
-                <td class="px-5 py-4 text-brandDark/70">${escapeHtml(phone)}</td>
-                <td class="px-5 py-4 text-brandDark/70">${escapeHtml(campaign)}</td>
-                <td class="px-5 py-4 text-brandDark/70">${escapeHtml(outcome)}</td>
-                <td class="px-5 py-4 font-medium text-brandAmber">${escapeHtml(agent)}</td>
-                <td class="px-5 py-4 text-brandDark/70">--</td>
+                ${CUSTOMER_DISPLAY_COLUMNS.map(([key]) => `<td class="px-5 py-4 ${key === 'agentId' ? 'font-medium text-brandAmber' : 'text-brandDark/70'}">${escapeHtml(displayValue(c[key]))}</td>`).join('')}
             </tr>
         `;
     });
@@ -1285,15 +1290,9 @@ window.renderTLCustomers = function() {
         return;
     }
 
-    let allKeys = new Set();
-    mockCustomers.forEach(c => Object.keys(c).forEach(k => allKeys.add(k)));
-    
-    const excludeKeys = ['pendingReschedule', 'worked']; 
-    const columns = Array.from(allKeys).filter(k => !excludeKeys.includes(k));
-
     let theadHTML = `<tr class="text-[11px] font-semibold uppercase text-brandDark/70 bg-white/90 sticky top-0 border-b border-brandDark/10">`;
-    columns.forEach(col => { 
-        theadHTML += `<th class="px-5 py-3 text-left whitespace-nowrap">${escapeHtml(col)}</th>`; 
+    CUSTOMER_DISPLAY_COLUMNS.forEach(([, label]) => {
+        theadHTML += `<th class="px-5 py-3 text-left whitespace-nowrap">${escapeHtml(label)}</th>`;
     });
     theadHTML += `</tr>`;
 
@@ -1301,13 +1300,9 @@ window.renderTLCustomers = function() {
     let tbodyHTML = '';
     mockCustomers.slice(0, 200).forEach(c => {
         tbodyHTML += `<tr class="border-b border-brandDark/5 hover:bg-slate-50/50 transition">`;
-        columns.forEach(col => {
-            let val = c[col] || '--';
-            let colorClass = "text-brandDark/80";
-            if (col.toLowerCase() === 'agentid' || col.toLowerCase() === 'agentname') colorClass = "font-medium text-brandAmber";
-            if (col.toLowerCase() === 'outcome') colorClass = "font-medium text-brandDark";
-            
-            tbodyHTML += `<td class="px-5 py-4 whitespace-nowrap text-sm ${colorClass}">${escapeHtml(val)}</td>`;
+        CUSTOMER_DISPLAY_COLUMNS.forEach(([key]) => {
+            const colorClass = key === 'agentId' ? 'font-medium text-brandAmber' : 'text-brandDark/80';
+            tbodyHTML += `<td class="px-5 py-4 whitespace-nowrap text-sm ${colorClass}">${escapeHtml(displayValue(c[key]))}</td>`;
         });
         tbodyHTML += `</tr>`;
     });
@@ -1527,10 +1522,9 @@ window.renderAnalyticsResponses = function() {
         return;
     }
 
-    let allKeys = new Set();
-    workedCustomers.forEach(c => Object.keys(c).forEach(k => allKeys.add(k)));
-    const excludeKeys = ['id', 'pendingReschedule', 'worked'];
-    const columns = Array.from(allKeys).filter(k => !excludeKeys.includes(k));
+    const columns = CUSTOMER_DISPLAY_COLUMNS
+        .filter(([key]) => key !== 'id' && key !== 'worked')
+        .map(([key]) => key);
 
     let tableHTML = `
         <div class="overflow-x-auto">
@@ -1538,12 +1532,15 @@ window.renderAnalyticsResponses = function() {
                 <thead class="bg-white/90 sticky top-0 z-10 shadow-sm border-b border-brandDark/20">
                     <tr class="text-[11px] font-semibold uppercase text-brandDark/70">`;
     
-    columns.forEach(col => { tableHTML += `<th class="px-4 py-3">${escapeHtml(col)}</th>`; });
+    columns.forEach(col => {
+        const label = CUSTOMER_DISPLAY_COLUMNS.find(([key]) => key === col)[1];
+        tableHTML += `<th class="px-4 py-3">${escapeHtml(label)}</th>`;
+    });
     tableHTML += `</tr></thead><tbody class="text-[13px] font-medium">`;
 
     workedCustomers.forEach(c => {
         tableHTML += `<tr class="border-b border-brandDark/5 hover:bg-white/40 transition">`;
-        columns.forEach(col => { tableHTML += `<td class="px-4 py-3">${escapeHtml(c[col] || '--')}</td>`; });
+        columns.forEach(col => { tableHTML += `<td class="px-4 py-3">${escapeHtml(displayValue(c[col]))}</td>`; });
         tableHTML += `</tr>`;
     });
 
@@ -1569,10 +1566,9 @@ window.exportResponsesCSV = function() {
     }
 
     // Get dynamic headers
-    let allKeys = new Set();
-    workedCustomers.forEach(c => Object.keys(c).forEach(k => allKeys.add(k)));
-    const excludeKeys = ['id', 'pendingReschedule', 'worked'];
-    const columns = Array.from(allKeys).filter(k => !excludeKeys.includes(k));
+    const columns = CUSTOMER_DISPLAY_COLUMNS
+        .filter(([key]) => key !== 'id' && key !== 'worked')
+        .map(([key]) => key);
 
     // Build CSV String
     let csvContent = columns.join(",") + "\n";
@@ -1762,4 +1758,15 @@ if (localStorage.getItem('theme') === 'dark') {
     document.documentElement.classList.add('dark');
 } else {
     document.documentElement.classList.remove('dark'); // Forces Light Mode by default
+}
+
+const CUSTOMER_DISPLAY_COLUMNS = [
+    ['id', 'ID'], ['name', 'Customer Name'], ['phone', 'Phone'],
+    ['branch', 'Branch'], ['sector', 'Sector'], ['balance', 'Balance'],
+    ['campaign', 'Campaign'], ['agentId', 'Assigned Agent'],
+    ['worked', 'Worked'], ['outcome', 'Outcome'], ['status', 'Status']
+];
+
+function displayValue(value) {
+    return value === 0 || value === false ? String(value) : (value || '--');
 }

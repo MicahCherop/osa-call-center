@@ -24,7 +24,7 @@
   </div>
 
   <!-- ADD CAMPAIGN MODAL -->
-  <div id="add-campaign-modal-backdrop" class="fixed inset-0 app-modal-backdrop z-50 hidden transition-opacity duration-300 opacity-0 flex items-center justify-center" onclick="closeAddCampaignModal(event)">
+  <div id="add-campaign-modal-backdrop" class="fixed inset-0 app-modal-backdrop z-50 hidden transition-opacity duration-300 opacity-0 items-center justify-center" onclick="closeAddCampaignModal(event)">
     <div id="add-campaign-modal" class="glass-panel w-full max-w-2xl rounded-2xl p-6 app-modal-card relative shadow-2xl flex flex-col max-h-[90vh]" onclick="event.stopPropagation()">
       <div class="flex justify-between items-center mb-6 border-b border-brandDark/5 pb-4">
         <h2 class="text-xl font-medium flex items-center gap-2"><i class="fa-solid fa-bullhorn text-brandAmber"></i> Create New Campaign</h2>
@@ -317,12 +317,17 @@
               <table class="w-full text-left border-collapse whitespace-nowrap">
                 <thead class="sticky top-0 bg-white/90 backdrop-blur-md z-10 border-b border-brandDark/5">
                   <tr class="text-[11px] font-semibold uppercase tracking-wider text-brandDark/50">
+                    <th class="px-5 py-4">ID</th>
                     <th class="px-5 py-4">Customer Name</th>
                     <th class="px-5 py-4">Phone</th>
+                    <th class="px-5 py-4">Branch</th>
+                    <th class="px-5 py-4">Sector</th>
+                    <th class="px-5 py-4">Balance</th>
                     <th class="px-5 py-4">Campaign</th>
+                    <th class="px-5 py-4 text-brandAmber">Assigned Agent</th>
+                    <th class="px-5 py-4">Worked</th>
                     <th class="px-5 py-4">Outcome</th>
-                    <th class="px-5 py-4 text-brandAmber">Agent Assigned</th>
-                    <th class="px-5 py-4">Comments</th>
+                    <th class="px-5 py-4">Status</th>
                   </tr>
                 </thead>
                 <tbody id="tl-pending-tbody" class="text-[13px] font-normal"></tbody>

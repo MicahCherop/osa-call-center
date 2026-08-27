@@ -13,6 +13,7 @@ app = FastAPI(title="OSA Call Center API")
 
 _sheet_cache = None
 _sheet_cache_lock = threading.Lock()
+_category_sheet_lock = threading.Lock()
 
 # Enable CORS for Vercel Frontend
 app.add_middleware(
@@ -56,11 +57,24 @@ def get_google_sheet():
 
 
 def normalize_record(record: Dict[str, Any]) -> Dict[str, Any]:
-    """Expose stable camel-case keys regardless of worksheet header casing."""
+    """Expose stable keys regardless of worksheet header spelling or casing."""
     normalized = {}
     for key, value in record.items():
         if key:
-            normalized[key[0].lower() + key[1:]] = value
+            compact_key = "".join(char.lower() for char in str(key) if char.isalnum())
+            aliases = {
+                "customerid": "id", "customername": "name", "phonenumber": "phone",
+                "campaignname": "campaign", "assignedagent": "agentId", "agent": "agentId",
+                "agentid": "agentId", "isworked": "worked", "accountstatus": "status",
+                "campaignpriority": "priority", "startdate": "startDate", "enddate": "endDate",
+            }
+            if compact_key in aliases:
+                normalized[aliases[compact_key]] = value
+                continue
+
+            words = "".join(char if char.isalnum() else " " for char in str(key)).split()
+            camel_key = words[0].lower() + "".join(word.title() for word in words[1:])
+            normalized[camel_key] = value
     return normalized
 
 
@@ -78,6 +92,38 @@ def column_letter(number: int) -> str:
         number, remainder = divmod(number - 1, 26)
         result = chr(65 + remainder) + result
     return result
+
+
+CUSTOMER_HEADERS = [
+    "id", "name", "phone", "branch", "sector", "balance", "campaign",
+    "agentId", "worked", "outcome", "status"
+]
+
+
+def category_sheet_name(category: str) -> str:
+    """Convert an upload category into a safe, stable worksheet title."""
+    cleaned = " ".join(str(category or "Uncategorized").strip().split())
+    for source in ("_", "-"):
+        cleaned = cleaned.replace(source, " ")
+    return " ".join(cleaned.split()).title()[:100] or "Uncategorized"
+
+
+def get_or_create_category_sheet(spreadsheet, category: str):
+    title = category_sheet_name(category)
+    try:
+        return spreadsheet.worksheet(title)
+    except gspread.exceptions.WorksheetNotFound:
+        with _category_sheet_lock:
+            try:
+                return spreadsheet.worksheet(title)
+            except gspread.exceptions.WorksheetNotFound:
+                worksheet = spreadsheet.add_worksheet(
+                    title=title,
+                    rows=1000,
+                    cols=len(CUSTOMER_HEADERS),
+                )
+                worksheet.append_row(CUSTOMER_HEADERS)
+                return worksheet
 
 # --- PYDANTIC SCHEMAS ---
 
@@ -310,8 +356,14 @@ def create_campaign(
     
     if rows:
         cust_sheet.append_rows(rows)
+        category_sheet = get_or_create_category_sheet(sh, type)
+        category_sheet.append_rows(rows)
     
-    return {"status": "success", "imported": len(customers)}
+    return {
+        "status": "success",
+        "imported": len(customers),
+        "categorySheet": category_sheet_name(type),
+    }
 
 @app.get("/customers")
 @app.get("/api/customers")
