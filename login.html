@@ -160,7 +160,7 @@
           if (!userInfo.email) throw new Error("Could not retrieve email from Google.");
 
           // LAYER 1: STRICT DOMAIN FIREWALL
-          const allowedDomain = "@osa.com";
+          const allowedDomain = "@4g-capital.com";
           if (!userInfo.email.toLowerCase().endsWith(allowedDomain)) {
               throw new Error(`Unauthorized network. Only corporate ${allowedDomain} accounts are permitted to access this system.`);
           }

@@ -1,5 +1,5 @@
 ﻿// --- FRONTEND API INTEGRATION ---
-const API_BASE = '/api';
+const API_BASE = 'https://osa-call-center.vercel.app/api';
 
 // Persistent Local UI States
 let activeCustomerId = null;
