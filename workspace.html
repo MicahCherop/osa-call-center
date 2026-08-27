@@ -23,7 +23,7 @@
   </div>
 
   <!-- ADD CAMPAIGN MODAL -->
-  <div id="add-campaign-modal-backdrop" class="fixed inset-0 app-modal-backdrop z-50 hidden transition-opacity duration-300 opacity-0 flex items-center justify-center" onclick="closeAddCampaignModal(event)">
+  <div id="add-campaign-modal-backdrop" class="fixed inset-0 app-modal-backdrop z-50 hidden transition-opacity duration-300 opacity-0 items-center justify-center" onclick="closeAddCampaignModal(event)">
     <div id="add-campaign-modal" class="glass-panel w-full max-w-2xl rounded-2xl p-6 app-modal-card relative shadow-2xl flex flex-col max-h-[90vh]" onclick="event.stopPropagation()">
       <div class="flex justify-between items-center mb-6 border-b border-brandDark/10 pb-4">
         <h2 class="text-xl font-medium flex items-center gap-2"><i class="fa-solid fa-bullhorn text-brandAmber"></i> Create New Campaign</h2>
@@ -256,10 +256,13 @@
           </div>
 
           <!-- LEFT: QUEUE LIST -->
-          <div id="workspace-queue" class="w-1/3 glass-card rounded-2xl p-5 flex flex-col h-full hidden">
+          <div id="workspace-queue" class="w-1/3 glass-card rounded-2xl p-5 flex-col h-full hidden">
             <div class="flex justify-between items-center mb-4 border-b border-brandDark/5 pb-3">
                <h3 class="font-medium text-brandDark flex items-center gap-2"><i class="fa-solid fa-list-ul text-brandAmber"></i> Workspace Queue</h3>
-               <span class="text-[11px] font-medium bg-brandAmber/10 text-amber-700 px-2 py-1 rounded-md" id="queue-count">0 Remaining</span>
+               <div class="flex items-center gap-2">
+                 <button type="button" onclick="claimNextCustomer()" class="text-[11px] font-medium bg-brandAmber text-white px-2.5 py-1.5 rounded-md" title="Assign the next unassigned account to me">Take Account</button>
+                 <span class="text-[11px] font-medium bg-brandAmber/10 text-amber-700 px-2 py-1 rounded-md" id="queue-count">0 Remaining</span>
+               </div>
             </div>
             <div class="grid grid-cols-2 gap-2 mb-4 bg-brandDark/5 p-1 rounded-lg">
               <!-- FIX: Active tab uses Amber -->
@@ -272,13 +275,13 @@
           </div>
 
           <!-- RIGHT: EMPTY STATE -->
-          <div id="empty-call-state" class="flex-1 glass-card rounded-2xl flex flex-col items-center justify-center hidden">
+          <div id="empty-call-state" class="flex-1 glass-card rounded-2xl flex-col items-center justify-center hidden">
              <i class="fa-solid fa-headset text-5xl text-brandDark/10 mb-4"></i>
              <p class="text-brandDark/50 font-normal text-sm">Select a customer from your queue to begin.</p>
           </div>
 
           <!-- RIGHT: ACTIVE CALL STATE (LOCKED) -->
-          <div id="active-call-panel" class="flex-1 flex gap-6 hidden h-full">
+          <div id="active-call-panel" class="flex-1 gap-6 hidden h-full">
             
             <!-- Customer info panel -->
             <div class="flex-1 glass-card rounded-2xl p-6 flex flex-col overflow-y-auto">
@@ -397,7 +400,7 @@
                 </div>
 
                 <!-- DYNAMIC: Amount recovered -->
-                <div id="dynamic-amount" class="hidden flex flex-col gap-3 bg-brandAmber/5 p-3 rounded-xl border border-brandAmber/10">
+                <div id="dynamic-amount" class="hidden flex-col gap-3 bg-brandAmber/5 p-3 rounded-xl border border-brandAmber/10">
                   <div>
                     <label class="block text-[11px] font-semibold text-brandDark/60 uppercase mb-1.5">Amount (Sh) *</label>
                     <input type="number" id="input-amount" placeholder="e.g. 5000" class="glass-input rounded-lg w-full px-3 py-2 text-sm font-normal">

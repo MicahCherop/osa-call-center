@@ -897,8 +897,14 @@ async function submitDisposition(e) {
 
       activeCustomerId = null;
       updateWorkspaceStats();
-      if (document.getElementById('active-call-panel')) document.getElementById('active-call-panel').classList.add('hidden');
-      if (document.getElementById('empty-call-state')) document.getElementById('empty-call-state').classList.remove('hidden');
+            if (document.getElementById('active-call-panel')) {
+                document.getElementById('active-call-panel').classList.add('hidden');
+                document.getElementById('active-call-panel').classList.remove('flex');
+            }
+            if (document.getElementById('empty-call-state')) {
+                document.getElementById('empty-call-state').classList.remove('hidden');
+                document.getElementById('empty-call-state').classList.add('flex');
+            }
       renderAgentQueue();
       
       updateAnalyticsUI();
@@ -1202,9 +1208,10 @@ function toggleAgentStatus(checkbox) {
       globalText.innerHTML = `<span class="w-2 h-2 rounded-full bg-green-500"></span> ONLINE`;
     }
     if (idleMsg) idleMsg.classList.add('hidden');
-    if (queuePanel) queuePanel.classList.remove('hidden');
+    if (queuePanel) { queuePanel.classList.remove('hidden'); queuePanel.classList.add('flex'); }
     
-    if (!activeCustomerId && emptyState) emptyState.classList.remove('hidden');
+    if (!activeCustomerId && emptyState) { emptyState.classList.remove('hidden'); emptyState.classList.add('flex'); }
+    claimNextCustomer();
     renderAgentQueue();
   } else {
     if (label) { label.innerText = "Clocked Out"; label.classList.remove('text-green-600'); }
@@ -1213,9 +1220,9 @@ function toggleAgentStatus(checkbox) {
       globalText.innerHTML = `<span class="w-2 h-2 rounded-full bg-gray-400"></span> OFFLINE`;
     }
     if (idleMsg) idleMsg.classList.remove('hidden');
-    if (queuePanel) queuePanel.classList.add('hidden');
-    if (emptyState) emptyState.classList.add('hidden');
-    if (activeCall) activeCall.classList.add('hidden');
+    if (queuePanel) { queuePanel.classList.add('hidden'); queuePanel.classList.remove('flex'); }
+    if (emptyState) { emptyState.classList.add('hidden'); emptyState.classList.remove('flex'); }
+    if (activeCall) { activeCall.classList.add('hidden'); activeCall.classList.remove('flex'); }
   }
 }
 
@@ -1355,8 +1362,14 @@ function startCall(id) {
   const c = mockCustomers.find(x => x.id === id);
   if (!c) return;
 
-  if (document.getElementById('empty-call-state')) document.getElementById('empty-call-state').classList.add('hidden');
-  if (document.getElementById('active-call-panel')) document.getElementById('active-call-panel').classList.remove('hidden');
+    if (document.getElementById('empty-call-state')) {
+        document.getElementById('empty-call-state').classList.add('hidden');
+        document.getElementById('empty-call-state').classList.remove('flex');
+    }
+    if (document.getElementById('active-call-panel')) {
+        document.getElementById('active-call-panel').classList.remove('hidden');
+        document.getElementById('active-call-panel').classList.add('flex');
+    }
 
   if (document.getElementById('active-name')) document.getElementById('active-name').innerText = c.name || 'Unknown';
   if (document.getElementById('active-phone')) document.getElementById('active-phone').innerText = c.phone || '--';
@@ -1413,9 +1426,11 @@ function handleOutcomeChangeGlass() {
   if (amtContainer && amtInput) {
     if (needsAnsweredDisposition && (status === 'Promise to Pay (PTP)' || status === 'Settled')) {
       amtContainer.classList.remove('hidden');
+            amtContainer.classList.add('flex');
       amtInput.required = true;
     } else {
       amtContainer.classList.add('hidden');
+            amtContainer.classList.remove('flex');
       amtInput.required = false;
     }
   }
@@ -1647,6 +1662,7 @@ window.fetchAgentsData = async function() {
         if (res.ok) {
             const data = await res.json();
             window.agents = Array.isArray(data) ? data : (data.agents || data.data || []);
+            agents = window.agents;
             
             const currentPage = document.body.getAttribute('data-page');
             
@@ -1672,6 +1688,7 @@ window.fetchCustomersData = async function() {
         if (res.ok) {
             const data = await res.json();
             window.customers = Array.isArray(data) ? data : (data.items || data.customers || data.data || []);
+            mockCustomers = window.customers;
             
             const currentPage = document.body.getAttribute('data-page');
             
@@ -1813,4 +1830,26 @@ const CATEGORY_DISPLAY_COLUMNS = {
 function customerColumns(customer) {
     const type = String(campaignConfigs[customer?.campaign] || '').toLowerCase();
     return CATEGORY_DISPLAY_COLUMNS[type] || CUSTOMER_DISPLAY_COLUMNS;
+}
+
+async function claimNextCustomer() {
+    if (!LOGGED_IN_AGENT) return;
+    const nextCustomer = mockCustomers.find(customer =>
+        (!customer.agentId || customer.agentId === '') && String(customer.worked).toUpperCase() !== 'TRUE'
+    );
+    if (!nextCustomer) return;
+
+    try {
+        const response = await fetch(`${API_BASE}/assign`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ customerId: Number(nextCustomer.id), agentName: LOGGED_IN_AGENT })
+        });
+        if (!response.ok) throw new Error(`Status ${response.status}`);
+        nextCustomer.agentId = LOGGED_IN_AGENT;
+        renderAgentQueue();
+    } catch (error) {
+        console.error('Failed to assign customer:', error);
+        showAppAlert('Could not assign an account to you. Please try again.', 'Assignment Error');
+    }
 }

@@ -1,6 +1,7 @@
 import os
 import json
 import threading
+import time
 from typing import Any, Dict, List, Optional
 from fastapi import FastAPI, HTTPException, Body
 from fastapi.staticfiles import StaticFiles
@@ -14,6 +15,8 @@ app = FastAPI(title="OSA Call Center API")
 _sheet_cache = None
 _sheet_cache_lock = threading.Lock()
 _category_sheet_lock = threading.Lock()
+_customer_queue_cache = {}
+_customer_queue_cache_lock = threading.Lock()
 
 # Enable CORS for Vercel Frontend
 app.add_middleware(
@@ -172,6 +175,13 @@ class DispositionModel(BaseModel):
     outcome: str
     status: str
     amountRec: float = 0.0
+    agentName: str
+    comments: str = ""
+    businessStatus: str = ""
+
+
+class CustomerAssignModel(BaseModel):
+    customerId: int
     agentName: str
 
 class CustomerUploadModel(BaseModel):
@@ -427,22 +437,40 @@ def get_customers(
     if offset < 0 or limit < 1 or limit > 500:
         raise HTTPException(status_code=400, detail="offset must be >= 0 and limit must be between 1 and 500")
 
-    sheet = get_google_sheet().worksheet("Customers")
-    headers = sheet.row_values(1)
+    try:
+        sheet = get_google_sheet().worksheet("Customers")
+        headers = sheet.row_values(1)
+    except gspread.exceptions.WorksheetNotFound:
+        raise HTTPException(status_code=404, detail="Customers worksheet was not found")
+    except Exception as error:
+        raise HTTPException(status_code=503, detail=f"Google Sheets connection failed: {error}")
     if not headers:
         return {"items": [], "offset": offset, "limit": limit, "total": 0, "hasMore": False}
 
     end_column = column_letter(len(headers))
     if agentName:
-        # Assigned queues are filtered in bounded chunks, never materialized at once.
+        cache_key = agentName.strip().lower()
+        with _customer_queue_cache_lock:
+            cached = _customer_queue_cache.get(cache_key)
+            if cached and cached[0] > time.time():
+                matches = cached[1]
+                return {
+                    "items": matches[offset:offset + limit], "offset": offset,
+                    "limit": limit, "total": len(matches),
+                    "hasMore": offset + limit < len(matches),
+                }
+
+        # Filter in larger bounded requests to reduce Google Sheets API calls.
         matches = []
-        chunk_size = 5000
+        chunk_size = 50000
         for start in range(2, sheet.row_count + 1, chunk_size):
             end = min(start + chunk_size - 1, sheet.row_count)
             rows = sheet.get_values(f"A{start}:{end_column}{end}")
             for record in records_from_rows(rows, headers):
                 if str(record.get("agentId", "")).strip() == agentName and str(record.get("worked", "")).upper() != "TRUE":
                     matches.append(record)
+        with _customer_queue_cache_lock:
+            _customer_queue_cache[cache_key] = (time.time() + 20, matches)
         total = len(matches)
         items = matches[offset:offset + limit]
     else:
@@ -459,6 +487,26 @@ def get_customers(
         "total": total,
         "hasMore": offset + len(items) < total,
     }
+
+
+@app.post("/assign")
+@app.post("/api/assign")
+def assign_customer(assignment: CustomerAssignModel):
+    sheet = get_google_sheet().worksheet("Customers")
+    cell = sheet.find(str(assignment.customerId))
+    headers = sheet.row_values(1)
+    try:
+        agent_column = headers.index("agentId") + 1
+    except ValueError:
+        try:
+            agent_column = headers.index("AgentId") + 1
+        except ValueError:
+            raise HTTPException(status_code=500, detail="Customers sheet is missing the agentId column")
+
+    sheet.update_cell(cell.row, agent_column, assignment.agentName)
+    with _customer_queue_cache_lock:
+        _customer_queue_cache.clear()
+    return {"status": "success", "customerId": assignment.customerId, "agentName": assignment.agentName}
 
 
 # --- ALLOCATION ENGINE ---
@@ -539,6 +587,8 @@ def submit_disposition(disp: DispositionModel):
     except gspread.exceptions.CellNotFound:
         pass
         
+    with _customer_queue_cache_lock:
+        _customer_queue_cache.clear()
     return {"status": "success"}
 
 # --- LOCALHOST STATIC FILE SERVING ---
