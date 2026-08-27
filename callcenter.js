@@ -940,11 +940,9 @@ async function submitAddCampaign(e) {
       return;
     }
 
-    // FIX: Dynamically capture ALL CSV columns while ensuring required backend fields exist
+    // Capture CSV columns dynamically
     const formattedCustomers = rawCustomers.map((row, index) => {
-        const customer = { ...row }; // Captures every column dynamically
-        
-        // Enforce required fields
+        const customer = { ...row }; 
         customer.id = parseInt(row.id) || (index + 1);
         customer.name = row.name || row.Name || row.NAME || "Unknown";
         customer.phone = String(row.phone || row.Phone || row.PHONE || "");
@@ -952,30 +950,39 @@ async function submitAddCampaign(e) {
         customer.sector = row.sector || row.Sector || row.SECTOR || "Not Specified";
         customer.balance = String(row.balance || row.Balance || row.BALANCE || "0");
         customer.campaign = campaignName;
-        
         return customer;
     });
 
-    const payload = {
-        name: campaignName,
-        type: campaignType,
-        priority: priority,
-        startDate: startDate,
-        endDate: endDate,
-        customers: formattedCustomers
-    };
-
     try {
-        const res = await fetch(`${API_BASE}/campaigns`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        });
+        const CHUNK_SIZE = 500; // Safe limit to prevent 413 errors
+        
+        // Loop through the data and send it in smaller batches
+        for (let i = 0; i < formattedCustomers.length; i += CHUNK_SIZE) {
+            const chunk = formattedCustomers.slice(i, i + CHUNK_SIZE);
+            
+            const payload = {
+                name: campaignName,
+                type: campaignType,
+                priority: priority,
+                startDate: startDate,
+                endDate: endDate,
+                customers: chunk
+            };
 
-        if (!res.ok) throw new Error(`Status ${res.status}`);
+            const res = await fetch(`${API_BASE}/campaigns`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            if (!res.ok) throw new Error(`Status ${res.status}`);
+            
+            // Update the button text to show progress for massive files
+            submitBtn.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin"></i> Uploading ${Math.min(i + CHUNK_SIZE, formattedCustomers.length)} of ${formattedCustomers.length}...`;
+        }
         
+        // Refresh UI after all chunks succeed
         await fetchAllData();
-        
         updateCampaignDropdowns();
         renderCampaignList(); 
         
@@ -986,15 +993,18 @@ async function submitAddCampaign(e) {
           document.getElementById('csv-filename').innerText = "No file selected";
         }
         
-        showAppAlert(`Success! Created campaign "${campaignName}" with ${formattedCustomers.length} imported customers.`, "Campaign created");
+        showAppAlert(`Success! Created campaign "${campaignName}" and imported ${formattedCustomers.length} customers.`, "Campaign created");
     } catch (err) {
         submitBtn.innerHTML = originalText;
         console.error("Campaign Creation Error:", err);
-        showAppAlert("Failed to create campaign in Google Sheets.", "Error");
+        showAppAlert("Failed to create campaign or upload all customers. Please check the console.", "Error");
     }
   };
+  
+  // Trigger the file reader
   reader.readAsText(file);
 }
+
 async function distributeCustomers() {
   const campEl = document.getElementById('alloc-campaign');
   const campaign = campEl ? campEl.value : '';
@@ -1691,6 +1701,7 @@ window.renderOverviewData = function() {
 };
 
 // Make sure to call these in your data fetch callbacks!
+
 const originalFetchAgents = window.fetchAgentsData;
 window.fetchAgentsData = async function() {
     await originalFetchAgents();
