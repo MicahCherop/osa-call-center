@@ -246,23 +246,30 @@ window.renderCampaignAgentSelector = function() {
 
 async function fetchAllData() {
     try {
-        // 1. Fetch Agents
-        const resAgents = await fetch(`${API_BASE}/agents`);
-        if (!resAgents.ok) throw new Error(`API Error: ${resAgents.status}`);
-        const agentsData = await resAgents.json();
-        
-        // SAFE PARSING: Look for array directly, or inside "agents" or "data" keys
-        window.agents = Array.isArray(agentsData) 
-            ? agentsData 
-            : (agentsData.agents || agentsData.data || []);
-        agents = window.agents;
-        
-        console.log("DEBUG: Agents fetched from API:", agents); // <-- Check your browser console!
+        const fetchJson = async (url) => {
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), 15000);
+            try {
+                const response = await fetch(url, { signal: controller.signal });
+                if (!response.ok) throw new Error(`API Error: ${response.status}`);
+                return response.json();
+            } finally {
+                clearTimeout(timeout);
+            }
+        };
 
-        // 2. Fetch Campaigns
-        const resCamps = await fetch(`${API_BASE}/campaigns`);
-        if (!resCamps.ok) throw new Error(`API Error: ${resCamps.status}`);
-        const campaigns = await resCamps.json();
+        const customerPages = new Set(['workspace', 'teamleader', 'campaigns']);
+        const [agentsData, campaigns, custData] = await Promise.all([
+            fetchJson(`${API_BASE}/agents`),
+            fetchJson(`${API_BASE}/campaigns`),
+            customerPages.has(currentPage)
+                ? fetchJson(`${API_BASE}/customers?limit=200${currentPage === 'workspace' && LOGGED_IN_AGENT ? `&agentName=${encodeURIComponent(LOGGED_IN_AGENT)}` : ''}`)
+                : Promise.resolve({ items: [] })
+        ]);
+
+        // 1. Fetch Agents
+        window.agents = Array.isArray(agentsData) ? agentsData : (agentsData.agents || agentsData.data || []);
+        agents = window.agents;
         
         const parsedCampaigns = Array.isArray(campaigns) 
             ? campaigns 
@@ -272,18 +279,9 @@ async function fetchAllData() {
             if (c && c.name) campaignConfigs[c.name] = c.type;
         });
 
-        // 3. Fetch Customers
-        const resCust = await fetch(`${API_BASE}/customers`);
-        if (!resCust.ok) throw new Error(`API Error: ${resCust.status}`);
-        const custData = await resCust.json();
-        
-        // SAFE PARSING: Apply the exact same safety net for customers
-        window.customers = Array.isArray(custData) 
-            ? custData 
-            : (custData.customers || custData.data || []);
+        // 3. Customers are deliberately bounded; load more pages on demand.
+        window.customers = Array.isArray(custData) ? custData : (custData.items || custData.customers || custData.data || []);
         mockCustomers = window.customers;
-        
-        console.log("DEBUG: Customers fetched from API:", mockCustomers); // <-- Check your browser console!
 
         // 4. Calculate Stats
         recalculateGlobalStats();
@@ -1192,11 +1190,11 @@ function toggleAgentStatus(checkbox) {
   }
 }
 
+// 1. OPTIMIZED AGENT QUEUE (Fixes Workspace Freeze)
 function renderAgentQueue() {
     const queueDiv = document.getElementById('agent-customer-list');
     if (!queueDiv || !LOGGED_IN_AGENT) return;
     const countSpan = document.getElementById('queue-count');
-    queueDiv.innerHTML = '';
 
     const myCustomers = mockCustomers.filter(c => {
       if (activeWorkspaceQueueTab === 'pending') {
@@ -1216,8 +1214,10 @@ function renderAgentQueue() {
         return;
     }
 
-    myCustomers.forEach(c => {
-        queueDiv.innerHTML += `
+    // FAST RENDER: Build string first, only render top 100 to save memory
+    let htmlString = '';
+    myCustomers.slice(0, 100).forEach(c => {
+        htmlString += `
         <div class="bg-white/80 border border-white hover:border-brandAmber/50 hover:shadow-md p-3 rounded-lg cursor-pointer transition flex flex-col gap-1" onclick="startCall(${c.id})">
             <div class="flex justify-between items-center">
                 <button type="button" onclick="event.stopPropagation(); openCustomerDrawer(${c.id})" class="font-bold text-sm text-brandDark text-left hover:text-brandAmber transition">${escapeHtml(c.name)}</button>
@@ -1227,7 +1227,101 @@ function renderAgentQueue() {
             ${c.pendingReschedule ? '<div class="text-[11px] font-bold text-amber-700">Pending callback</div>' : ''}
         </div>`;
     });
+    
+    // Inject once
+    queueDiv.innerHTML = htmlString;
 }
+
+
+// 2. OPTIMIZED TEAM LEADER PENDING (Fixes Team Leader Freeze)
+window.renderTLPending = function() {
+    const tbody = document.getElementById('tl-pending-tbody');
+    if (!tbody) return;
+
+    const pending = window.customers.filter(c => {
+        const worked = String(c.Worked || c.worked || 'FALSE').toUpperCase();
+        return worked !== 'TRUE';
+    });
+
+    if (pending.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="px-5 py-4 text-center text-brandDark/50">No pending callbacks.</td></tr>';
+        return;
+    }
+
+    // FAST RENDER: Build string first, only render top 200
+    let htmlString = '';
+    pending.slice(0, 200).forEach(c => {
+        const name = c.Name || c.name || 'Unknown';
+        const phone = c.Phone || c.phone || '--';
+        const campaign = c.Campaign || c.campaign || '--';
+        const outcome = c.Outcome || c.outcome || '--';
+        const agent = c.AgentId || c.agentId || 'Unassigned';
+
+        htmlString += `
+            <tr class="border-b border-brandDark/5 hover:bg-slate-50/50 transition">
+                <td class="px-5 py-4 font-medium">${escapeHtml(name)}</td>
+                <td class="px-5 py-4 text-brandDark/70">${escapeHtml(phone)}</td>
+                <td class="px-5 py-4 text-brandDark/70">${escapeHtml(campaign)}</td>
+                <td class="px-5 py-4 text-brandDark/70">${escapeHtml(outcome)}</td>
+                <td class="px-5 py-4 font-medium text-brandAmber">${escapeHtml(agent)}</td>
+                <td class="px-5 py-4 text-brandDark/70">--</td>
+            </tr>
+        `;
+    });
+    
+    tbody.innerHTML = htmlString;
+};
+
+
+// 3. OPTIMIZED TEAM LEADER CUSTOMERS (Fixes All Customers Freeze)
+window.renderTLCustomers = function() {
+    const tbody = document.getElementById('tl-customers-tbody');
+    if (!tbody) return;
+    
+    const table = tbody.closest('table');
+
+    if (!mockCustomers || mockCustomers.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="10" class="px-5 py-4 text-center text-brandDark/50">No customers found in the database.</td></tr>';
+        return;
+    }
+
+    let allKeys = new Set();
+    mockCustomers.forEach(c => Object.keys(c).forEach(k => allKeys.add(k)));
+    
+    const excludeKeys = ['pendingReschedule', 'worked']; 
+    const columns = Array.from(allKeys).filter(k => !excludeKeys.includes(k));
+
+    let theadHTML = `<tr class="text-[11px] font-semibold uppercase text-brandDark/70 bg-white/90 sticky top-0 border-b border-brandDark/10">`;
+    columns.forEach(col => { 
+        theadHTML += `<th class="px-5 py-3 text-left whitespace-nowrap">${escapeHtml(col)}</th>`; 
+    });
+    theadHTML += `</tr>`;
+
+    // FAST RENDER: Only render the first 200 items in the DOM
+    let tbodyHTML = '';
+    mockCustomers.slice(0, 200).forEach(c => {
+        tbodyHTML += `<tr class="border-b border-brandDark/5 hover:bg-slate-50/50 transition">`;
+        columns.forEach(col => {
+            let val = c[col] || '--';
+            let colorClass = "text-brandDark/80";
+            if (col.toLowerCase() === 'agentid' || col.toLowerCase() === 'agentname') colorClass = "font-medium text-brandAmber";
+            if (col.toLowerCase() === 'outcome') colorClass = "font-medium text-brandDark";
+            
+            tbodyHTML += `<td class="px-5 py-4 whitespace-nowrap text-sm ${colorClass}">${escapeHtml(val)}</td>`;
+        });
+        tbodyHTML += `</tr>`;
+    });
+
+    if (table) {
+        let thead = table.querySelector('thead');
+        if (!thead) {
+            thead = document.createElement('thead');
+            table.insertBefore(thead, table.firstChild);
+        }
+        thead.innerHTML = theadHTML;
+    }
+    tbody.innerHTML = tbodyHTML;
+};
 
 function startCall(id) {
   activeCustomerId = id;
@@ -1523,7 +1617,8 @@ window.fetchAgentsData = async function() {
     try {
         const res = await fetch('/api/agents');
         if (res.ok) {
-            window.agents = await res.json();
+            const data = await res.json();
+            window.agents = Array.isArray(data) ? data : (data.agents || data.data || []);
             
             const currentPage = document.body.getAttribute('data-page');
             
@@ -1545,9 +1640,10 @@ window.fetchAgentsData = async function() {
 // 2. Fetch Customers (Used by Team Leader page)
 window.fetchCustomersData = async function() {
     try {
-        const res = await fetch('/api/customers');
+        const res = await fetch('/api/customers?limit=200');
         if (res.ok) {
-            window.customers = await res.json();
+            const data = await res.json();
+            window.customers = Array.isArray(data) ? data : (data.items || data.customers || data.data || []);
             
             const currentPage = document.body.getAttribute('data-page');
             
@@ -1585,35 +1681,6 @@ document.addEventListener('DOMContentLoaded', () => {
 // DATA RENDERING & OVERVIEW LOGIC
 // ==========================================
 
-window.renderTLCustomers = function() {
-    const tbody = document.getElementById('tl-customers-tbody');
-    if (!tbody) return;
-    tbody.innerHTML = '';
-
-    if (!mockCustomers || mockCustomers.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="5" class="px-5 py-4 text-center text-brandDark/50">No customers found.</td></tr>';
-        return;
-    }
-
-    mockCustomers.forEach(c => {
-        const name = c.name || c.Name || 'Unknown';
-        const phone = c.phone || c.Phone || '--';
-        const campaign = c.campaign || c.Campaign || '--';
-        const agent = c.agentId || c.AgentId || c.AgentName || 'Unassigned';
-        const outcome = c.outcome || c.Outcome || 'Pending';
-
-        tbody.innerHTML += `
-            <tr class="border-b border-brandDark/5 hover:bg-slate-50/50 transition">
-                <td class="px-5 py-4 font-medium">${escapeHtml(name)}</td>
-                <td class="px-5 py-4 text-brandDark/70">${escapeHtml(phone)}</td>
-                <td class="px-5 py-4 text-brandDark/70">${escapeHtml(campaign)}</td>
-                <td class="px-5 py-4 font-medium ${agent === 'Unassigned' ? 'text-red-500' : 'text-brandAmber'}">${escapeHtml(agent)}</td>
-                <td class="px-5 py-4 text-brandDark/70">${escapeHtml(outcome)}</td>
-            </tr>
-        `;
-    });
-};
-
 window.renderShiftManager = function() {
     const tbody = document.getElementById('shift-manager-tbody');
     if (!tbody) return;
@@ -1644,42 +1711,6 @@ window.renderShiftManager = function() {
     });
 };
 
-
-// --- TEAM LEADER: PENDING CALLBACKS ---
-window.renderTLPending = function() {
-    const tbody = document.getElementById('tl-pending-tbody');
-    if (!tbody) return;
-    tbody.innerHTML = '';
-
-    const pending = window.customers.filter(c => {
-        const worked = String(c.Worked || c.worked || 'FALSE').toUpperCase();
-        return worked !== 'TRUE';
-    });
-
-    if (pending.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="6" class="px-5 py-4 text-center text-brandDark/50">No pending callbacks.</td></tr>';
-        return;
-    }
-
-    pending.forEach(c => {
-        const name = c.Name || c.name || 'Unknown';
-        const phone = c.Phone || c.phone || '--';
-        const campaign = c.Campaign || c.campaign || '--';
-        const outcome = c.Outcome || c.outcome || '--';
-        const agent = c.AgentId || c.agentId || 'Unassigned';
-
-        tbody.innerHTML += `
-            <tr class="border-b border-brandDark/5 hover:bg-slate-50/50 transition">
-                <td class="px-5 py-4 font-medium">${escapeHtml(name)}</td>
-                <td class="px-5 py-4 text-brandDark/70">${escapeHtml(phone)}</td>
-                <td class="px-5 py-4 text-brandDark/70">${escapeHtml(campaign)}</td>
-                <td class="px-5 py-4 text-brandDark/70">${escapeHtml(outcome)}</td>
-                <td class="px-5 py-4 font-medium text-brandAmber">${escapeHtml(agent)}</td>
-                <td class="px-5 py-4 text-brandDark/70">--</td>
-            </tr>
-        `;
-    });
-};
 
 window.renderOverviewData = function() {
     if (currentPage !== 'overview') return;

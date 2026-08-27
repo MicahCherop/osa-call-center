@@ -1,6 +1,7 @@
 import os
 import json
-from typing import List, Optional
+import threading
+from typing import Any, Dict, List, Optional
 from fastapi import FastAPI, HTTPException, Body
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
@@ -9,6 +10,9 @@ import gspread
 from google.oauth2.service_account import Credentials
 
 app = FastAPI(title="OSA Call Center API")
+
+_sheet_cache = None
+_sheet_cache_lock = threading.Lock()
 
 # Enable CORS for Vercel Frontend
 app.add_middleware(
@@ -26,6 +30,11 @@ SCOPE = [
 
 
 def get_google_sheet():
+    global _sheet_cache
+
+    if _sheet_cache is not None:
+        return _sheet_cache
+
     creds_json = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")
     
     if not creds_json:
@@ -38,9 +47,37 @@ def get_google_sheet():
     sheet_id = os.getenv("GOOGLE_SHEET_ID", "1VmLCg_6iY0QsjPbDjgDRNugFyyNRWABtPIASGDepZeU")
     
     try:
-        return client.open_by_key(sheet_id)
+        with _sheet_cache_lock:
+            if _sheet_cache is None:
+                _sheet_cache = client.open_by_key(sheet_id)
+            return _sheet_cache
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to open sheet: {str(e)}")
+
+
+def normalize_record(record: Dict[str, Any]) -> Dict[str, Any]:
+    """Expose stable camel-case keys regardless of worksheet header casing."""
+    normalized = {}
+    for key, value in record.items():
+        if key:
+            normalized[key[0].lower() + key[1:]] = value
+    return normalized
+
+
+def records_from_rows(rows: List[List[Any]], headers: List[str]) -> List[Dict[str, Any]]:
+    return [
+        normalize_record(dict(zip(headers, row + [""] * (len(headers) - len(row)))))
+        for row in rows
+        if any(str(value).strip() for value in row)
+    ]
+
+
+def column_letter(number: int) -> str:
+    result = ""
+    while number:
+        number, remainder = divmod(number - 1, 26)
+        result = chr(65 + remainder) + result
+    return result
 
 # --- PYDANTIC SCHEMAS ---
 
@@ -140,7 +177,11 @@ def login(creds: LoginModel):
 @app.get("/api/agents")
 def get_agents():
     sheet = get_google_sheet().worksheet("Agents")
-    return sheet.get_all_records()
+    headers = sheet.row_values(1)
+    if not headers:
+        return []
+    rows = sheet.get_values(f"A2:{column_letter(len(headers))}{sheet.row_count}")
+    return records_from_rows(rows, headers)
 
 @app.post("/api/users/add")
 def add_user(user: UserCreateModel):
@@ -236,7 +277,11 @@ def update_agent_status(name: str = Body(...), status: str = Body(...)):
 @app.get("/api/campaigns")
 def get_campaigns():
     sheet = get_google_sheet().worksheet("Campaigns")
-    return sheet.get_all_records()
+    headers = sheet.row_values(1)
+    if not headers:
+        return []
+    rows = sheet.get_values(f"A2:{column_letter(len(headers))}{sheet.row_count}")
+    return records_from_rows(rows, headers)
 
 @app.post("/campaigns")
 @app.post("/api/campaigns")
@@ -270,15 +315,46 @@ def create_campaign(
 
 @app.get("/customers")
 @app.get("/api/customers")
-def get_customers(agentName: Optional[str] = None):
+def get_customers(
+    agentName: Optional[str] = None,
+    offset: int = 0,
+    limit: int = 200,
+):
+    if offset < 0 or limit < 1 or limit > 500:
+        raise HTTPException(status_code=400, detail="offset must be >= 0 and limit must be between 1 and 500")
+
     sheet = get_google_sheet().worksheet("Customers")
-    records = sheet.get_all_records()
+    headers = sheet.row_values(1)
+    if not headers:
+        return {"items": [], "offset": offset, "limit": limit, "total": 0, "hasMore": False}
+
+    end_column = column_letter(len(headers))
     if agentName:
-        records = [
-            r for r in records 
-            if str(r.get("agentId")) == agentName and str(r.get("worked")).upper() != "TRUE"
-        ]
-    return records
+        # Assigned queues are filtered in bounded chunks, never materialized at once.
+        matches = []
+        chunk_size = 5000
+        for start in range(2, sheet.row_count + 1, chunk_size):
+            end = min(start + chunk_size - 1, sheet.row_count)
+            rows = sheet.get_values(f"A{start}:{end_column}{end}")
+            for record in records_from_rows(rows, headers):
+                if str(record.get("agentId", "")).strip() == agentName and str(record.get("worked", "")).upper() != "TRUE":
+                    matches.append(record)
+        total = len(matches)
+        items = matches[offset:offset + limit]
+    else:
+        total = max(sheet.row_count - 1, 0)
+        start = offset + 2
+        end = min(start + limit - 1, sheet.row_count)
+        rows = [] if start > sheet.row_count else sheet.get_values(f"A{start}:{end_column}{end}")
+        items = records_from_rows(rows, headers)
+
+    return {
+        "items": items,
+        "offset": offset,
+        "limit": limit,
+        "total": total,
+        "hasMore": offset + len(items) < total,
+    }
 
 
 # --- ALLOCATION ENGINE ---
