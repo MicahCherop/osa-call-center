@@ -132,6 +132,32 @@ function loadUserProfile() {
             statusIndicator.style.display = 'none'; // Hide it for Admins/TLs
         }
     }
+    ensureHeaderClockControl();
+}
+
+function ensureHeaderClockControl() {
+    const logoutModal = document.getElementById('logout-modal');
+    if (!logoutModal || document.getElementById('header-clock-control')) return;
+    const signOutButton = logoutModal.querySelector('button[onclick="logout()"]');
+    const control = document.createElement('div');
+    control.id = 'header-clock-control';
+    control.className = 'px-4 py-3 border-b border-brandDark/5 bg-white';
+    control.innerHTML = `<div class="flex items-center justify-between gap-3">
+        <span id="header-clock-label" class="text-sm font-medium text-brandDark/70">Clocked Out</span>
+        <label class="relative inline-flex items-center cursor-pointer">
+          <input type="checkbox" id="header-clock-toggle" class="sr-only peer" onchange="toggleAgentStatus(this)">
+          <div class="w-11 h-6 bg-gray-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-500"></div>
+        </label>
+      </div>`;
+    if (signOutButton) logoutModal.insertBefore(control, signOutButton);
+    syncHeaderClockControl();
+}
+
+function syncHeaderClockControl() {
+    const toggle = document.getElementById('header-clock-toggle');
+    const label = document.getElementById('header-clock-label');
+    if (toggle) toggle.checked = isClockedIn;
+    if (label) label.innerText = isClockedIn ? 'Clocked In' : 'Clocked Out';
 }
 
 // 2. Toggle the logout dropdown modal
@@ -1067,6 +1093,10 @@ async function submitAddCampaign(e) {
 }
 
 async function distributeCustomers() {
+    if (CURRENT_USER_ROLE !== 'Admin') {
+        showAppAlert('Only Admin users can assign accounts.', 'Permission Denied');
+        return;
+    }
   const campEl = document.getElementById('alloc-campaign');
   const campaign = campEl ? campEl.value : '';
   if (!campaign) {
@@ -1078,7 +1108,7 @@ async function distributeCustomers() {
       const res = await fetch(`${API_BASE}/distribute`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ campaign })
+          body: JSON.stringify({ campaign, requesterRole: CURRENT_USER_ROLE })
       });
       const data = await res.json();
       
@@ -1136,6 +1166,10 @@ window.updateAvailableAgents = function() {
 // 2. Handle the form submission and distribute customers
 window.submitAllocation = function(e) {
     e.preventDefault();
+    if (CURRENT_USER_ROLE !== 'Admin') {
+        showAppAlert('Only Admin users can assign accounts.', 'Permission Denied');
+        return;
+    }
     
     const campaignSelect = document.getElementById('allocate-campaign');
     const campaign = campaignSelect ? campaignSelect.value : null;
@@ -1216,6 +1250,13 @@ function switchWorkspaceQueueTab(tab) {
 function toggleAgentStatus(checkbox) {
   isClockedIn = checkbox.checked;
     localStorage.setItem('IS_CLOCKED_IN', String(isClockedIn));
+    syncHeaderClockControl();
+    const status = isClockedIn ? 'Clocked In' : 'Clocked Out';
+    fetch(`${API_BASE}/agents/status`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: LOGGED_IN_AGENT, status })
+    }).catch(error => console.error('Failed to persist agent status:', error));
   const label = document.getElementById('clock-status-label');
   const globalText = document.getElementById('global-status-text');
   const idleMsg = document.getElementById('idle-overlay');
@@ -1895,6 +1936,10 @@ function customerColumns(customer) {
 
 async function claimNextCustomer() {
     if (!LOGGED_IN_AGENT) return;
+    if (CURRENT_USER_ROLE !== 'Admin') {
+        showAppAlert('Only Admin users can assign accounts.', 'Permission Denied');
+        return;
+    }
     const nextCustomer = mockCustomers.find(customer =>
         (!customer.agentId || customer.agentId === '') && String(customer.worked).toUpperCase() !== 'TRUE'
     );
@@ -1904,7 +1949,7 @@ async function claimNextCustomer() {
         const response = await fetch(`${API_BASE}/assign`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ customerId: Number(nextCustomer.id), agentName: LOGGED_IN_AGENT })
+            body: JSON.stringify({ customerId: Number(nextCustomer.id), agentName: LOGGED_IN_AGENT, requesterRole: CURRENT_USER_ROLE })
         });
         if (!response.ok) throw new Error(`Status ${response.status}`);
         nextCustomer.agentId = LOGGED_IN_AGENT;

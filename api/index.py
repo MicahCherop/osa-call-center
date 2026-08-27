@@ -126,6 +126,8 @@ def get_or_create_category_sheet(spreadsheet, category: str):
     headers = CATEGORY_HEADERS.get(title, CUSTOMER_HEADERS)
     try:
         worksheet = spreadsheet.worksheet(title)
+        if worksheet.col_count < len(headers):
+            worksheet.resize(cols=len(headers))
         if worksheet.row_values(1) != headers:
             worksheet.update("A1", [headers])
         return worksheet
@@ -133,6 +135,8 @@ def get_or_create_category_sheet(spreadsheet, category: str):
         with _category_sheet_lock:
             try:
                 worksheet = spreadsheet.worksheet(title)
+                if worksheet.col_count < len(headers):
+                    worksheet.resize(cols=len(headers))
                 if worksheet.row_values(1) != headers:
                     worksheet.update("A1", [headers])
                 return worksheet
@@ -147,6 +151,8 @@ def get_or_create_category_sheet(spreadsheet, category: str):
 
 
 def ensure_customer_headers(worksheet) -> None:
+    if worksheet.col_count < len(CUSTOMER_HEADERS):
+        worksheet.resize(cols=len(CUSTOMER_HEADERS))
     headers = worksheet.row_values(1)
     missing = [header for header in CUSTOMER_HEADERS if header not in headers]
     for index, header in enumerate(missing, start=len(headers) + 1):
@@ -185,6 +191,7 @@ class DispositionModel(BaseModel):
 class CustomerAssignModel(BaseModel):
     customerId: int
     agentName: str
+    requesterRole: str = ""
 
 class CustomerUploadModel(BaseModel):
     id: int
@@ -497,6 +504,8 @@ def get_customers(
 @app.post("/assign")
 @app.post("/api/assign")
 def assign_customer(assignment: CustomerAssignModel):
+    if assignment.requesterRole.strip().lower() != "admin":
+        raise HTTPException(status_code=403, detail="Only Admin users can assign accounts")
     sheet = get_google_sheet().worksheet("Customers")
     cell = sheet.find(str(assignment.customerId))
     headers = sheet.row_values(1)
@@ -517,7 +526,9 @@ def assign_customer(assignment: CustomerAssignModel):
 # --- ALLOCATION ENGINE ---
 @app.post("/distribute")
 @app.post("/api/distribute")
-def distribute_customers(campaign: str = Body(...)):
+def distribute_customers(campaign: str = Body(...), requesterRole: str = Body("")):
+    if requesterRole.strip().lower() != "admin":
+        raise HTTPException(status_code=403, detail="Only Admin users can assign accounts")
     sh = get_google_sheet()
     cust_sheet = sh.worksheet("Customers")
     agent_sheet = sh.worksheet("Agents")
