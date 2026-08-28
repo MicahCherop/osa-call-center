@@ -2113,6 +2113,7 @@ async function claimNextCustomer() {
         return;
     }
     const nextCustomer = mockCustomers.find(customer =>
+        String(customer.id ?? '').trim() &&
         (!customer.agentId || customer.agentId === '') && String(customer.worked).toUpperCase() !== 'TRUE'
     );
     if (!nextCustomer) return;
@@ -2121,9 +2122,12 @@ async function claimNextCustomer() {
         const response = await fetch(`${API_BASE}/assign`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ customerId: Number(nextCustomer.id), agentName: LOGGED_IN_AGENT, requesterRole: CURRENT_USER_ROLE })
+            body: JSON.stringify({ customerId: String(nextCustomer.id ?? '').trim(), agentName: LOGGED_IN_AGENT, requesterRole: CURRENT_USER_ROLE })
         });
-        if (!response.ok) throw new Error(`Status ${response.status}`);
+        if (!response.ok) {
+            const errorBody = await response.json().catch(() => ({}));
+            throw new Error(errorBody.detail || `Status ${response.status}`);
+        }
         nextCustomer.agentId = LOGGED_IN_AGENT;
         renderAgentQueue();
     } catch (error) {

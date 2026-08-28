@@ -245,7 +245,7 @@ class DispositionModel(BaseModel):
 
 
 class CustomerAssignModel(BaseModel):
-    customerId: int
+    customerId: str
     agentName: str
     requesterRole: str = ""
 
@@ -365,7 +365,10 @@ def get_agents():
         if not headers:
             return []
         rows = sheet.get_values(f"A2:{column_letter(len(headers))}{sheet.row_count}")
-        return records_from_rows(rows, headers)
+        records = records_from_rows(rows, headers)
+        for record in records:
+            record.pop("password", None)
+        return records
     except HTTPException:
         raise
     except Exception as error:
@@ -630,7 +633,7 @@ def find_customer_location(spreadsheet, customer_id: int):
             continue
     for sheet in sheets:
         try:
-            cell = sheet.find(str(customer_id))
+            cell = sheet.find(str(customer_id).strip())
             return sheet, cell
         except gspread.exceptions.CellNotFound:
             continue
