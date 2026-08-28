@@ -339,23 +339,25 @@
                   <select required class="glass-input rounded-lg w-full px-3 py-2 text-sm font-normal" id="disp-outcome" onchange="handleOutcomeChangeGlass()">
                     <option value="">Select outcome...</option>
                     <option value="Answered">Answered</option>
-                    <option value="Unanswered">Unanswered</option>
+                    <option value="Not Answered">Not Answered</option>
                     <option value="Offline">Offline</option>
-                    <option value="Third party">Third party</option>
-                    <option value="Voicemail">Voicemail</option>
+                    <option value="Number Busy">Number Busy</option>
+                    <option value="Third Party">Third Party</option>
                   </select>
                 </div>
 
                 <!-- DYNAMIC CONDITIONAL: Customer Response -->
                 <div id="container-customer-response" class="hidden">
                   <label class="block text-[11px] font-semibold text-brandDark/60 uppercase mb-1.5">Customer Response *</label>
-                  <select class="glass-input rounded-lg w-full px-3 py-2 text-sm font-normal" id="disp-response" onchange="handleOutcomeChangeGlass()">
-                    <option value="">Select response...</option>
-                    <option value="Interested">Interested</option>
-                    <option value="Interested Later">Interested Later</option>
-                    <option value="Not Interested">Not Interested</option>
-                    <option value="Needs Visit">Needs Visit</option>
-                  </select>
+                  <div class="flex gap-2">
+                    <select class="glass-input rounded-lg flex-1 px-3 py-2 text-sm font-normal" id="disp-response" onchange="handleOutcomeChangeGlass()">
+                      <option value="">Select response...</option>
+                      <option value="Interested">Interested</option>
+                      <option value="Interested Later">Interested Later</option>
+                      <option value="Not Interested">Not Interested</option>
+                    </select>
+                    <button type="button" onclick="addCustomOption('disp-response')" class="bg-brandAmber/10 hover:bg-brandAmber/20 text-brandAmber px-3 rounded-lg font-medium transition text-lg leading-none flex items-center justify-center ease-in">+</button>
+                  </div>
                 </div>
 
                 <!-- DYNAMIC CONDITIONAL: Account Status -->
@@ -374,7 +376,7 @@
                 </div>
 
                 <!-- Business Status -->
-                <div>
+                <div id="container-business-status" class="hidden">
                   <label class="block text-[11px] font-semibold text-brandDark/60 uppercase mb-1.5">Business Status</label>
                   <div class="flex gap-2">
                     <select class="glass-input rounded-lg flex-1 px-3 py-2 text-sm font-normal" id="disp-business">
@@ -393,6 +395,10 @@
                   <div>
                     <label class="block text-[11px] font-semibold text-brandDark/60 uppercase mb-1.5">Amount (Sh) *</label>
                     <input type="number" id="input-amount" placeholder="e.g. 5000" class="glass-input rounded-lg w-full px-3 py-2 text-sm font-normal">
+                  </div>
+                  <div>
+                    <label class="block text-[11px] font-semibold text-brandDark/60 uppercase mb-1.5">PTP Time *</label>
+                    <input type="datetime-local" id="input-ptp-time" class="glass-input rounded-lg w-full px-3 py-2 text-sm font-normal">
                   </div>
                 </div>
 

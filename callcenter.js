@@ -23,6 +23,47 @@ let agents = readCachedArray('CALLCENTER_AGENTS_CACHE');
 let campaignRecords = readCachedArray('CALLCENTER_CAMPAIGNS_CACHE');
 let globalStats = { totalCalls: 0, connected: 0, recovered: 0, outcomes: {} };
 
+function agentName(agent) {
+    return String(agent?.name || agent?.Name || '').trim();
+}
+
+function agentIsClockedIn(agent) {
+    const status = String(agent?.status || agent?.Status || '').trim().toLowerCase();
+    return status === 'clocked in' || status === 'online';
+}
+
+function agentHasCampaign(agent) {
+    const name = agentName(agent);
+    return (mockCustomers || []).some(customer => {
+        const assignedAgent = String(customer.agentId || customer.AgentId || customer.assignedAgent || '').trim();
+        return assignedAgent === name && String(customer.campaign || customer.Campaign || '').trim();
+    });
+}
+
+function getControlAgentState(agent) {
+    if (!agentIsClockedIn(agent)) return 'Offline';
+    return agentHasCampaign(agent) ? 'Online (On Call)' : 'Idle';
+}
+
+function agentCampaign(agent) {
+    const explicitCampaign = agent?.campaign || agent?.Campaign || agent?.currentCampaign;
+    if (explicitCampaign) return String(explicitCampaign).trim();
+    const name = agentName(agent);
+    return (mockCustomers || []).find(customer => {
+        const assignedAgent = String(customer.agentId || customer.AgentId || customer.assignedAgent || '').trim();
+        return assignedAgent === name && String(customer.campaign || customer.Campaign || '').trim();
+    })?.campaign || '';
+}
+
+function normalizeCampaignType(value) {
+    const type = String(value || '').trim().toLowerCase().replace(/[_-]+/g, ' ');
+    if (type === 'active no loan' || type === 'active no loans' || type === 'active with no loan' || type === 'active with no loans') return 'active_no_loan';
+    if (type === 'upcoming due' || type === 'upcoming dues') return 'upcoming_dues';
+    if (type === 'defaulted' || type === 'defaulters' || type === 'defaulted customers') return 'defaulted';
+    if (type === 'dormant') return 'dormant';
+    return type.replace(/\s+/g, '_');
+}
+
 function rebuildCampaignConfigs() {
     campaignConfigs = {};
     campaignRecords = campaignRecords.map(normalizeCampaignRecord).filter(campaign => campaign.name);
@@ -961,10 +1002,11 @@ async function submitDisposition(e) {
   
   const outcome = document.getElementById('disp-outcome').value;
   const activeCustomer = mockCustomers.find(x => x.id === activeCustomerId);
-  const campType = campaignConfigs[activeCustomer?.campaign] || 'defaulted';
+    const campType = normalizeCampaignType(campaignConfigs[activeCustomer?.campaign] || 'defaulted');
   
   let dispositionSaved = '';
   let amountRec = 0;
+    let ptpTime = document.getElementById('input-ptp-time')?.value || '';
   let comments = document.getElementById('disp-comments')?.value.trim() || '';
   let businessStatus = document.getElementById('disp-business')?.value || '';
   
@@ -982,6 +1024,7 @@ async function submitDisposition(e) {
       outcome: outcome,
       status: dispositionSaved,
       amountRec: amountRec,
+    ptpTime: ptpTime,
       agentName: LOGGED_IN_AGENT,
       comments: comments,
       businessStatus: businessStatus
@@ -1202,13 +1245,11 @@ window.updateAvailableAgents = function() {
     // Find all Control Agents safely handling case-sensitivity
     const controlAgents = agents.filter(a => {
         const role = String(a.Role || a.role || '').trim().toLowerCase();
-        const status = String(a.Status || a.status || '').trim().toLowerCase();
-        const campaign = a.Campaign || a.campaign || a.currentCampaign || '';
-        return role === 'control agent' && ['clocked in', 'online'].includes(status) && !String(campaign).trim();
+        return role === 'control agent' && agentIsClockedIn(a) && !agentHasCampaign(a);
     });
 
     if (controlAgents.length === 0) {
-        agentsContainer.innerHTML = '<p class="text-[13px] text-red-500 font-bold p-3">No Control Agents found in the database.</p>';
+        agentsContainer.innerHTML = '<p class="text-[13px] text-red-500 font-bold p-3">No Active Control Agents available.</p>';
         return;
     }
 
@@ -1535,7 +1576,7 @@ function startCall(id) {
   const form = document.getElementById('disposition-form');
   if (form) form.reset();
   
-  const campType = campaignConfigs[c.campaign] || 'defaulted'; 
+    const campType = normalizeCampaignType(campaignConfigs[c.campaign] || 'defaulted');
   const resContainer = document.getElementById('container-customer-response');
   const statContainer = document.getElementById('container-account-status');
   
@@ -1562,28 +1603,37 @@ function handleOutcomeChangeGlass() {
   const amtContainer = document.getElementById('dynamic-amount');
   const amtInput = document.getElementById('input-amount');
   const responseInput = document.getElementById('disp-response');
+    const responseContainer = document.getElementById('container-customer-response');
+    const businessContainer = document.getElementById('container-business-status');
+    const accountContainer = document.getElementById('container-account-status');
+    const ptpTimeInput = document.getElementById('input-ptp-time');
   const activeCustomer = mockCustomers.find(x => x.id === activeCustomerId);
-  const campType = campaignConfigs[activeCustomer?.campaign] || 'defaulted';
+    const campType = normalizeCampaignType(campaignConfigs[activeCustomer?.campaign] || 'defaulted');
 
   const status = statusEl ? statusEl.value : '';
   const outcome = outcomeEl ? outcomeEl.value : '';
 
-  const needsAnsweredDisposition = !outcome || outcome === 'Answered';
-  if (responseInput && (campType === 'active_no_loan' || campType === 'dormant')) {
-    responseInput.required = needsAnsweredDisposition;
-  } else if (statusEl) {
-    statusEl.required = needsAnsweredDisposition;
-  }
+    const isAnswered = outcome === 'Answered';
+    const isCustomerResponseCampaign = campType === 'active_no_loan' || campType === 'dormant';
+    const isPtpCampaign = campType === 'defaulted' || campType === 'upcoming_dues';
+    responseContainer?.classList.toggle('hidden', !isAnswered || !isCustomerResponseCampaign);
+    businessContainer?.classList.toggle('hidden', !isAnswered);
+    accountContainer?.classList.toggle('hidden', !isAnswered || !isPtpCampaign);
+    if (responseInput) responseInput.required = isAnswered && isCustomerResponseCampaign;
+    if (statusEl) statusEl.required = isAnswered && isPtpCampaign;
   
   if (amtContainer && amtInput) {
-    if (needsAnsweredDisposition && (status === 'Promise to Pay (PTP)' || status === 'Settled')) {
+    const needsPtpDetails = isAnswered && isPtpCampaign && status === 'Promise to Pay (PTP)';
+    if (needsPtpDetails) {
       amtContainer.classList.remove('hidden');
             amtContainer.classList.add('flex');
       amtInput.required = true;
+            if (ptpTimeInput) ptpTimeInput.required = true;
     } else {
       amtContainer.classList.add('hidden');
             amtContainer.classList.remove('flex');
       amtInput.required = false;
+    if (ptpTimeInput) ptpTimeInput.required = false;
     }
   }
 }
@@ -1896,11 +1946,10 @@ window.renderShiftManager = function() {
     visibleAgents.forEach(a => {
         const name = a.name || a.Name || 'Unknown';
         const role = a.role || a.Role || '--';
-        const rawStatus = String(a.status || a.Status || '').trim().toLowerCase();
-        const status = rawStatus === 'clocked in' || rawStatus === 'online' ? 'Active' : 'Offline';
-        const campaign = a.campaign || a.Campaign || 'None';
+        const status = role.toLowerCase() === 'control agent' ? getControlAgentState(a) : 'Offline';
+        const campaign = agentCampaign(a) || 'None';
         
-        let statusColor = status.toLowerCase() === 'active' ? 'text-green-500' : 'text-gray-400';
+        let statusColor = status === 'Online (On Call)' ? 'text-green-500' : status === 'Idle' ? 'text-amber-500' : 'text-gray-400';
 
         tbody.innerHTML += `
             <tr class="border-b border-brandDark/5 hover:bg-slate-50/50 transition">
@@ -1923,21 +1972,15 @@ window.renderOverviewData = function() {
         const role = String(a.Role || a.role || '').trim().toLowerCase();
         return role === 'control agent';
     });
-    const activeAgents = controlAgents.filter(a => {
-        const status = String(a.Status || a.status || '').trim().toLowerCase();
-        return status === 'clocked in' || status === 'online';
-    });
+    const onCallAgents = controlAgents.filter(agent => getControlAgentState(agent) === 'Online (On Call)');
     const onlineEl = document.getElementById('ov-online-count');
-    if (onlineEl) onlineEl.innerText = activeAgents.length;
+    if (onlineEl) onlineEl.innerText = onCallAgents.length;
 
     const idleEl = document.getElementById('ov-idle-pulse-count');
     const offlineEl = document.getElementById('ov-offline-count');
-    const idleAgents = controlAgents.filter(agent => {
-        const status = String(agent.Status || agent.status || '').trim().toLowerCase();
-        return status === 'idle' || status === 'waiting';
-    });
+    const idleAgents = controlAgents.filter(agent => getControlAgentState(agent) === 'Idle');
     if (idleEl) idleEl.innerText = idleAgents.length;
-    if (offlineEl) offlineEl.innerText = Math.max(controlAgents.length - activeAgents.length - idleAgents.length, 0);
+    if (offlineEl) offlineEl.innerText = Math.max(controlAgents.length - onCallAgents.length - idleAgents.length, 0);
 
     // Bottlenecks: Count unassigned leads
     const unassigned = (mockCustomers || []).filter(c => {
@@ -1958,15 +2001,12 @@ window.renderOverviewData = function() {
         productivityBody.innerHTML = controlAgents.map(agent => {
             const name = agent.name || agent.Name || 'Unknown';
             const role = agent.role || agent.Role || '--';
-            const rawStatus = String(agent.status || agent.Status || '').trim().toLowerCase();
-            const status = rawStatus === 'idle' || rawStatus === 'waiting'
-                ? 'Idle'
-                : activeAgents.includes(agent) ? 'Active' : 'Offline';
+            const status = getControlAgentState(agent);
             const calls = Number(agent.callsMade || agent.CallsMade || 0);
             const connected = Number(agent.connected || agent.Connected || 0);
             const recovered = Number(agent.conversion || agent.Conversion || 0);
             const rate = calls ? Math.round((connected / calls) * 100) : 0;
-            const statusClass = status.toLowerCase() === 'active' || status.toLowerCase() === 'clocked in' ? 'text-green-600' : 'text-brandDark/50';
+            const statusClass = status === 'Online (On Call)' ? 'text-green-600' : status === 'Idle' ? 'text-amber-600' : 'text-brandDark/50';
             return `<tr class="border-b border-brandDark/5 hover:bg-white/40 transition">
                 <td class="px-6 py-4 font-medium">${escapeHtml(name)}</td>
                 <td class="px-6 py-4">${escapeHtml(role)}</td>

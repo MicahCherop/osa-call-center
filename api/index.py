@@ -106,7 +106,7 @@ def column_letter(number: int) -> str:
 CUSTOMER_HEADERS = [
     "id", "name", "phone", "branch", "sector", "balance", "campaign",
     "agentId", "worked", "outcome", "status", "dueDate",
-    "pair", "disbAmount", "totalPaid"
+    "pair", "disbAmount", "totalPaid", "businessStatus", "ptpAmount", "ptpTime"
 ]
 
 CATEGORY_HEADERS = {
@@ -228,6 +228,7 @@ class DispositionModel(BaseModel):
     agentName: str
     comments: str = ""
     businessStatus: str = ""
+    ptpTime: str = ""
 
 
 class CustomerAssignModel(BaseModel):
@@ -500,7 +501,7 @@ def create_campaign(
         campaign_sheet = get_or_create_campaign_sheet(sh, name)
         rows = [[
             c.id, c.name, c.phone, c.branch, c.sector, c.balance, name, "", "FALSE", "", "",
-            c.dueDate, c.branch, c.branch, c.pair, c.disbAmount, c.totalPaid,
+            c.dueDate, c.pair, c.disbAmount, c.totalPaid, "", "", "",
         ] for c in customers]
 
         if rows:
@@ -724,10 +725,16 @@ def distribute_customers(distribution: DistributionModel):
     customers = [normalize_record(record) for record in cust_sheet.get_all_records()]
     headers = cust_sheet.row_values(1)
     agent_column = next((index + 1 for index, header in enumerate(headers) if str(header).strip().lower() in {"agentid", "assignedagent", "agent"}), 8)
+    assigned_agents = {
+        str(customer.get("agentId", "")).strip()
+        for customer in read_customer_records(sh)
+        if str(customer.get("agentId", "")).strip()
+        and str(customer.get("campaign", "")).strip()
+    }
     agents = [normalize_record(record) for record in agent_sheet.get_all_records()
         if str(record.get("status", record.get("Status", ""))).strip().lower() in {"clocked in", "online"}
         and str(record.get("role", record.get("Role", ""))).strip().lower() == "control agent"
-        and not str(record.get("campaign", record.get("Campaign", ""))).strip()
+        and str(record.get("name", record.get("Name", ""))).strip() not in assigned_agents
         and record.get("name", record.get("Name")) in distribution.selectedAgents]
     
     if not agents:
@@ -772,7 +779,7 @@ def submit_disposition(disp: DispositionModel):
         headers = cust_sheet.row_values(1)
         columns = {str(header).strip().lower(): index + 1 for index, header in enumerate(headers)}
         customer_updates = []
-        for key, value in (("worked", "TRUE"), ("outcome", disp.outcome), ("status", disp.status)):
+        for key, value in (("worked", "TRUE"), ("outcome", disp.outcome), ("status", disp.status), ("businessstatus", disp.businessStatus), ("ptpamount", disp.amountRec), ("ptptime", disp.ptpTime)):
             column = columns.get(key)
             if column:
                 customer_updates.append(gspread.Cell(r, column, value))
