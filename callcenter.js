@@ -1922,9 +1922,21 @@ window.renderOverviewData = function() {
         const role = String(a.Role || a.role || '').trim().toLowerCase();
         return role === 'control agent';
     });
-    const activeAgents = controlAgents.filter(a => String(a.Status || a.status).toLowerCase() === 'active');
+    const activeAgents = controlAgents.filter(a => {
+        const status = String(a.Status || a.status || '').trim().toLowerCase();
+        return status === 'active' || status === 'clocked in' || status === 'online';
+    });
     const onlineEl = document.getElementById('ov-online-count');
     if (onlineEl) onlineEl.innerText = activeAgents.length;
+
+    const idleEl = document.getElementById('ov-idle-pulse-count');
+    const offlineEl = document.getElementById('ov-offline-count');
+    const idleAgents = controlAgents.filter(agent => {
+        const status = String(agent.Status || agent.status || '').trim().toLowerCase();
+        return status === 'idle' || status === 'waiting';
+    });
+    if (idleEl) idleEl.innerText = idleAgents.length;
+    if (offlineEl) offlineEl.innerText = Math.max(controlAgents.length - activeAgents.length - idleAgents.length, 0);
 
     // Bottlenecks: Count unassigned leads
     const unassigned = (mockCustomers || []).filter(c => {
@@ -1945,7 +1957,10 @@ window.renderOverviewData = function() {
         productivityBody.innerHTML = controlAgents.map(agent => {
             const name = agent.name || agent.Name || 'Unknown';
             const role = agent.role || agent.Role || '--';
-            const status = agent.status || agent.Status || 'Offline';
+            const rawStatus = String(agent.status || agent.Status || '').trim().toLowerCase();
+            const status = rawStatus === 'idle' || rawStatus === 'waiting'
+                ? 'Idle'
+                : activeAgents.includes(agent) ? 'Active' : 'Offline';
             const calls = Number(agent.callsMade || agent.CallsMade || 0);
             const connected = Number(agent.connected || agent.Connected || 0);
             const recovered = Number(agent.conversion || agent.Conversion || 0);
@@ -1961,6 +1976,36 @@ window.renderOverviewData = function() {
                 <td class="px-6 py-4 text-right font-medium">${recovered.toLocaleString()}</td>
             </tr>`;
         }).join('');
+    }
+
+    const campaignsBody = document.getElementById('ov-campaigns-list');
+    if (campaignsBody) {
+        const campaignNames = campaignRecords
+            .map(campaign => normalizeCampaignRecord(campaign).name)
+            .filter(Boolean);
+        const campaignProgress = campaignNames.map(name => {
+            const customers = (mockCustomers || []).filter(customer => String(customer.campaign || '').trim() === name);
+            const completed = customers.filter(customer => String(customer.worked || '').toUpperCase() === 'TRUE').length;
+            const total = customers.length;
+            const percent = total ? Math.round((completed / total) * 100) : 0;
+            return { name, total, completed, remaining: Math.max(total - completed, 0), percent };
+        });
+        campaignsBody.innerHTML = campaignProgress.length
+            ? campaignProgress.map(progress => `
+                <div>
+                    <div class="flex items-center justify-between gap-4 mb-2">
+                        <span class="text-sm font-medium text-brandDark truncate">${escapeHtml(progress.name)}</span>
+                        <span class="text-xs font-medium text-brandDark/60 shrink-0">${progress.completed}/${progress.total} calls</span>
+                    </div>
+                    <div class="w-full bg-slate-100 rounded-full h-2.5">
+                        <div class="bg-brandAmber h-2.5 rounded-full transition-all duration-500" style="width: ${progress.percent}%"></div>
+                    </div>
+                    <div class="flex justify-between mt-1.5 text-[11px] text-brandDark/50">
+                        <span>${progress.percent}% complete</span>
+                        <span>${progress.remaining} remaining</span>
+                    </div>
+                </div>`).join('')
+            : '<p class="text-sm text-brandDark/50 italic py-2">No campaigns found.</p>';
     }
 };
 

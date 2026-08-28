@@ -306,12 +306,17 @@ def login(creds: LoginModel):
 @app.get("/agents")
 @app.get("/api/agents")
 def get_agents():
-    sheet = get_google_sheet().worksheet("Agents")
-    headers = sheet.row_values(1)
-    if not headers:
-        return []
-    rows = sheet.get_values(f"A2:{column_letter(len(headers))}{sheet.row_count}")
-    return records_from_rows(rows, headers)
+    try:
+        sheet = get_google_sheet().worksheet("Agents")
+        headers = sheet.row_values(1)
+        if not headers:
+            return []
+        rows = sheet.get_values(f"A2:{column_letter(len(headers))}{sheet.row_count}")
+        return records_from_rows(rows, headers)
+    except HTTPException:
+        raise
+    except Exception as error:
+        raise HTTPException(status_code=503, detail=f"Google Sheets connection failed: {error}")
 
 @app.post("/api/users/add")
 def add_user(user: UserCreateModel):
@@ -395,8 +400,9 @@ def update_agent_status(name: str = Body(...), status: str = Body(...)):
         cell = sheet.find(name)
         if not cell:
             raise HTTPException(status_code=404, detail="Agent not found")
-        # Ensure your status column is correctly mapped (using Col 1 as standard, change if your sheet differs)
-        sheet.update_cell(cell.row, 1, status) 
+        headers = sheet.row_values(1)
+        status_column = next((index + 1 for index, header in enumerate(headers) if str(header).strip().lower() in {"status", "agentstatus", "shiftstatus"}), 1)
+        sheet.update_cell(cell.row, status_column, status)
         return {"status": "success"}
     except gspread.exceptions.CellNotFound:
         raise HTTPException(status_code=404, detail="Agent not found in database")
