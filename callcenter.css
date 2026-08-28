@@ -193,6 +193,10 @@ html.dark .text-brandDark\/70 { color: #eef4fb !important; }
 html.dark .text-brandDark\/60 { color: var(--dark-text-soft) !important; }
 html.dark .text-brandDark\/50,
 html.dark .text-brandDark\/40 { color: var(--dark-text-muted) !important; }
+html.dark #header-user-name,
+html.dark #header-user-role { color: #f8fafc !important; }
+html.dark #header-user-role { color: #d7e0ec !important; }
+html.dark .dark-mode-toggle + div { background-color: #fbbf24 !important; }
 
 html.dark .text-brandAmber,
 html.dark .hover\:text-brandAmber:hover { color: var(--dark-amber) !important; }
@@ -251,6 +255,10 @@ html.dark .bg-brandDark { background-color: #f8fafc !important; color: #0b1220 !
 html.dark .hover\:bg-slate-800:hover { background-color: #fbbf24 !important; color: #0b1220 !important; }
 html.dark ::-webkit-scrollbar-thumb { background: rgba(203, 213, 225, 0.28); }
 html.dark ::-webkit-scrollbar-thumb:hover { background: rgba(251, 191, 36, 0.58); }
+
+.dark-mode-toggle + div { transition: background-color 0.2s ease, box-shadow 0.2s ease; }
+.dark-mode-toggle + div::after { content: ''; position: absolute; left: 2px; top: 2px; width: 20px; height: 20px; border-radius: 9999px; background: #fff; box-shadow: 0 1px 3px rgba(15, 23, 42, 0.25); transition: transform 0.2s ease; }
+.dark-mode-toggle:checked + div::after { transform: translateX(20px); }
 
 /* ==========================================
    RESPONSIVE APP LAYOUT & TYPE RHYTHM

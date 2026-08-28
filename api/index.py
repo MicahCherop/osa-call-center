@@ -16,6 +16,8 @@ app = FastAPI(title="OSA Call Center API")
 _sheet_cache = None
 _sheet_cache_lock = threading.Lock()
 _category_sheet_lock = threading.Lock()
+_campaign_registry_cache = None
+_campaign_sheet_cache = {}
 _customer_queue_cache = {}
 _customer_queue_cache_lock = threading.Lock()
 
@@ -202,13 +204,17 @@ def campaign_sheet_name(campaign: str) -> str:
 
 
 def get_or_create_campaign_sheet(spreadsheet, campaign: str):
+    global _campaign_sheet_cache
     title = campaign_sheet_name(campaign)
+    if title in _campaign_sheet_cache:
+        return _campaign_sheet_cache[title]
     try:
         worksheet = spreadsheet.worksheet(title)
         if worksheet.col_count < len(CUSTOMER_HEADERS):
             worksheet.resize(cols=len(CUSTOMER_HEADERS))
         if worksheet.row_values(1) != CUSTOMER_HEADERS:
             worksheet.update("A1", [CUSTOMER_HEADERS])
+        _campaign_sheet_cache[title] = worksheet
         return worksheet
     except gspread.exceptions.WorksheetNotFound:
         with _category_sheet_lock:
@@ -218,23 +224,30 @@ def get_or_create_campaign_sheet(spreadsheet, campaign: str):
                     worksheet.resize(cols=len(CUSTOMER_HEADERS))
                 if worksheet.row_values(1) != CUSTOMER_HEADERS:
                     worksheet.update("A1", [CUSTOMER_HEADERS])
+                _campaign_sheet_cache[title] = worksheet
                 return worksheet
             except gspread.exceptions.WorksheetNotFound:
                 worksheet = spreadsheet.add_worksheet(title=title, rows=1000, cols=len(CUSTOMER_HEADERS))
                 worksheet.append_row(CUSTOMER_HEADERS)
+                _campaign_sheet_cache[title] = worksheet
                 return worksheet
 
 
 def get_or_create_campaign_registry(spreadsheet):
+    global _campaign_registry_cache
     headers = ["name", "type", "priority", "startDate", "endDate"]
+    if _campaign_registry_cache is not None:
+        return _campaign_registry_cache
     try:
         worksheet = spreadsheet.worksheet("Campaigns")
         if not worksheet.row_values(1):
             worksheet.update("A1", [headers])
+        _campaign_registry_cache = worksheet
         return worksheet
     except gspread.exceptions.WorksheetNotFound:
         worksheet = spreadsheet.add_worksheet(title="Campaigns", rows=100, cols=len(headers))
         worksheet.append_row(headers)
+        _campaign_registry_cache = worksheet
         return worksheet
 
 
@@ -535,17 +548,20 @@ def create_campaign(
     priority: str = Body(...), 
     startDate: str = Body(...), 
     endDate: str = Body(...), 
-    customers: List[CustomerUploadModel] = Body(...)
+    customers: List[CustomerUploadModel] = Body(...),
+    chunkIndex: int = Body(0)
 ):
+    if len(customers) > 2000:
+        raise HTTPException(status_code=413, detail="Each upload request may contain at most 2,000 accounts")
     stage = "Google Sheets connection"
     try:
         sh = get_google_sheet()
-        stage = "campaign registry"
-        camp_sheet = get_or_create_campaign_registry(sh)
-        existing_campaigns = camp_sheet.col_values(1)
-
-        if name not in existing_campaigns:
-            camp_sheet.append_row([name, type, priority, startDate, endDate])
+        if chunkIndex == 0:
+            stage = "campaign registry"
+            camp_sheet = get_or_create_campaign_registry(sh)
+            if not campaign_registry_has_name(camp_sheet, name):
+                camp_sheet.append_row([name, type, priority, startDate, endDate])
+                campaign_registry_has_name.names.add(name)
 
         stage = "campaign worksheet"
         campaign_sheet = get_or_create_campaign_sheet(sh, name)
@@ -570,6 +586,14 @@ def create_campaign(
     except Exception as error:
         print(f"Campaign upload failed during {stage}: {error}")
         raise HTTPException(status_code=503, detail=f"Campaign upload failed during {stage}: {error}")
+
+
+def campaign_registry_has_name(worksheet, campaign_name: str) -> bool:
+    names = getattr(campaign_registry_has_name, "names", None)
+    if names is None:
+        names = {str(value).strip() for value in worksheet.col_values(1) if str(value).strip()}
+        campaign_registry_has_name.names = names
+    return campaign_name in names
 
 
 def read_customer_records(spreadsheet) -> List[Dict[str, Any]]:

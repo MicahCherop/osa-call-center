@@ -21,7 +21,7 @@
   </div>
 
   <!-- EDIT USER MODAL -->
-  <div id="edit-user-modal-backdrop" class="fixed inset-0 app-modal-backdrop z-50 hidden transition-opacity duration-300 opacity-0 flex items-center justify-center" onclick="closeEditUserModal(event)">
+  <div id="edit-user-modal-backdrop" class="fixed inset-0 app-modal-backdrop z-50 hidden transition-opacity duration-300 opacity-0 items-center justify-center" onclick="closeEditUserModal(event)">
     <div id="edit-user-modal" class="glass-panel w-full max-w-md rounded-2xl p-6 app-modal-card relative shadow-2xl flex flex-col" onclick="event.stopPropagation()">
       <div class="flex justify-between items-center mb-6 border-b border-brandDark/5 pb-4">
         <h2 class="text-xl font-medium flex items-center gap-2"><i class="fa-solid fa-user-pen text-brandAmber"></i> Edit User</h2>
@@ -62,9 +62,10 @@
     
     <div class="flex items-center gap-5 text-sm">
       <button class="text-brandDark/60 hover:text-brandAmber transition"><i class="fa-regular fa-bell text-lg"></i></button>
-      <button onclick="toggleDarkMode()" class="text-brandDark/60 hover:text-brandAmber transition ml-3" title="Toggle Dark Mode">
-          <i class="fa-solid fa-moon text-lg"></i>
-      </button>      
+      <label class="relative inline-flex items-center cursor-pointer ml-3" title="Toggle Dark Mode">
+        <input type="checkbox" class="dark-mode-toggle sr-only peer" onchange="toggleDarkMode(this.checked)">
+        <div class="relative w-11 h-6 rounded-full bg-slate-300 peer-checked:bg-brandAmber"></div>
+      </label>
       <div class="flex items-center gap-3 pl-4 border-l border-brandDark/10">
         <div class="relative">
           <button onclick="toggleLogoutModal()" class="flex items-center gap-3 hover:bg-slate-50 p-1.5 rounded-lg transition text-left outline-none">

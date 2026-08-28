@@ -1,5 +1,46 @@
 ﻿// --- FRONTEND API INTEGRATION ---
 const API_BASE = `${window.location.origin}/api`;
+const API_CACHE_TTL = 30000;
+const API_CACHE_PREFIX = 'CALLCENTER_API_CACHE_';
+
+function apiCacheKey(url) {
+    return `${API_CACHE_PREFIX}${url}`;
+}
+
+function readApiCache(url) {
+    try {
+        const cached = JSON.parse(localStorage.getItem(apiCacheKey(url)) || 'null');
+        if (!cached || Date.now() - cached.timestamp > API_CACHE_TTL) return null;
+        return cached.data;
+    } catch {
+        return null;
+    }
+}
+
+function writeApiCache(url, data) {
+    try {
+        localStorage.setItem(apiCacheKey(url), JSON.stringify({ timestamp: Date.now(), data }));
+    } catch (error) {
+        console.warn('API cache write skipped:', error);
+    }
+}
+
+function invalidateApiCache(match) {
+    const keys = [];
+    for (let index = 0; index < localStorage.length; index += 1) {
+        const key = localStorage.key(index);
+        if (key?.startsWith(API_CACHE_PREFIX) && (!match || key.includes(match))) keys.push(key);
+    }
+    keys.forEach(key => localStorage.removeItem(key));
+}
+
+async function cachedApiGet(url, request) {
+    const cached = readApiCache(url);
+    if (cached !== null) return cached;
+    const data = await request();
+    writeApiCache(url, data);
+    return data;
+}
 
 // Persistent Local UI States
 let activeCustomerId = null;
@@ -361,15 +402,30 @@ window.renderCampaignAgentSelector = function() {
 async function fetchAllData() {
     try {
         const fetchJson = async (url) => {
-            const controller = new AbortController();
-            const timeout = setTimeout(() => controller.abort(), 15000);
-            try {
-                const response = await fetch(url, { signal: controller.signal });
-                if (!response.ok) throw new Error(`API Error: ${response.status}`);
-                return response.json();
-            } finally {
-                clearTimeout(timeout);
+            const cached = readApiCache(url);
+            if (cached !== null) return cached;
+            let lastError;
+            for (let attempt = 0; attempt < 3; attempt += 1) {
+                const controller = new AbortController();
+                const timeout = setTimeout(() => controller.abort(), 15000);
+                try {
+                    const response = await fetch(url, { signal: controller.signal });
+                    if (response.ok) {
+                        const data = await response.json();
+                        writeApiCache(url, data);
+                        return data;
+                    }
+                    lastError = new Error(`API Error: ${response.status}`);
+                    if (![429, 500, 502, 503, 504].includes(response.status) || attempt === 2) break;
+                } catch (error) {
+                    lastError = error;
+                    if (attempt === 2) break;
+                } finally {
+                    clearTimeout(timeout);
+                }
+                await new Promise(resolve => setTimeout(resolve, (attempt + 1) * 1000));
             }
+            throw lastError;
         };
 
         const customerPages = new Set(['workspace', 'teamleader', 'campaigns', 'overview', 'dashboard']);
@@ -956,6 +1012,7 @@ async function updateAgentStatus(index, status) {
 
       if (!res.ok) throw new Error(`Status ${res.status}`);
       
+    invalidateApiCache();
       await fetchAllData(); 
       
       renderShiftManager();
@@ -1056,6 +1113,7 @@ async function submitDisposition(e) {
 
       if (!res.ok) throw new Error(`Status ${res.status}`);
       
+    invalidateApiCache();
       await fetchAllData();
 
       activeCustomerId = null;
@@ -1128,12 +1186,18 @@ async function submitAddCampaign(e) {
       submitBtn.innerHTML = originalText;
       return;
     }
+        if (rawCustomers.length > 20000) {
+            showAppAlert("A campaign upload can contain at most 20,000 accounts.", "Upload limit exceeded");
+            submitBtn.innerHTML = originalText;
+            return;
+        }
 
     // Capture CSV columns dynamically
     const formattedCustomers = rawCustomers.map((row, index) => {
         const customer = { ...row }; 
         const csvValue = (...keys) => keys.map(key => row[key] || row[key.toLowerCase()]).find(value => value !== undefined) || '';
-        customer.id = parseInt(row.id) || (index + 1);
+        const parsedId = parseInt(row.id, 10);
+        customer.id = Number.isFinite(parsedId) ? parsedId : (index + 1);
         customer.name = row.name || row.Name || row.NAME || "Unknown";
         customer.phone = String(row.phone || row.Phone || row.PHONE || row['mobile no'] || row['Mobile No'] || "");
         customer.branch = row.branch || row.Branch || row.BRANCH || "Not Specified";
@@ -1150,7 +1214,7 @@ async function submitAddCampaign(e) {
     });
 
     try {
-        const CHUNK_SIZE = 500; // Safe limit to prevent 413 errors
+        const CHUNK_SIZE = 2000; // Ten requests are enough for the maximum 20,000-account upload
         
         // Loop through the data and send it in smaller batches
         for (let i = 0; i < formattedCustomers.length; i += CHUNK_SIZE) {
@@ -1162,14 +1226,21 @@ async function submitAddCampaign(e) {
                 priority: priority,
                 startDate: startDate,
                 endDate: endDate,
+                chunkIndex: Math.floor(i / CHUNK_SIZE),
                 customers: chunk
             };
 
-            const res = await fetch(`${API_BASE}/campaigns`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
+            let res;
+            for (let attempt = 0; attempt < 3; attempt += 1) {
+                res = await fetch(`${API_BASE}/campaigns`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                if (res.status !== 429 || attempt === 2) break;
+                const retryAfter = Number(res.headers.get('Retry-After')) || (attempt + 1) * 2;
+                await new Promise(resolve => setTimeout(resolve, retryAfter * 1000));
+            }
 
             if (!res.ok) {
                 const errorText = await res.text();
@@ -1187,8 +1258,21 @@ async function submitAddCampaign(e) {
             submitBtn.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin"></i> Uploading ${Math.min(i + CHUNK_SIZE, formattedCustomers.length)} of ${formattedCustomers.length}...`;
         }
         
-        // Refresh UI after all chunks succeed
-        await fetchAllData();
+                // Update local state without immediately issuing three more Sheets reads.
+                invalidateApiCache();
+                if (!campaignRecords.some(campaign => campaign.name === campaignName)) {
+                    campaignRecords.push(normalizeCampaignRecord({
+                        name: campaignName,
+                        type: campaignType,
+                        priority,
+                        startDate,
+                        endDate
+                    }));
+                }
+                mockCustomers = [...mockCustomers, ...formattedCustomers];
+                localStorage.setItem('CALLCENTER_CAMPAIGNS_CACHE', JSON.stringify(campaignRecords));
+                localStorage.setItem('CALLCENTER_CUSTOMERS_CACHE', JSON.stringify(mockCustomers));
+                rebuildCampaignConfigs();
         updateCampaignDropdowns();
         renderCampaignList(); 
         
@@ -1234,7 +1318,7 @@ async function distributeCustomers() {
           })
       });
       const data = await res.json();
-      
+    invalidateApiCache();
       await fetchAllData();
       
       renderShiftManager();
@@ -1339,6 +1423,7 @@ window.submitAllocation = function(e) {
     }).then(async response => {
         const data = await response.json();
         if (!response.ok) throw new Error(data.detail || 'Allocation failed');
+        invalidateApiCache();
         await fetchAllData();
         renderShiftManager();
         updateAvailableAgents();
@@ -1399,7 +1484,7 @@ function toggleAgentStatus(checkbox) {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: LOGGED_IN_AGENT, status })
-    }).catch(error => console.error('Failed to persist agent status:', error));
+    }).then(() => invalidateApiCache()).catch(error => console.error('Failed to persist agent status:', error));
   const label = document.getElementById('clock-status-label');
   const globalText = document.getElementById('global-status-text');
   const idleMsg = document.getElementById('idle-overlay');
@@ -1871,9 +1956,13 @@ window.customers = [];
 // 1. Fetch Agents (Used by Admin and Team Leader pages)
 window.fetchAgentsData = async function() {
     try {
-        const res = await fetch('/api/agents');
-        if (res.ok) {
-            const data = await res.json();
+        const url = `${API_BASE}/agents`;
+        const data = await cachedApiGet(url, async () => {
+            const res = await fetch(url);
+            if (!res.ok) throw new Error(`Status ${res.status}`);
+            return res.json();
+        });
+        if (data) {
             window.agents = Array.isArray(data) ? data : (data.agents || data.data || []);
             agents = window.agents;
             
@@ -1897,9 +1986,13 @@ window.fetchAgentsData = async function() {
 // 2. Fetch Customers (Used by Team Leader page)
 window.fetchCustomersData = async function() {
     try {
-        const res = await fetch('/api/customers?limit=200');
-        if (res.ok) {
-            const data = await res.json();
+        const url = `${API_BASE}/customers?limit=200`;
+        const data = await cachedApiGet(url, async () => {
+            const res = await fetch(url);
+            if (!res.ok) throw new Error(`Status ${res.status}`);
+            return res.json();
+        });
+        if (data) {
             window.customers = Array.isArray(data) ? data : (data.items || data.customers || data.data || []);
             mockCustomers = window.customers;
             
@@ -2078,13 +2171,12 @@ window.fetchCustomersData = async function() {
 // --- DARK MODE LOGIC ---
 window.toggleDarkMode = function() {
     const htmlEl = document.documentElement;
-    if (htmlEl.classList.contains('dark')) {
-        htmlEl.classList.remove('dark');
-        localStorage.setItem('theme', 'light');
-    } else {
-        htmlEl.classList.add('dark');
-        localStorage.setItem('theme', 'dark');
-    }
+    const isDark = typeof arguments[0] === 'boolean' ? arguments[0] : !htmlEl.classList.contains('dark');
+    htmlEl.classList.toggle('dark', isDark);
+    localStorage.setItem('theme', isDark ? 'dark' : 'light');
+    document.querySelectorAll('.dark-mode-toggle').forEach(toggle => {
+        toggle.checked = isDark;
+    });
 };
 
 // ONLY apply Dark Mode if the user specifically clicked the toggle previously
@@ -2093,6 +2185,9 @@ if (localStorage.getItem('theme') === 'dark') {
 } else {
     document.documentElement.classList.remove('dark'); // Forces Light Mode by default
 }
+document.querySelectorAll('.dark-mode-toggle').forEach(toggle => {
+    toggle.checked = document.documentElement.classList.contains('dark');
+});
 
 const CUSTOMER_DISPLAY_COLUMNS = [
     ['id', 'ID'], ['name', 'Customer Name'], ['phone', 'Phone'],
