@@ -275,7 +275,7 @@ window.renderCampaignList = function() {
     if (!listBody) return;
     
     if (campaignRecords.length === 0) {
-        listBody.innerHTML = '<tr><td colspan="5" class="px-5 py-8 text-center text-brandDark/50 italic">No campaigns found. Create one to get started.</td></tr>';
+        listBody.innerHTML = '<tr><td colspan="6" class="px-5 py-8 text-center text-brandDark/50 italic">No campaigns found. Create one to get started.</td></tr>';
         return;
     }
 
@@ -340,7 +340,6 @@ async function fetchAllData() {
             campaignRecords = parsedCampaigns.map(normalizeCampaignRecord);
             localStorage.setItem('CALLCENTER_CAMPAIGNS_CACHE', JSON.stringify(campaignRecords));
             rebuildCampaignConfigs();
-            listBody.innerHTML = '<tr><td colspan="6" class="px-5 py-8 text-center text-brandDark/50 italic">No campaigns found. Create one to get started.</td></tr>';
         }
 
         // 3. Customers are deliberately bounded; load more pages on demand.

@@ -112,6 +112,13 @@ CATEGORY_HEADERS = {
     "Dormant": ["Name", "Mobile No", "Due Date", "Station", "Stations", "Pair", "Sector", "Disb Amount"],
 }
 
+CATEGORY_SHEET_ALIASES = {
+    "Defaulted": ("Defaulted", "Defaulters"),
+    "Upcoming Dues": ("Upcoming Dues",),
+    "Active No Loan": ("Active No Loan", "Active With No Loans", "Active No Loans"),
+    "Dormant": ("Dormant",),
+}
+
 
 def category_sheet_name(category: str) -> str:
     """Convert an upload category into a safe, stable worksheet title."""
@@ -445,6 +452,47 @@ def create_campaign(
         print(f"Campaign upload failed: {error}")
         raise HTTPException(status_code=503, detail="Google Sheets upload failed. Check API logs and spreadsheet permissions.")
 
+
+def read_customer_records(spreadsheet) -> List[Dict[str, Any]]:
+    """Read the master customer sheet and supplement it with category sheets."""
+    records = []
+    try:
+        master_sheet = spreadsheet.worksheet("Customers")
+        master_headers = master_sheet.row_values(1)
+        if master_headers:
+            end_column = column_letter(len(master_headers))
+            rows = master_sheet.get_values(f"A2:{end_column}{master_sheet.row_count}")
+            records.extend(records_from_rows(rows, master_headers))
+    except gspread.exceptions.WorksheetNotFound:
+        pass
+
+    def customer_key(record: Dict[str, Any]):
+        phone = str(record.get("phone", "")).strip()
+        name = str(record.get("name", "")).strip().lower()
+        if phone or name:
+            return (phone, name)
+        return ("id", str(record.get("id", "")).strip())
+
+    existing_keys = {customer_key(record) for record in records}
+    for category, sheet_names in CATEGORY_SHEET_ALIASES.items():
+        for sheet_name in sheet_names:
+            try:
+                category_sheet = spreadsheet.worksheet(sheet_name)
+            except gspread.exceptions.WorksheetNotFound:
+                continue
+            headers = category_sheet.row_values(1)
+            if not headers:
+                continue
+            end_column = column_letter(len(headers))
+            rows = category_sheet.get_values(f"A2:{end_column}{category_sheet.row_count}")
+            for record in records_from_rows(rows, headers):
+                record.setdefault("campaign", category)
+                key = customer_key(record)
+                if key not in existing_keys:
+                    records.append(record)
+                    existing_keys.add(key)
+    return records
+
 @app.get("/customers")
 @app.get("/api/customers")
 def get_customers(
@@ -456,16 +504,15 @@ def get_customers(
         raise HTTPException(status_code=400, detail="offset must be >= 0 and limit must be between 1 and 500")
 
     try:
-        sheet = get_google_sheet().worksheet("Customers")
-        headers = sheet.row_values(1)
+        spreadsheet = get_google_sheet()
+        records = read_customer_records(spreadsheet)
     except gspread.exceptions.WorksheetNotFound:
         raise HTTPException(status_code=404, detail="Customers worksheet was not found")
     except Exception as error:
         raise HTTPException(status_code=503, detail=f"Google Sheets connection failed: {error}")
-    if not headers:
+    if not records:
         return {"items": [], "offset": offset, "limit": limit, "total": 0, "hasMore": False}
 
-    end_column = column_letter(len(headers))
     if agentName:
         cache_key = agentName.strip().lower()
         with _customer_queue_cache_lock:
@@ -478,25 +525,18 @@ def get_customers(
                     "hasMore": offset + limit < len(matches),
                 }
 
-        # Filter in larger bounded requests to reduce Google Sheets API calls.
-        matches = []
-        chunk_size = 50000
-        for start in range(2, sheet.row_count + 1, chunk_size):
-            end = min(start + chunk_size - 1, sheet.row_count)
-            rows = sheet.get_values(f"A{start}:{end_column}{end}")
-            for record in records_from_rows(rows, headers):
-                if str(record.get("agentId", "")).strip() == agentName and str(record.get("worked", "")).upper() != "TRUE":
-                    matches.append(record)
+        matches = [
+            record for record in records
+            if str(record.get("agentId", "")).strip() == agentName
+            and str(record.get("worked", "")).upper() != "TRUE"
+        ]
         with _customer_queue_cache_lock:
             _customer_queue_cache[cache_key] = (time.time() + 20, matches)
         total = len(matches)
         items = matches[offset:offset + limit]
     else:
-        total = max(sheet.row_count - 1, 0)
-        start = offset + 2
-        end = min(start + limit - 1, sheet.row_count)
-        rows = [] if start > sheet.row_count else sheet.get_values(f"A{start}:{end_column}{end}")
-        items = records_from_rows(rows, headers)
+        total = len(records)
+        items = records[offset:offset + limit]
 
     return {
         "items": items,
