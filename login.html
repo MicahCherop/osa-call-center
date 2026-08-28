@@ -192,12 +192,10 @@
           localStorage.setItem('USER_ROLE', data.role);
           localStorage.setItem('LOGGED_IN_AGENT', data.name);
           
-          if(data.role === "Admin") {
-            window.location.replace('/admin.html');
-          } else if(data.role === "Team Leader" || data.role === "Ops Manager") {
-            window.location.replace('/teamleader.html');
-          } else {
+          if(data.role === "Control Agent") {
             window.location.replace('/workspace.html');
+          } else {
+            window.location.replace('/overview.html');
           }
 
         } catch (err) {

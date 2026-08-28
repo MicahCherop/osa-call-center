@@ -87,15 +87,15 @@ function enforceSecurity() {
         // 5. Hide unauthorized sidebar links visually
         hideUnauthorizedMenuLinks(allowedPages);
     }
+
+    return true;
 }
 
 // Helper: Routes users to their specific default dashboard
 function routeUserByRole(role) {
-    if (role === 'Admin' || role === 'Ops Manager' || role === 'Team Leader') {
-        // Leaders now land on the Overview Command Center by default
+    if (['Admin', 'Ops Manager', 'Team Leader'].includes(role)) {
         window.location.replace('/overview.html');
     } else {
-        // Control Agents still land directly in their workspace
         window.location.replace('/workspace.html'); 
     }
 }
@@ -115,7 +115,7 @@ function hideUnauthorizedMenuLinks(allowedPages) {
 document.addEventListener('DOMContentLoaded', enforceSecurity);
 window.logout = function() {
     localStorage.clear();
-    window.location.replace('/login');
+    window.location.replace('/login.html');
 };
 
 
@@ -425,9 +425,15 @@ function restoreClockedInWorkspace() {
 
 function setActiveNavLink() {
   const page = document.body.dataset.page || 'workspace';
-  document.querySelectorAll('.nav-btn').forEach(btn => {
+    document.querySelectorAll('aside a[data-page]').forEach(btn => {
     const isActive = btn.dataset.page === page;
     btn.classList.toggle('bg-white/40', isActive);
+        btn.classList.toggle('bg-brandAmber/10', isActive);
+        btn.classList.toggle('text-brandAmber', isActive);
+        btn.classList.toggle('font-medium', isActive);
+        btn.classList.toggle('text-brandDark/70', !isActive);
+        btn.classList.toggle('border-r-2', isActive);
+        btn.classList.toggle('border-brandAmber', isActive);
     const indicator = btn.querySelector('.active-indicator');
     if (indicator) indicator.classList.toggle('hidden', !isActive);
   });
@@ -1140,7 +1146,7 @@ async function distributeCustomers() {
         showAppAlert('Only Admin users can assign accounts.', 'Permission Denied');
         return;
     }
-  const campEl = document.getElementById('alloc-campaign');
+    const campEl = document.getElementById('allocate-campaign');
   const campaign = campEl ? campEl.value : '';
   if (!campaign) {
     showAppAlert("Please select a campaign from the dropdown first.", "Campaign required");
