@@ -1204,7 +1204,7 @@ window.updateAvailableAgents = function() {
         const role = String(a.Role || a.role || '').trim().toLowerCase();
         const status = String(a.Status || a.status || '').trim().toLowerCase();
         const campaign = a.Campaign || a.campaign || a.currentCampaign || '';
-        return role === 'control agent' && ['active', 'clocked in', 'online'].includes(status) && !String(campaign).trim();
+        return role === 'control agent' && ['clocked in', 'online'].includes(status) && !String(campaign).trim();
     });
 
     if (controlAgents.length === 0) {
@@ -1896,7 +1896,8 @@ window.renderShiftManager = function() {
     visibleAgents.forEach(a => {
         const name = a.name || a.Name || 'Unknown';
         const role = a.role || a.Role || '--';
-        const status = a.status || a.Status || 'Offline';
+        const rawStatus = String(a.status || a.Status || '').trim().toLowerCase();
+        const status = rawStatus === 'clocked in' || rawStatus === 'online' ? 'Active' : 'Offline';
         const campaign = a.campaign || a.Campaign || 'None';
         
         let statusColor = status.toLowerCase() === 'active' ? 'text-green-500' : 'text-gray-400';
@@ -1924,7 +1925,7 @@ window.renderOverviewData = function() {
     });
     const activeAgents = controlAgents.filter(a => {
         const status = String(a.Status || a.status || '').trim().toLowerCase();
-        return status === 'active' || status === 'clocked in' || status === 'online';
+        return status === 'clocked in' || status === 'online';
     });
     const onlineEl = document.getElementById('ov-online-count');
     if (onlineEl) onlineEl.innerText = activeAgents.length;
@@ -2054,10 +2055,10 @@ function displayValue(value) {
 }
 
 const CATEGORY_DISPLAY_COLUMNS = {
-    defaulted: [['name', 'Name'], ['phone', 'Mobile No'], ['dueDate', 'Due Date'], ['station', 'Station'], ['stations', 'Stations'], ['pair', 'Pair'], ['sector', 'Sector'], ['disbAmount', 'Disb Amount'], ['totalPaid', 'Total Paid'], ['balance', 'Balance']],
-    upcoming_dues: [['name', 'Name'], ['phone', 'Mobile No'], ['dueDate', 'Due Date'], ['station', 'Station'], ['stations', 'Stations'], ['pair', 'Pair'], ['sector', 'Sector'], ['disbAmount', 'Disb Amount'], ['totalPaid', 'Total Paid'], ['balance', 'Balance']],
-    active_no_loan: [['name', 'Name'], ['phone', 'Mobile No'], ['dueDate', 'Due Date'], ['station', 'Station'], ['stations', 'Stations'], ['pair', 'Pair'], ['sector', 'Sector'], ['disbAmount', 'Disb Amount']],
-    dormant: [['name', 'Name'], ['phone', 'Mobile No'], ['dueDate', 'Due Date'], ['station', 'Station'], ['stations', 'Stations'], ['pair', 'Pair'], ['sector', 'Sector'], ['disbAmount', 'Disb Amount']]
+    defaulted: [['name', 'Name'], ['phone', 'Mobile No'], ['dueDate', 'Due Date'], ['branch', 'Branch'], ['pair', 'Pair'], ['sector', 'Sector'], ['disbAmount', 'Disb Amount'], ['totalPaid', 'Total Paid'], ['balance', 'Balance']],
+    upcoming_dues: [['name', 'Name'], ['phone', 'Mobile No'], ['dueDate', 'Due Date'], ['branch', 'Branch'], ['pair', 'Pair'], ['sector', 'Sector'], ['disbAmount', 'Disb Amount'], ['totalPaid', 'Total Paid'], ['balance', 'Balance']],
+    active_no_loan: [['name', 'Name'], ['phone', 'Mobile No'], ['dueDate', 'Due Date'], ['branch', 'Branch'], ['pair', 'Pair'], ['sector', 'Sector'], ['disbAmount', 'Disb Amount']],
+    dormant: [['name', 'Name'], ['phone', 'Mobile No'], ['dueDate', 'Due Date'], ['branch', 'Branch'], ['pair', 'Pair'], ['sector', 'Sector'], ['disbAmount', 'Disb Amount']]
 };
 
 function customerColumns(customer) {

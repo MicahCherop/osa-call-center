@@ -80,6 +80,10 @@ def normalize_record(record: Dict[str, Any]) -> Dict[str, Any]:
             words = "".join(char if char.isalnum() else " " for char in str(key)).split()
             camel_key = words[0].lower() + "".join(word.title() for word in words[1:])
             normalized[camel_key] = value
+    if not normalized.get("branch"):
+        normalized["branch"] = normalized.get("station") or normalized.get("stations", "")
+    normalized.pop("station", None)
+    normalized.pop("stations", None)
     return normalized
 
 
@@ -101,15 +105,15 @@ def column_letter(number: int) -> str:
 
 CUSTOMER_HEADERS = [
     "id", "name", "phone", "branch", "sector", "balance", "campaign",
-    "agentId", "worked", "outcome", "status", "dueDate", "station", "stations",
+    "agentId", "worked", "outcome", "status", "dueDate",
     "pair", "disbAmount", "totalPaid"
 ]
 
 CATEGORY_HEADERS = {
-    "Defaulted": ["Name", "Mobile No", "Due Date", "Station", "Stations", "Pair", "Sector", "Disb Amount", "Total Paid", "Balance"],
-    "Upcoming Dues": ["Name", "Mobile No", "Due Date", "Station", "Stations", "Pair", "Sector", "Disb Amount", "Total Paid", "Balance"],
-    "Active No Loan": ["Name", "Mobile No", "Due Date", "Station", "Stations", "Pair", "Sector", "Disb Amount"],
-    "Dormant": ["Name", "Mobile No", "Due Date", "Station", "Stations", "Pair", "Sector", "Disb Amount"],
+    "Defaulted": ["Name", "Mobile No", "Due Date", "Branch", "Pair", "Sector", "Disb Amount", "Total Paid", "Balance"],
+    "Upcoming Dues": ["Name", "Mobile No", "Due Date", "Branch", "Pair", "Sector", "Disb Amount", "Total Paid", "Balance"],
+    "Active No Loan": ["Name", "Mobile No", "Due Date", "Branch", "Pair", "Sector", "Disb Amount"],
+    "Dormant": ["Name", "Mobile No", "Due Date", "Branch", "Pair", "Sector", "Disb Amount"],
 }
 
 CATEGORY_SHEET_ALIASES = {
@@ -154,6 +158,37 @@ def get_or_create_category_sheet(spreadsheet, category: str):
                     cols=len(headers),
                 )
                 worksheet.append_row(headers)
+                return worksheet
+
+
+def campaign_sheet_name(campaign: str) -> str:
+    cleaned = " ".join(str(campaign or "Campaign").strip().split())
+    for character in ("/", "\\", "?", "*", "[", "]", ":"):
+        cleaned = cleaned.replace(character, " ")
+    return " ".join(cleaned.split())[:100] or "Campaign"
+
+
+def get_or_create_campaign_sheet(spreadsheet, campaign: str):
+    title = campaign_sheet_name(campaign)
+    try:
+        worksheet = spreadsheet.worksheet(title)
+        if worksheet.col_count < len(CUSTOMER_HEADERS):
+            worksheet.resize(cols=len(CUSTOMER_HEADERS))
+        if worksheet.row_values(1) != CUSTOMER_HEADERS:
+            worksheet.update("A1", [CUSTOMER_HEADERS])
+        return worksheet
+    except gspread.exceptions.WorksheetNotFound:
+        with _category_sheet_lock:
+            try:
+                worksheet = spreadsheet.worksheet(title)
+                if worksheet.col_count < len(CUSTOMER_HEADERS):
+                    worksheet.resize(cols=len(CUSTOMER_HEADERS))
+                if worksheet.row_values(1) != CUSTOMER_HEADERS:
+                    worksheet.update("A1", [CUSTOMER_HEADERS])
+                return worksheet
+            except gspread.exceptions.WorksheetNotFound:
+                worksheet = spreadsheet.add_worksheet(title=title, rows=1000, cols=len(CUSTOMER_HEADERS))
+                worksheet.append_row(CUSTOMER_HEADERS)
                 return worksheet
 
 
@@ -234,8 +269,7 @@ def category_row(customer: CustomerUploadModel, category: str) -> List[Any]:
         "Name": customer.name,
         "Mobile No": customer.phone,
         "Due Date": customer.dueDate,
-        "Station": customer.station,
-        "Stations": customer.stations,
+        "Branch": customer.branch,
         "Pair": customer.pair,
         "Sector": customer.sector,
         "Disb Amount": customer.disbAmount,
@@ -463,22 +497,19 @@ def create_campaign(
         if name not in existing_campaigns:
             camp_sheet.append_row([name, type, priority, startDate, endDate])
 
-        cust_sheet = sh.worksheet("Customers")
-        ensure_customer_headers(cust_sheet)
+        campaign_sheet = get_or_create_campaign_sheet(sh, name)
         rows = [[
             c.id, c.name, c.phone, c.branch, c.sector, c.balance, name, "", "FALSE", "", "",
-            c.dueDate, c.station, c.stations, c.pair, c.disbAmount, c.totalPaid,
+            c.dueDate, c.branch, c.branch, c.pair, c.disbAmount, c.totalPaid,
         ] for c in customers]
 
         if rows:
-            cust_sheet.append_rows(rows)
-            category_sheet = get_or_create_category_sheet(sh, type)
-            category_sheet.append_rows([category_row(customer, type) for customer in customers])
+            campaign_sheet.append_rows(rows)
 
         return {
             "status": "success",
             "imported": len(customers),
-            "categorySheet": category_sheet_name(type),
+            "campaignSheet": campaign_sheet_name(name),
         }
     except HTTPException:
         raise
@@ -510,6 +541,37 @@ def read_customer_records(spreadsheet) -> List[Dict[str, Any]]:
         return ("id", str(record.get("id", "")).strip())
 
     existing_keys = {customer_key(record) for record in records}
+    campaign_names = []
+    try:
+        campaign_registry = spreadsheet.worksheet("Campaigns")
+        registry_headers = campaign_registry.row_values(1)
+        if registry_headers:
+            registry_rows = campaign_registry.get_values(f"A2:{column_letter(len(registry_headers))}{campaign_registry.row_count}")
+            campaign_names = [
+                str(record.get("name", "")).strip()
+                for record in records_from_rows(registry_rows, registry_headers)
+                if str(record.get("name", "")).strip()
+            ]
+    except gspread.exceptions.WorksheetNotFound:
+        pass
+
+    for campaign in campaign_names:
+        try:
+            campaign_sheet = spreadsheet.worksheet(campaign_sheet_name(campaign))
+            headers = campaign_sheet.row_values(1)
+            if not headers:
+                continue
+            end_column = column_letter(len(headers))
+            rows = campaign_sheet.get_values(f"A2:{end_column}{campaign_sheet.row_count}")
+            for record in records_from_rows(rows, headers):
+                record.setdefault("campaign", campaign)
+                key = customer_key(record)
+                if key not in existing_keys:
+                    records.append(record)
+                    existing_keys.add(key)
+        except gspread.exceptions.WorksheetNotFound:
+            continue
+
     for category, sheet_names in CATEGORY_SHEET_ALIASES.items():
         for sheet_name in sheet_names:
             try:
@@ -532,6 +594,44 @@ def read_customer_records(spreadsheet) -> List[Dict[str, Any]]:
                 print(f"Skipping unavailable category sheet {sheet_name}: {error}")
                 continue
     return records
+
+
+def find_customer_location(spreadsheet, customer_id: int):
+    sheets = []
+    try:
+        sheets.append(spreadsheet.worksheet("Customers"))
+    except gspread.exceptions.WorksheetNotFound:
+        pass
+    for campaign in read_campaign_names(spreadsheet):
+        try:
+            sheet = spreadsheet.worksheet(campaign_sheet_name(campaign))
+            if sheet not in sheets:
+                sheets.append(sheet)
+        except gspread.exceptions.WorksheetNotFound:
+            continue
+    for sheet in sheets:
+        try:
+            cell = sheet.find(str(customer_id))
+            return sheet, cell
+        except gspread.exceptions.CellNotFound:
+            continue
+    raise gspread.exceptions.CellNotFound(customer_id)
+
+
+def read_campaign_names(spreadsheet) -> List[str]:
+    try:
+        registry = spreadsheet.worksheet("Campaigns")
+        headers = registry.row_values(1)
+        if not headers:
+            return []
+        rows = registry.get_values(f"A2:{column_letter(len(headers))}{registry.row_count}")
+        return [
+            str(record.get("name", "")).strip()
+            for record in records_from_rows(rows, headers)
+            if str(record.get("name", "")).strip()
+        ]
+    except gspread.exceptions.WorksheetNotFound:
+        return []
 
 @app.get("/customers")
 @app.get("/api/customers")
@@ -592,16 +692,15 @@ def get_customers(
 def assign_customer(assignment: CustomerAssignModel):
     if not can_allocate(assignment.requesterRole):
         raise HTTPException(status_code=403, detail="Only managers can assign accounts")
-    sheet = get_google_sheet().worksheet("Customers")
-    cell = sheet.find(str(assignment.customerId))
-    headers = sheet.row_values(1)
+    spreadsheet = get_google_sheet()
     try:
-        agent_column = headers.index("agentId") + 1
-    except ValueError:
-        try:
-            agent_column = headers.index("AgentId") + 1
-        except ValueError:
-            raise HTTPException(status_code=500, detail="Customers sheet is missing the agentId column")
+        sheet, cell = find_customer_location(spreadsheet, assignment.customerId)
+    except gspread.exceptions.CellNotFound:
+        raise HTTPException(status_code=404, detail="Customer not found")
+    headers = sheet.row_values(1)
+    agent_column = next((index + 1 for index, header in enumerate(headers) if str(header).strip().lower() in {"agentid", "assignedagent", "agent"}), 0)
+    if not agent_column:
+        raise HTTPException(status_code=500, detail="Campaign worksheet is missing the agentId column")
 
     sheet.update_cell(cell.row, agent_column, assignment.agentName)
     with _customer_queue_cache_lock:
@@ -616,14 +715,17 @@ def distribute_customers(distribution: DistributionModel):
     if not can_allocate(distribution.requesterRole):
         raise HTTPException(status_code=403, detail="Only managers can assign accounts")
     sh = get_google_sheet()
-    cust_sheet = sh.worksheet("Customers")
+    try:
+        cust_sheet = sh.worksheet(campaign_sheet_name(distribution.campaign))
+    except gspread.exceptions.WorksheetNotFound:
+        raise HTTPException(status_code=404, detail="Campaign worksheet was not found")
     agent_sheet = sh.worksheet("Agents")
     
     customers = [normalize_record(record) for record in cust_sheet.get_all_records()]
     headers = cust_sheet.row_values(1)
     agent_column = next((index + 1 for index, header in enumerate(headers) if str(header).strip().lower() in {"agentid", "assignedagent", "agent"}), 8)
     agents = [normalize_record(record) for record in agent_sheet.get_all_records()
-        if str(record.get("status", record.get("Status", ""))).strip().lower() in {"active", "clocked in", "online"}
+        if str(record.get("status", record.get("Status", ""))).strip().lower() in {"clocked in", "online"}
         and str(record.get("role", record.get("Role", ""))).strip().lower() == "control agent"
         and not str(record.get("campaign", record.get("Campaign", ""))).strip()
         and record.get("name", record.get("Name")) in distribution.selectedAgents]
@@ -661,18 +763,19 @@ def distribute_customers(distribution: DistributionModel):
 @app.post("/api/disposition")
 def submit_disposition(disp: DispositionModel):
     sh = get_google_sheet()
-    cust_sheet = sh.worksheet("Customers")
     agent_sheet = sh.worksheet("Agents")
     
     # 1. Update Customer Record
     try:
-        cust_cell = cust_sheet.find(str(disp.customerId))
+        cust_sheet, cust_cell = find_customer_location(sh, disp.customerId)
         r = cust_cell.row
-        customer_updates = [
-            gspread.Cell(r, 9, "TRUE"),        # worked
-            gspread.Cell(r, 10, disp.outcome), # outcome
-            gspread.Cell(r, 11, disp.status)   # status
-        ]
+        headers = cust_sheet.row_values(1)
+        columns = {str(header).strip().lower(): index + 1 for index, header in enumerate(headers)}
+        customer_updates = []
+        for key, value in (("worked", "TRUE"), ("outcome", disp.outcome), ("status", disp.status)):
+            column = columns.get(key)
+            if column:
+                customer_updates.append(gspread.Cell(r, column, value))
         cust_sheet.update_cells(customer_updates)
     except gspread.exceptions.CellNotFound:
         pass
