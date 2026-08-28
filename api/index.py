@@ -541,10 +541,10 @@ def distribute_customers(distribution: DistributionModel):
     
     customers = [normalize_record(record) for record in cust_sheet.get_all_records()]
     agents = [normalize_record(record) for record in agent_sheet.get_all_records()
-        if str(record.get("status", "")).strip().lower() == "clocked in"
-        and str(record.get("role", "")).strip().lower() == "control agent"
-        and not str(record.get("campaign", "")).strip()
-        and record.get("name") in distribution.selectedAgents]
+        if str(record.get("status", record.get("Status", ""))).strip().lower() in {"active", "clocked in", "online"}
+        and str(record.get("role", record.get("Role", ""))).strip().lower() == "control agent"
+        and not str(record.get("campaign", record.get("Campaign", ""))).strip()
+        and record.get("name", record.get("Name")) in distribution.selectedAgents]
     
     if not agents:
         raise HTTPException(status_code=400, detail="No active agents found")

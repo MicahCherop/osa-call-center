@@ -8,10 +8,19 @@ let activeAppModal = null;
 let isClockedIn = localStorage.getItem('IS_CLOCKED_IN') === 'true';
 
 // Dynamic Data States
-let mockCustomers = [];
+function readCachedArray(key) {
+    try {
+        const value = JSON.parse(localStorage.getItem(key) || '[]');
+        return Array.isArray(value) ? value : [];
+    } catch {
+        return [];
+    }
+}
+
+let mockCustomers = readCachedArray('CALLCENTER_CUSTOMERS_CACHE');
 let campaignConfigs = {};
-let agents = [];
-let campaignRecords = [];
+let agents = readCachedArray('CALLCENTER_AGENTS_CACHE');
+let campaignRecords = readCachedArray('CALLCENTER_CAMPAIGNS_CACHE');
 let globalStats = { totalCalls: 0, connected: 0, recovered: 0, outcomes: {} };
 
 // --- RBAC: SECURITY & ENFORCEMENT ---
@@ -283,42 +292,53 @@ async function fetchAllData() {
         };
 
         const customerPages = new Set(['workspace', 'teamleader', 'campaigns', 'overview', 'dashboard']);
-        const [agentsData, campaigns, custData] = await Promise.all([
+        const requests = [
             fetchJson(`${API_BASE}/agents`),
             fetchJson(`${API_BASE}/campaigns`),
             customerPages.has(currentPage)
                 ? fetchJson(`${API_BASE}/customers?limit=200${currentPage === 'workspace' && LOGGED_IN_AGENT ? `&agentName=${encodeURIComponent(LOGGED_IN_AGENT)}` : ''}`)
                 : Promise.resolve({ items: [] })
-        ]);
+        ];
+        const [agentsResult, campaignsResult, customersResult] = await Promise.allSettled(requests);
 
         // 1. Fetch Agents
-        window.agents = Array.isArray(agentsData) ? agentsData : (agentsData.agents || agentsData.data || []);
-        agents = window.agents;
+        if (agentsResult.status === 'fulfilled') {
+            const agentsData = agentsResult.value;
+            window.agents = Array.isArray(agentsData) ? agentsData : (agentsData.agents || agentsData.data || []);
+            agents = window.agents;
+            localStorage.setItem('CALLCENTER_AGENTS_CACHE', JSON.stringify(agents));
+        }
         
-        const parsedCampaigns = Array.isArray(campaigns) 
-            ? campaigns 
-            : (campaigns.campaigns || campaigns.data || []);
-        campaignRecords = parsedCampaigns;
-        campaignConfigs = {};
-        parsedCampaigns.forEach(c => {
-            const campaignName = c && (c.name || c.campaignName || c.campaign);
-            if (campaignName) {
-                c.name = campaignName;
-                campaignConfigs[campaignName] = c.type || c.campaignType || '';
-            }
-        });
+        if (campaignsResult.status === 'fulfilled') {
+            const campaigns = campaignsResult.value;
+            const parsedCampaigns = Array.isArray(campaigns)
+                ? campaigns
+                : (campaigns.campaigns || campaigns.data || []);
+            campaignRecords = parsedCampaigns;
+            localStorage.setItem('CALLCENTER_CAMPAIGNS_CACHE', JSON.stringify(campaignRecords));
+            campaignConfigs = {};
+            parsedCampaigns.forEach(c => {
+                const campaignName = c && (c.name || c.campaignName || c.campaign);
+                if (campaignName) {
+                    c.name = campaignName;
+                    campaignConfigs[campaignName] = c.type || c.campaignType || '';
+                }
+            });
+        }
 
         // 3. Customers are deliberately bounded; load more pages on demand.
-        window.customers = Array.isArray(custData) ? custData : (custData.items || custData.customers || custData.data || []);
-        mockCustomers = window.customers;
+        if (customersResult.status === 'fulfilled') {
+            const custData = customersResult.value;
+            window.customers = Array.isArray(custData) ? custData : (custData.items || custData.customers || custData.data || []);
+            mockCustomers = window.customers;
+            localStorage.setItem('CALLCENTER_CUSTOMERS_CACHE', JSON.stringify(mockCustomers));
+        }
 
         // 4. Calculate Stats
         recalculateGlobalStats();
         
     } catch (err) {
         console.error("API Error - Could not fetch data:", err);
-        agents = []; 
-        mockCustomers = [];
         showAppAlert("Could not connect to the database. The API returned an error.", "Connection Error");
     }
 }
@@ -367,6 +387,17 @@ function initCurrentPage() {
     if (currentPage === 'workspace' && isClockedIn) {
         restoreClockedInWorkspace();
     }
+    syncGlobalClockStatus();
+}
+
+function syncGlobalClockStatus() {
+    const globalText = document.getElementById('global-status-text');
+    if (!globalText || CURRENT_USER_ROLE !== 'Control Agent') return;
+    globalText.innerHTML = isClockedIn
+        ? '<span class="w-2 h-2 rounded-full bg-green-500"></span> ONLINE'
+        : '<span class="w-2 h-2 rounded-full bg-gray-400"></span> OFFLINE';
+    globalText.classList.toggle('text-green-700', isClockedIn);
+    globalText.classList.toggle('text-gray-500', !isClockedIn);
 }
 
 function restoreClockedInWorkspace() {
@@ -1150,8 +1181,8 @@ window.updateAvailableAgents = function() {
     const controlAgents = agents.filter(a => {
         const role = String(a.Role || a.role || '').trim().toLowerCase();
         const status = String(a.Status || a.status || '').trim().toLowerCase();
-        const campaign = a.Campaign || a.campaign || '';
-        return role === 'control agent' && status === 'clocked in' && !String(campaign).trim();
+        const campaign = a.Campaign || a.campaign || a.currentCampaign || '';
+        return role === 'control agent' && ['active', 'clocked in', 'online'].includes(status) && !String(campaign).trim();
     });
 
     if (controlAgents.length === 0) {
@@ -1322,6 +1353,7 @@ function toggleAgentStatus(checkbox) {
     if (emptyState) { emptyState.classList.add('hidden'); emptyState.classList.remove('flex'); }
     if (activeCall) { activeCall.classList.add('hidden'); activeCall.classList.remove('flex'); }
   }
+        syncGlobalClockStatus();
 }
 
 // 1. OPTIMIZED AGENT QUEUE (Fixes Workspace Freeze)
