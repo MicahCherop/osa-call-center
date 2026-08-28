@@ -402,12 +402,34 @@ def update_agent_status(name: str = Body(...), status: str = Body(...)):
 @app.get("/campaigns")
 @app.get("/api/campaigns")
 def get_campaigns():
-    sheet = get_google_sheet().worksheet("Campaigns")
-    headers = sheet.row_values(1)
-    if not headers:
-        return []
-    rows = sheet.get_values(f"A2:{column_letter(len(headers))}{sheet.row_count}")
-    return records_from_rows(rows, headers)
+    spreadsheet = get_google_sheet()
+    campaign_records = []
+    try:
+        sheet = spreadsheet.worksheet("Campaigns")
+        headers = sheet.row_values(1)
+        if headers:
+            rows = sheet.get_values(f"A2:{column_letter(len(headers))}{sheet.row_count}")
+            campaign_records = records_from_rows(rows, headers)
+    except gspread.exceptions.WorksheetNotFound:
+        pass
+
+    if campaign_records:
+        return campaign_records
+
+    # Some deployments store campaign uploads only in Customers/category sheets.
+    # Derive a registry response so the campaign page and allocation dropdown stay usable.
+    derived = {}
+    for customer in read_customer_records(spreadsheet):
+        campaign_name = str(customer.get("campaign", "")).strip()
+        if campaign_name and campaign_name not in derived:
+            derived[campaign_name] = {
+                "name": campaign_name,
+                "type": campaign_name if campaign_name in CATEGORY_HEADERS else "",
+                "priority": "",
+                "startDate": "",
+                "endDate": "",
+            }
+    return list(derived.values())
 
 @app.post("/campaigns")
 @app.post("/api/campaigns")
