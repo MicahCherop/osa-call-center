@@ -55,6 +55,18 @@ function agentCampaign(agent) {
     })?.campaign || '';
 }
 
+function getAgentQueueCampaign() {
+    const campaigns = [...new Set((mockCustomers || [])
+        .filter(customer => String(customer.agentId || customer.AgentId || '').trim() === LOGGED_IN_AGENT)
+        .map(customer => String(customer.campaign || customer.Campaign || '').trim())
+        .filter(Boolean))];
+    const storageKey = `ACTIVE_QUEUE_CAMPAIGN_${LOGGED_IN_AGENT || 'unknown'}`;
+    const savedCampaign = localStorage.getItem(storageKey);
+    const activeCampaign = campaigns.includes(savedCampaign) ? savedCampaign : (campaigns[0] || '');
+    if (activeCampaign) localStorage.setItem(storageKey, activeCampaign);
+    return activeCampaign;
+}
+
 function normalizeCampaignType(value) {
     const type = String(value || '').trim().toLowerCase().replace(/[_-]+/g, ' ');
     if (type === 'active no loan' || type === 'active no loans' || type === 'active with no loan' || type === 'active with no loans') return 'active_no_loan';
@@ -62,6 +74,11 @@ function normalizeCampaignType(value) {
     if (type === 'defaulted' || type === 'defaulters' || type === 'defaulted customers') return 'defaulted';
     if (type === 'dormant') return 'dormant';
     return type.replace(/\s+/g, '_');
+}
+
+function customerCampaignType(customer) {
+    const campaign = customer?.campaign || customer?.Campaign || '';
+    return normalizeCampaignType(campaignConfigs[campaign] || campaign || 'defaulted');
 }
 
 function rebuildCampaignConfigs() {
@@ -1002,7 +1019,7 @@ async function submitDisposition(e) {
   
   const outcome = document.getElementById('disp-outcome').value;
   const activeCustomer = mockCustomers.find(x => x.id === activeCustomerId);
-    const campType = normalizeCampaignType(campaignConfigs[activeCustomer?.campaign] || 'defaulted');
+    const campType = customerCampaignType(activeCustomer);
   
   let dispositionSaved = '';
   let amountRec = 0;
@@ -1348,6 +1365,10 @@ function escapeHtml(value) {
     .replace(/'/g, '&#039;');
 }
 
+function inlineString(value) {
+    return `'${String(value ?? '').replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\r?\n/g, '\\n')}'`;
+}
+
 function formatMoney(value) {
   const numericValue = Number(String(value ?? 0).replace(/[^\d.-]/g, '')) || 0;
   return `Sh ${numericValue.toLocaleString()}`;
@@ -1424,8 +1445,13 @@ function renderAgentQueue() {
     const queueDiv = document.getElementById('agent-customer-list');
     if (!queueDiv || !LOGGED_IN_AGENT) return;
     const countSpan = document.getElementById('queue-count');
+        const activeCampaign = getAgentQueueCampaign();
+    const campaignLabel = document.getElementById('active-queue-campaign');
+    if (campaignLabel) campaignLabel.innerText = activeCampaign ? `(${activeCampaign})` : '';
 
     const myCustomers = mockCustomers.filter(c => {
+            const customerCampaign = String(c.campaign || c.Campaign || '').trim();
+            if (customerCampaign !== activeCampaign) return false;
       if (activeWorkspaceQueueTab === 'pending') {
         return c.pendingReschedule && String(c.worked).toUpperCase() !== 'TRUE' && (!c.agentId || c.agentId === LOGGED_IN_AGENT);
       }
@@ -1447,9 +1473,9 @@ function renderAgentQueue() {
     let htmlString = '';
     myCustomers.slice(0, 100).forEach(c => {
         htmlString += `
-        <div class="bg-white/80 border border-white hover:border-brandAmber/50 hover:shadow-md p-3 rounded-lg cursor-pointer transition flex flex-col gap-1" onclick="startCall(${c.id})">
+        <div class="bg-white/80 border border-white hover:border-brandAmber/50 hover:shadow-md p-3 rounded-lg cursor-pointer transition flex flex-col gap-1" onclick="startCall(${inlineString(c.id)})">
             <div class="flex justify-between items-center">
-                <button type="button" onclick="event.stopPropagation(); openCustomerDrawer(${c.id})" class="font-bold text-sm text-brandDark text-left hover:text-brandAmber transition">${escapeHtml(c.name)}</button>
+            <button type="button" onclick="event.stopPropagation(); openCustomerDrawer(${inlineString(c.id)})" class="font-bold text-sm text-brandDark text-left hover:text-brandAmber transition">${escapeHtml(c.name)}</button>
                 <i class="fa-solid fa-phone text-brandAmber text-xs"></i>
             </div>
             <div class="text-xs text-brandDark/60">${escapeHtml(c.campaign || '')}</div>
@@ -1576,23 +1602,8 @@ function startCall(id) {
   const form = document.getElementById('disposition-form');
   if (form) form.reset();
   
-    const campType = normalizeCampaignType(campaignConfigs[c.campaign] || 'defaulted');
   const resContainer = document.getElementById('container-customer-response');
   const statContainer = document.getElementById('container-account-status');
-  
-  if (resContainer && statContainer) {
-    if (campType === 'active_no_loan' || campType === 'dormant') {
-       resContainer.classList.remove('hidden');
-       if (document.getElementById('disp-response')) document.getElementById('disp-response').required = true;
-       statContainer.classList.add('hidden');
-       if (document.getElementById('disp-status')) document.getElementById('disp-status').required = false;
-    } else {
-       statContainer.classList.remove('hidden');
-       if (document.getElementById('disp-status')) document.getElementById('disp-status').required = true;
-       resContainer.classList.add('hidden');
-       if (document.getElementById('disp-response')) document.getElementById('disp-response').required = false;
-    }
-  }
 
   handleOutcomeChangeGlass(); 
 }
@@ -1608,7 +1619,7 @@ function handleOutcomeChangeGlass() {
     const accountContainer = document.getElementById('container-account-status');
     const ptpTimeInput = document.getElementById('input-ptp-time');
   const activeCustomer = mockCustomers.find(x => x.id === activeCustomerId);
-    const campType = normalizeCampaignType(campaignConfigs[activeCustomer?.campaign] || 'defaulted');
+    const campType = customerCampaignType(activeCustomer);
 
   const status = statusEl ? statusEl.value : '';
   const outcome = outcomeEl ? outcomeEl.value : '';

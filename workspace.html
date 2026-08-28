@@ -9,6 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="/callcenter-tailwind.css">
+  <link rel="stylesheet" href="/callcenter.css">
   <link rel="icon" type="image/png" href="https://cdn.brandfetch.io/idkNTof4f-/w/400/h/400/theme/dark/icon.jpeg?c=1dxbfHSJFAPEGdCLU4o5B">
 </head>
 
@@ -247,7 +248,10 @@
           <!-- LEFT: QUEUE LIST -->
           <div id="workspace-queue" class="w-1/3 glass-card rounded-2xl p-5 flex-col h-full hidden">
             <div class="flex justify-between items-center mb-4 border-b border-brandDark/5 pb-3">
-               <h3 class="font-medium text-brandDark flex items-center gap-2"><i class="fa-solid fa-list-ul text-brandAmber"></i> Workspace Queue</h3>
+               <div class="flex items-center gap-2 min-w-0">
+                 <h3 class="font-medium text-brandDark flex items-center gap-2"><i class="fa-solid fa-list-ul text-brandAmber"></i> Workspace Queue</h3>
+                 <span id="active-queue-campaign" class="text-[11px] text-brandDark/50 truncate"></span>
+               </div>
                <div class="flex items-center gap-2">
                  <button type="button" onclick="claimNextCustomer()" class="text-[11px] font-medium bg-brandAmber text-white px-2.5 py-1.5 rounded-md" title="Assign the next unassigned account to me">Take Account</button>
                  <span class="text-[11px] font-medium bg-brandAmber/10 text-amber-700 px-2 py-1 rounded-md" id="queue-count">0 Remaining</span>
@@ -273,7 +277,7 @@
           <div id="active-call-panel" class="flex-1 gap-6 hidden h-full">
             
             <!-- Customer info panel -->
-            <div class="flex-1 glass-card rounded-2xl p-6 flex flex-col overflow-y-auto">
+            <div id="active-customer-info" class="flex-1 glass-card rounded-2xl p-6 flex flex-col overflow-y-auto">
               <div class="flex justify-between items-start border-b border-brandDark/5 pb-4 mb-5">
                 <div>
                   <div class="flex items-center gap-3 mb-1">
