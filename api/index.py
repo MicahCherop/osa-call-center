@@ -1,5 +1,6 @@
 import os
 import json
+import base64
 import threading
 import time
 from typing import Any, Dict, List, Optional
@@ -39,24 +40,36 @@ def get_google_sheet():
     if _sheet_cache is not None:
         return _sheet_cache
 
-    creds_json = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")
-    
-    if not creds_json:
-        raise HTTPException(status_code=500, detail="Google credentials environment variable missing.")
-    
-    creds_dict = json.loads(creds_json)
-    creds = Credentials.from_service_account_info(creds_dict, scopes=SCOPE)
-    client = gspread.authorize(creds)
-    
-    sheet_id = os.getenv("GOOGLE_SHEET_ID", "1VmLCg_6iY0QsjPbDjgDRNugFyyNRWABtPIASGDepZeU")
-    
     try:
+        creds_json = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON", "").strip()
+        if not creds_json:
+            raise ValueError("GOOGLE_SERVICE_ACCOUNT_JSON is not configured")
+
+        if creds_json.startswith('"') and creds_json.endswith('"'):
+            creds_json = json.loads(creds_json)
+        if creds_json.startswith("{") and creds_json.endswith("}"):
+            creds_dict = json.loads(creds_json)
+        else:
+            creds_dict = json.loads(base64.b64decode(creds_json).decode("utf-8"))
+        if not creds_dict.get("client_email") or not creds_dict.get("private_key"):
+            raise ValueError("service account JSON is missing client_email or private_key")
+
+        sheet_id = os.getenv("GOOGLE_SHEET_ID", "1VmLCg_6iY0QsjPbDjgDRNugFyyNRWABtPIASGDepZeU").strip()
+        if not sheet_id:
+            raise ValueError("GOOGLE_SHEET_ID is not configured")
+
+        creds = Credentials.from_service_account_info(creds_dict, scopes=SCOPE)
+        client = gspread.authorize(creds)
         with _sheet_cache_lock:
             if _sheet_cache is None:
                 _sheet_cache = client.open_by_key(sheet_id)
             return _sheet_cache
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to open sheet: {str(e)}")
+    except HTTPException:
+        raise
+    except json.JSONDecodeError as error:
+        raise HTTPException(status_code=503, detail=f"Google credentials are not valid JSON: {error.msg}")
+    except Exception as error:
+        raise HTTPException(status_code=503, detail=f"Google Sheets connection failed: {error}")
 
 
 def normalize_record(record: Dict[str, Any]) -> Dict[str, Any]:
@@ -290,7 +303,12 @@ def read_root():
 @app.get("/health")
 @app.get("/api/health")
 def health_check():
-    return {"status": "ok", "message": "Call Center API is running"}
+    return {
+        "status": "ok",
+        "message": "Call Center API is running",
+        "googleCredentialsConfigured": bool(os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON", "").strip()),
+        "googleSheetConfigured": bool(os.getenv("GOOGLE_SHEET_ID", "").strip()),
+    }
 
 
 # --- AUTHENTICATION ---
