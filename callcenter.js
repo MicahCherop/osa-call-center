@@ -1918,7 +1918,11 @@ window.renderOverviewData = function() {
     if (currentPage !== 'overview') return;
 
     // Pulse: Count active agents
-    const activeAgents = (agents || []).filter(a => String(a.Status || a.status).toLowerCase() === 'active');
+    const controlAgents = (agents || []).filter(a => {
+        const role = String(a.Role || a.role || '').trim().toLowerCase();
+        return role === 'control agent';
+    });
+    const activeAgents = controlAgents.filter(a => String(a.Status || a.status).toLowerCase() === 'active');
     const onlineEl = document.getElementById('ov-online-count');
     if (onlineEl) onlineEl.innerText = activeAgents.length;
 
@@ -1934,11 +1938,11 @@ window.renderOverviewData = function() {
 
     const productivityBody = document.getElementById('ov-agent-productivity');
     if (productivityBody) {
-        if (!agents || agents.length === 0) {
+        if (controlAgents.length === 0) {
             productivityBody.innerHTML = '<tr><td colspan="7" class="px-6 py-8 text-center text-brandDark/50 italic">No agents found.</td></tr>';
             return;
         }
-        productivityBody.innerHTML = agents.map(agent => {
+        productivityBody.innerHTML = controlAgents.map(agent => {
             const name = agent.name || agent.Name || 'Unknown';
             const role = agent.role || agent.Role || '--';
             const status = agent.status || agent.Status || 'Offline';

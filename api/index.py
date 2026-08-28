@@ -480,17 +480,21 @@ def read_customer_records(spreadsheet) -> List[Dict[str, Any]]:
                 category_sheet = spreadsheet.worksheet(sheet_name)
             except gspread.exceptions.WorksheetNotFound:
                 continue
-            headers = category_sheet.row_values(1)
-            if not headers:
+            try:
+                headers = category_sheet.row_values(1)
+                if not headers:
+                    continue
+                end_column = column_letter(len(headers))
+                rows = category_sheet.get_values(f"A2:{end_column}{category_sheet.row_count}")
+                for record in records_from_rows(rows, headers):
+                    record.setdefault("campaign", category)
+                    key = customer_key(record)
+                    if key not in existing_keys:
+                        records.append(record)
+                        existing_keys.add(key)
+            except Exception as error:
+                print(f"Skipping unavailable category sheet {sheet_name}: {error}")
                 continue
-            end_column = column_letter(len(headers))
-            rows = category_sheet.get_values(f"A2:{end_column}{category_sheet.row_count}")
-            for record in records_from_rows(rows, headers):
-                record.setdefault("campaign", category)
-                key = customer_key(record)
-                if key not in existing_keys:
-                    records.append(record)
-                    existing_keys.add(key)
     return records
 
 @app.get("/customers")
