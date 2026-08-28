@@ -85,6 +85,8 @@ def normalize_record(record: Dict[str, Any]) -> Dict[str, Any]:
                 "campaignpriority": "priority", "startdate": "startDate", "enddate": "endDate",
                 "callsmade": "callsMade", "calls": "callsMade", "connectedcalls": "connected",
                 "amountrecovered": "conversion", "recovered": "conversion",
+                "daysinactive": "daysInactive", "daysdormant": "daysDormant",
+                "lastloanamount": "lastLoanAmount", "loyalty": "loyalty", "feedback": "feedback",
             }
             if compact_key in aliases:
                 normalized[aliases[compact_key]] = value
@@ -109,7 +111,17 @@ def records_from_rows(rows: List[List[Any]], headers: List[str]) -> List[Dict[st
 
 
 def worksheet_records(worksheet) -> List[Dict[str, Any]]:
-    values = worksheet.get_all_values()
+    last_error = None
+    for attempt in range(2):
+        try:
+            values = worksheet.get_all_values()
+            break
+        except Exception as error:
+            last_error = error
+            if attempt == 0:
+                time.sleep(0.25)
+    else:
+        raise last_error
     if not values:
         return []
     headers = values[0]
@@ -213,6 +225,19 @@ def get_or_create_campaign_sheet(spreadsheet, campaign: str):
                 return worksheet
 
 
+def get_or_create_campaign_registry(spreadsheet):
+    headers = ["name", "type", "priority", "startDate", "endDate"]
+    try:
+        worksheet = spreadsheet.worksheet("Campaigns")
+        if not worksheet.row_values(1):
+            worksheet.update("A1", [headers])
+        return worksheet
+    except gspread.exceptions.WorksheetNotFound:
+        worksheet = spreadsheet.add_worksheet(title="Campaigns", rows=100, cols=len(headers))
+        worksheet.append_row(headers)
+        return worksheet
+
+
 def ensure_customer_headers(worksheet) -> None:
     if worksheet.col_count < len(CUSTOMER_HEADERS):
         worksheet.resize(cols=len(CUSTOMER_HEADERS))
@@ -242,7 +267,7 @@ class LoginModel(BaseModel):
     email: str
 
 class DispositionModel(BaseModel):
-    customerId: int
+    customerId: str
     outcome: str
     status: str
     amountRec: float = 0.0
@@ -512,14 +537,17 @@ def create_campaign(
     endDate: str = Body(...), 
     customers: List[CustomerUploadModel] = Body(...)
 ):
+    stage = "Google Sheets connection"
     try:
         sh = get_google_sheet()
-        camp_sheet = sh.worksheet("Campaigns")
+        stage = "campaign registry"
+        camp_sheet = get_or_create_campaign_registry(sh)
         existing_campaigns = camp_sheet.col_values(1)
 
         if name not in existing_campaigns:
             camp_sheet.append_row([name, type, priority, startDate, endDate])
 
+        stage = "campaign worksheet"
         campaign_sheet = get_or_create_campaign_sheet(sh, name)
         rows = [[
             c.id, c.name, c.phone, c.branch, c.sector, c.balance, name, "", "FALSE", "", "",
@@ -527,6 +555,7 @@ def create_campaign(
         ] for c in customers]
 
         if rows:
+            stage = "customer upload"
             campaign_sheet.append_rows(rows)
 
         return {
@@ -537,10 +566,10 @@ def create_campaign(
     except HTTPException:
         raise
     except gspread.exceptions.WorksheetNotFound as error:
-        raise HTTPException(status_code=503, detail=f"Required Google worksheet was not found: {error}")
+        raise HTTPException(status_code=503, detail=f"{stage} worksheet was not found: {error}")
     except Exception as error:
-        print(f"Campaign upload failed: {error}")
-        raise HTTPException(status_code=503, detail="Google Sheets upload failed. Check API logs and spreadsheet permissions.")
+        print(f"Campaign upload failed during {stage}: {error}")
+        raise HTTPException(status_code=503, detail=f"Campaign upload failed during {stage}: {error}")
 
 
 def read_customer_records(spreadsheet) -> List[Dict[str, Any]]:
@@ -574,12 +603,7 @@ def read_customer_records(spreadsheet) -> List[Dict[str, Any]]:
     for campaign in campaign_names:
         try:
             campaign_sheet = spreadsheet.worksheet(campaign_sheet_name(campaign))
-            headers = campaign_sheet.row_values(1)
-            if not headers:
-                continue
-            end_column = column_letter(len(headers))
-            rows = campaign_sheet.get_values(f"A2:{end_column}{campaign_sheet.row_count}")
-            for record in records_from_rows(rows, headers):
+            for record in worksheet_records(campaign_sheet):
                 record.setdefault("campaign", campaign)
                 key = customer_key(record)
                 if key not in existing_keys:
@@ -607,7 +631,7 @@ def read_customer_records(spreadsheet) -> List[Dict[str, Any]]:
     return records
 
 
-def find_customer_location(spreadsheet, customer_id: int):
+def find_customer_location(spreadsheet, customer_id: str):
     sheets = []
     try:
         sheets.append(spreadsheet.worksheet("Customers"))

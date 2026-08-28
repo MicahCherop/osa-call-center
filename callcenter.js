@@ -2098,7 +2098,7 @@ const CUSTOMER_DISPLAY_COLUMNS = [
     ['id', 'ID'], ['name', 'Customer Name'], ['phone', 'Phone'],
     ['branch', 'Branch'], ['sector', 'Sector'], ['balance', 'Balance'],
     ['campaign', 'Campaign'], ['agentId', 'Assigned Agent'],
-    ['worked', 'Worked'], ['outcome', 'Outcome'], ['status', 'Status']
+    ['worked', 'Worked'], ['outcome', 'Outcome'], ['status', 'Status'], ['businessStatus', 'Business Status']
 ];
 
 function displayValue(value) {
@@ -2106,14 +2106,22 @@ function displayValue(value) {
 }
 
 const CATEGORY_DISPLAY_COLUMNS = {
-    defaulted: [['name', 'Name'], ['phone', 'Mobile No'], ['dueDate', 'Due Date'], ['branch', 'Branch'], ['pair', 'Pair'], ['sector', 'Sector'], ['disbAmount', 'Disb Amount'], ['totalPaid', 'Total Paid'], ['balance', 'Balance']],
-    upcoming_dues: [['name', 'Name'], ['phone', 'Mobile No'], ['dueDate', 'Due Date'], ['branch', 'Branch'], ['pair', 'Pair'], ['sector', 'Sector'], ['disbAmount', 'Disb Amount'], ['totalPaid', 'Total Paid'], ['balance', 'Balance']],
-    active_no_loan: [['name', 'Name'], ['phone', 'Mobile No'], ['dueDate', 'Due Date'], ['branch', 'Branch'], ['pair', 'Pair'], ['sector', 'Sector'], ['disbAmount', 'Disb Amount']],
-    dormant: [['name', 'Name'], ['phone', 'Mobile No'], ['dueDate', 'Due Date'], ['branch', 'Branch'], ['pair', 'Pair'], ['sector', 'Sector'], ['disbAmount', 'Disb Amount']]
+    defaulted: [['name', 'Name'], ['phone', 'Mobile No'], ['dueDate', 'Due Date'], ['branch', 'Branch'], ['pair', 'Pair'], ['sector', 'Sector'], ['disbAmount', 'Disb Amount'], ['totalPaid', 'Total Paid'], ['balance', 'Balance'], ['businessStatus', 'Business Status']],
+    upcoming_dues: [['name', 'Name'], ['phone', 'Mobile No'], ['dueDate', 'Due Date'], ['branch', 'Branch'], ['pair', 'Pair'], ['sector', 'Sector'], ['disbAmount', 'Disb Amount'], ['totalPaid', 'Total Paid'], ['balance', 'Balance'], ['businessStatus', 'Business Status']],
+    active_no_loan: [
+        ['sector', 'Sector'], ['branch', 'Station'], ['name', 'Customer'], ['phone', 'Mobile No'],
+        ['pair', 'Pair'], ['daysInactive', 'Days Inactive'], ['loyalty', 'Loyalty'],
+        ['lastLoanAmount', 'Lastloan Amount'], ['outcome', 'Call Outcome'], ['status', 'Status'], ['businessStatus', 'Business Status'], ['feedback', 'Feedback']
+    ],
+    dormant: [
+        ['sector', 'Sector'], ['branch', 'Station'], ['name', 'Customer'], ['phone', 'Mobile No'],
+        ['pair', 'Pair'], ['daysDormant', 'Days Dormant'], ['loyalty', 'Loyalty'],
+        ['lastLoanAmount', 'Lastloan Amount'], ['outcome', 'Call Outcome'], ['status', 'Status'], ['businessStatus', 'Business Status'], ['feedback', 'Feedback']
+    ]
 };
 
 function customerColumns(customer) {
-    const type = String(campaignConfigs[customer?.campaign] || '').toLowerCase();
+    const type = customerCampaignType(customer);
     return CATEGORY_DISPLAY_COLUMNS[type] || CUSTOMER_DISPLAY_COLUMNS;
 }
 
