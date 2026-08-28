@@ -1,4 +1,4 @@
-const CACHE_NAME = 'osa-call-center-shell-v3';
+const CACHE_NAME = 'osa-call-center-shell-v4';
 const APP_SHELL = [
   '/',
   '/index.html',

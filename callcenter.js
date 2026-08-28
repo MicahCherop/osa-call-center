@@ -8,7 +8,6 @@ function setupPwaInstall() {
         console.warn('PWA service worker registration failed:', error);
     });
     window.addEventListener('beforeinstallprompt', event => {
-        event.preventDefault();
         deferredInstallPrompt = event;
         document.getElementById('pwa-install-button')?.classList.remove('hidden');
     });
