@@ -1,5 +1,43 @@
 ﻿// --- FRONTEND API INTEGRATION ---
 const API_BASE = `${window.location.origin}/api`;
+let deferredInstallPrompt = null;
+
+function setupPwaInstall() {
+    if (!('serviceWorker' in navigator)) return;
+    navigator.serviceWorker.register('/service-worker.js').catch(error => {
+        console.warn('PWA service worker registration failed:', error);
+    });
+    window.addEventListener('beforeinstallprompt', event => {
+        event.preventDefault();
+        deferredInstallPrompt = event;
+        document.getElementById('pwa-install-button')?.classList.remove('hidden');
+    });
+    window.addEventListener('appinstalled', () => {
+        deferredInstallPrompt = null;
+        document.getElementById('pwa-install-button')?.remove();
+    });
+    if (window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone) return;
+    const installButton = document.createElement('button');
+    installButton.id = 'pwa-install-button';
+    installButton.type = 'button';
+    installButton.className = 'pwa-install-button';
+    installButton.title = 'Install Call Center Campaigns';
+    installButton.setAttribute('aria-label', 'Install Call Center Campaigns');
+    installButton.innerHTML = '<i class="fa-solid fa-download"></i><span>Install app</span>';
+    installButton.addEventListener('click', async () => {
+        if (!deferredInstallPrompt) {
+            showAppAlert('Use your browser menu and choose "Install Call Center Campaigns" or "Add to desktop".', 'Install app');
+            return;
+        }
+        deferredInstallPrompt.prompt();
+        await deferredInstallPrompt.userChoice;
+        deferredInstallPrompt = null;
+        installButton.classList.add('hidden');
+    });
+    document.body.appendChild(installButton);
+}
+
+document.addEventListener('DOMContentLoaded', setupPwaInstall);
 const API_CACHE_TTL = 30000;
 const API_CACHE_PREFIX = 'CALLCENTER_API_CACHE_';
 
@@ -1477,10 +1515,10 @@ function switchWorkspaceQueueTab(tab) {
     const isActive = tabName === tab;
     const btn = document.getElementById(`ws-queue-tab-${tabName}`);
     if (!btn) return;
-    btn.classList.toggle('bg-brandDark', isActive);
+    btn.classList.toggle('bg-brandAmber', isActive);
     btn.classList.toggle('text-white', isActive);
-    btn.classList.toggle('bg-white/50', !isActive);
-    btn.classList.toggle('text-brandDark/70', !isActive);
+    btn.classList.toggle('bg-brandAmber/10', !isActive);
+    btn.classList.toggle('text-amber-700', !isActive);
     btn.classList.toggle('border', !isActive);
     btn.classList.toggle('border-brandDark/10', !isActive);
   });
@@ -2107,6 +2145,24 @@ window.renderOverviewData = function() {
     
     const unassignedEl = document.getElementById('ov-unassigned-count');
     if (unassignedEl) unassignedEl.innerText = unassigned.length;
+
+    let interestedTotal = 0;
+    let defaultedCollected = 0;
+    let upcomingCollected = 0;
+    (mockCustomers || []).forEach(customer => {
+        const response = String(customer.status || customer.response || customer.feedback || '').trim().toLowerCase();
+        const campaignType = customerCampaignType(customer);
+        if (response === 'interested') interestedTotal += 1;
+        const amount = Number(String(customer.amountRec ?? customer.ptpAmount ?? customer.amountRecovered ?? customer.conversion ?? 0).replace(/[^\d.-]/g, '')) || 0;
+        if (campaignType === 'defaulted') defaultedCollected += amount;
+        if (campaignType === 'upcoming_dues') upcomingCollected += amount;
+    });
+    const interestedEl = document.getElementById('ov-interested-total');
+    const defaultedEl = document.getElementById('ov-defaulted-collected');
+    const upcomingEl = document.getElementById('ov-upcoming-collected');
+    if (interestedEl) interestedEl.innerText = interestedTotal.toLocaleString();
+    if (defaultedEl) defaultedEl.innerText = `Sh ${defaultedCollected.toLocaleString()}`;
+    if (upcomingEl) upcomingEl.innerText = `Sh ${upcomingCollected.toLocaleString()}`;
 
     const productivityBody = document.getElementById('ov-agent-productivity');
     if (productivityBody) {

@@ -1,0 +1,19 @@
+{
+  "name": "Call Center Campaigns",
+  "short_name": "Call Center Campaigns",
+  "description": "Call center campaign and customer workspace",
+  "start_url": "/overview.html",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0b1220",
+  "theme_color": "#f59e0b",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "/pwa-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

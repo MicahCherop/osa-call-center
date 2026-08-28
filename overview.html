@@ -3,7 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Overview - Call Center Campaigns</title>
+  <link rel="manifest" href="/manifest.webmanifest">
+  <meta name="theme-color" content="#f59e0b">
+  <script>if (localStorage.getItem('theme') === 'dark') document.documentElement.classList.add('dark');</script>
+  <title>Call Center Campaigns - Overview</title>
   
   <link rel="icon" type="image/png" href="https://cdn.brandfetch.io/idkNTof4f-/w/400/h/400/theme/dark/icon.jpeg?c=1dxbfHSJFAPEGdCLU4o5B">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -23,7 +26,7 @@
   <!-- FULL WIDTH HEADER -->
   <header class="w-full glass-panel border-b border-brandDark/5 px-6 py-3 flex justify-between items-center relative z-50 shrink-0">
     <h1 class="text-xl font-medium tracking-tight flex items-center gap-3 text-brandDark">
-      <i class="fa-solid fa-phone-volume text-brandAmber"></i> OSA Call Center
+      <i class="fa-solid fa-phone-volume text-brandAmber"></i> Call Center Campaigns
     </h1>
     
     <div class="flex items-center gap-5 text-sm">
@@ -97,12 +100,40 @@
               <i class="fa-solid fa-plus"></i> New Campaign
             </button>
             <button onclick="window.location.href='/teamleader.html'" class="bg-brandAmber hover:bg-amber-600 text-white px-4 py-2.5 rounded-lg text-sm font-medium transition ease-in shadow-sm flex items-center gap-2">
-              <i class="fa-solid fa-share-nodes"></i> Redistribute Leads
+              <i class="fa-solid fa-share-nodes"></i> Redistribute Customers
             </button>
           </div>
         </div>
 
-        <!-- ROW 1: FINANCIALS & GLOBAL METRICS -->
+        <!-- ROW 1: RESPONSE KPIS -->
+        <div class="overview-kpi-grid w-full mx-auto grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div class="glass-card p-5 rounded-2xl border border-brandDark/5">
+            <div class="flex items-center justify-between gap-3">
+              <h3 class="text-[11px] font-semibold uppercase tracking-wider text-brandDark/50">Total Interested</h3>
+              <i class="fa-solid fa-hand-pointer text-brandAmber"></i>
+            </div>
+            <div id="ov-interested-total" class="text-2xl font-medium text-brandDark mt-3">0</div>
+            <p class="text-xs text-brandDark/50 mt-1">Interested customer responses</p>
+          </div>
+          <div class="glass-card p-5 rounded-2xl border border-brandDark/5">
+            <div class="flex items-center justify-between gap-3">
+              <h3 class="text-[11px] font-semibold uppercase tracking-wider text-brandDark/50">Defaulted Collected</h3>
+              <i class="fa-solid fa-coins text-brandAmber"></i>
+            </div>
+            <div id="ov-defaulted-collected" class="text-2xl font-medium text-green-600 mt-3">Sh 0</div>
+            <p class="text-xs text-brandDark/50 mt-1">Recorded collections</p>
+          </div>
+          <div class="glass-card p-5 rounded-2xl border border-brandDark/5">
+            <div class="flex items-center justify-between gap-3">
+              <h3 class="text-[11px] font-semibold uppercase tracking-wider text-brandDark/50">Upcoming Dues Collected</h3>
+              <i class="fa-solid fa-calendar-check text-brandAmber"></i>
+            </div>
+            <div id="ov-upcoming-collected" class="text-2xl font-medium text-green-600 mt-3">Sh 0</div>
+            <p class="text-xs text-brandDark/50 mt-1">Recorded collections</p>
+          </div>
+        </div>
+
+        <!-- ROW 2: FINANCIALS & GLOBAL METRICS -->
         <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
           <!-- Daily Target Burn-up -->
           <div class="glass-card p-6 rounded-2xl border border-brandDark/5 md:col-span-2 relative overflow-hidden flex flex-col justify-center">

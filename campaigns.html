@@ -3,7 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>OSA Call Center - Campaigns</title>
+  <link rel="manifest" href="/manifest.webmanifest">
+  <meta name="theme-color" content="#f59e0b">
+  <script>if (localStorage.getItem('theme') === 'dark') document.documentElement.classList.add('dark');</script>
+  <title>Call Center Campaigns - Campaigns</title>
   
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -41,11 +44,11 @@
             <label class="block text-[11px] font-semibold text-brandDark/70 uppercase mb-1.5">Campaign Type *</label>
             <select required id="new-campaign-type" onchange="toggleCustomCategory(this)" class="glass-input rounded-lg w-full px-3 py-2 text-sm font-normal">
               <option value="">Select type...</option>
-              <option value="active_no_loan">Active Customers - No Loan</option>
+              <option value="active_no_loan">Active With No Loans</option>
               <option value="dormant">Dormant Customers</option>
               <option value="defaulted">Defaulted Accounts</option>
               <option value="upcoming_dues">Upcoming Dues</option>
-              <option value="custom">Other / New Category</option>
+              <option value="custom">+ Add Campaign Type</option>
             </select>
             <input type="text" id="new-campaign-custom-type" placeholder="Enter new category" class="glass-input rounded-lg w-full px-3 py-2 text-sm font-normal hidden mt-2">
           </div>
@@ -143,7 +146,7 @@
   <!-- 1. FULL WIDTH HEADER -->
   <header class="w-full glass-panel border-b border-brandDark/5 px-6 py-3 flex justify-between items-center relative z-50 shrink-0">
     <h1 class="text-xl font-medium tracking-tight flex items-center gap-3 text-brandDark">
-      <i class="fa-solid fa-phone-volume text-brandAmber"></i> OSA Call Center
+      <i class="fa-solid fa-phone-volume text-brandAmber"></i> Call Center Campaigns
     </h1>
     
     <div class="flex items-center gap-5 text-sm">

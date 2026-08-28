@@ -18,6 +18,8 @@ _sheet_cache_lock = threading.Lock()
 _category_sheet_lock = threading.Lock()
 _campaign_registry_cache = None
 _campaign_sheet_cache = {}
+_campaign_response_cache = None
+_campaign_response_cache_time = 0
 _agents_data_cache = None
 _agents_data_cache_time = 0
 _agents_data_cache_lock = threading.Lock()
@@ -532,6 +534,11 @@ def update_agent_status(name: str = Body(...), status: str = Body(...)):
 @app.get("/campaigns")
 @app.get("/api/campaigns")
 def get_campaigns():
+    global _campaign_response_cache, _campaign_response_cache_time
+    with _agents_data_cache_lock:
+        if _campaign_response_cache is not None and time.time() - _campaign_response_cache_time < 30:
+            return _campaign_response_cache
+
     spreadsheet = get_google_sheet()
     campaign_records = []
     try:
@@ -544,35 +551,47 @@ def get_campaigns():
     except gspread.exceptions.WorksheetNotFound:
         pass
 
-    customer_records = read_customer_records(spreadsheet)
     account_counts = {}
-    for customer in customer_records:
-        campaign_name = str(customer.get("campaign", "")).strip()
-        if campaign_name:
-            account_counts[campaign_name] = account_counts.get(campaign_name, 0) + 1
+    try:
+        for customer in read_customer_records(spreadsheet):
+            campaign_name = str(customer.get("campaign", "")).strip()
+            if campaign_name:
+                account_counts[campaign_name] = account_counts.get(campaign_name, 0) + 1
+    except Exception as error:
+        print(f"Campaign account counts unavailable: {error}")
 
     if campaign_records:
         for campaign in campaign_records:
             campaign["accountCount"] = account_counts.get(str(campaign.get("name", "")).strip(), 0)
             campaign["dateAdded"] = campaign.get("dateAdded") or campaign.get("startDate") or ""
+        with _agents_data_cache_lock:
+            _campaign_response_cache = campaign_records
+            _campaign_response_cache_time = time.time()
         return campaign_records
 
     # Some deployments store campaign uploads only in Customers/category sheets.
     # Derive a registry response so the campaign page and allocation dropdown stay usable.
     derived = {}
-    for customer in read_customer_records(spreadsheet):
-        campaign_name = str(customer.get("campaign", "")).strip()
-        if campaign_name and campaign_name not in derived:
-            derived[campaign_name] = {
-                "name": campaign_name,
-                "type": campaign_name if campaign_name in CATEGORY_HEADERS else "",
-                "priority": "",
-                "startDate": "",
-                "endDate": "",
-                "accountCount": account_counts.get(campaign_name, 0),
-                "dateAdded": "",
-            }
-    return list(derived.values())
+    try:
+        for customer in read_customer_records(spreadsheet):
+            campaign_name = str(customer.get("campaign", "")).strip()
+            if campaign_name and campaign_name not in derived:
+                derived[campaign_name] = {
+                    "name": campaign_name,
+                    "type": campaign_name if campaign_name in CATEGORY_HEADERS else "",
+                    "priority": "",
+                    "startDate": "",
+                    "endDate": "",
+                    "accountCount": account_counts.get(campaign_name, 0),
+                    "dateAdded": "",
+                }
+    except Exception as error:
+        print(f"Campaign discovery unavailable: {error}")
+    response = list(derived.values())
+    with _agents_data_cache_lock:
+        _campaign_response_cache = response
+        _campaign_response_cache_time = time.time()
+    return response
 
 @app.post("/campaigns")
 @app.post("/api/campaigns")
