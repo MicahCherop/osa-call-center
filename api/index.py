@@ -163,6 +163,13 @@ CATEGORY_SHEET_ALIASES = {
     "Dormant": ("Dormant",),
 }
 
+TYPE_SHEET_HEADERS = [
+    "id", "name", "phone", "branch", "sector", "balance", "campaign",
+    "agentId", "worked", "outcome", "status", "dueDate", "pair",
+    "disbAmount", "totalPaid", "businessStatus", "ptpAmount", "ptpTime",
+    "feedback", "daysInactive", "daysDormant", "loyalty", "lastLoanAmount",
+]
+
 
 def category_sheet_name(category: str) -> str:
     """Convert an upload category into a safe, stable worksheet title."""
@@ -174,7 +181,7 @@ def category_sheet_name(category: str) -> str:
 
 def get_or_create_category_sheet(spreadsheet, category: str):
     title = category_sheet_name(category)
-    headers = CATEGORY_HEADERS.get(title, CUSTOMER_HEADERS)
+    headers = TYPE_SHEET_HEADERS
     try:
         worksheet = spreadsheet.worksheet(title)
         if worksheet.col_count < len(headers):
@@ -348,6 +355,35 @@ def category_row(customer: CustomerUploadModel, category: str) -> List[Any]:
     }
     headers = CATEGORY_HEADERS.get(category_sheet_name(category), CUSTOMER_HEADERS)
     return [values.get(header, "") for header in headers]
+
+
+def type_sheet_row(customer: CustomerUploadModel, campaign_type: str, headers: List[str]) -> List[Any]:
+    values = {
+        "id": customer.id,
+        "name": customer.name,
+        "phone": customer.phone,
+        "branch": customer.branch,
+        "sector": customer.sector,
+        "balance": customer.balance,
+        "campaign": customer.campaign,
+        "agentid": "",
+        "worked": "FALSE",
+        "outcome": "",
+        "status": "",
+        "duedate": customer.dueDate,
+        "pair": customer.pair,
+        "disbamount": customer.disbAmount,
+        "totalpaid": customer.totalPaid,
+        "businessstatus": "",
+        "ptpamount": "",
+        "ptptime": "",
+        "feedback": "",
+        "daysinactive": "",
+        "daysdormant": "",
+        "loyalty": "",
+        "lastloanamount": "",
+    }
+    return [values.get(str(header).strip().lower().replace(" ", ""), "") for header in headers]
 
 
 # --- ROOT & HEALTH ENDPOINTS ---
@@ -612,13 +648,11 @@ def create_campaign(
         if chunkIndex == 0:
             stage = "campaign registry"
             camp_sheet = get_or_create_campaign_registry(sh)
-            if not campaign_registry_has_name(camp_sheet, name):
-                camp_sheet.append_row([name, type, priority, startDate, endDate, time.strftime("%Y-%m-%d")])
-                campaign_registry_has_name.names.add(name)
+            camp_sheet.append_row([name, type, priority, startDate, endDate, time.strftime("%Y-%m-%d")])
 
         stage = "campaign worksheet"
         campaign_sheet = get_or_create_category_sheet(sh, type)
-        rows = [category_row(customer, type) for customer in customers]
+        rows = [type_sheet_row(customer, type, campaign_sheet.row_values(1)) for customer in customers]
 
         if rows:
             stage = "customer upload"
