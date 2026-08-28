@@ -108,6 +108,14 @@ def records_from_rows(rows: List[List[Any]], headers: List[str]) -> List[Dict[st
     ]
 
 
+def worksheet_records(worksheet) -> List[Dict[str, Any]]:
+    values = worksheet.get_all_values()
+    if not values:
+        return []
+    headers = values[0]
+    return records_from_rows(values[1:], headers)
+
+
 def column_letter(number: int) -> str:
     result = ""
     while number:
@@ -361,11 +369,7 @@ def login(creds: LoginModel):
 def get_agents():
     try:
         sheet = get_google_sheet().worksheet("Agents")
-        headers = sheet.row_values(1)
-        if not headers:
-            return []
-        rows = sheet.get_values(f"A2:{column_letter(len(headers))}{sheet.row_count}")
-        records = records_from_rows(rows, headers)
+        records = worksheet_records(sheet)
         for record in records:
             record.pop("password", None)
         return records
@@ -472,14 +476,11 @@ def get_campaigns():
     campaign_records = []
     try:
         sheet = spreadsheet.worksheet("Campaigns")
-        headers = sheet.row_values(1)
-        if headers:
-            rows = sheet.get_values(f"A2:{column_letter(len(headers))}{sheet.row_count}")
-            campaign_records = [
-                normalize_record(record)
-                for record in records_from_rows(rows, headers)
-                if any(str(record.get(key, "")).strip() for key in ("name", "campaignName", "campaign"))
-            ]
+        campaign_records = [
+            normalize_record(record)
+            for record in worksheet_records(sheet)
+            if any(str(record.get(key, "")).strip() for key in ("name", "campaignName", "campaign"))
+        ]
     except gspread.exceptions.WorksheetNotFound:
         pass
 
@@ -547,11 +548,7 @@ def read_customer_records(spreadsheet) -> List[Dict[str, Any]]:
     records = []
     try:
         master_sheet = spreadsheet.worksheet("Customers")
-        master_headers = master_sheet.row_values(1)
-        if master_headers:
-            end_column = column_letter(len(master_headers))
-            rows = master_sheet.get_values(f"A2:{end_column}{master_sheet.row_count}")
-            records.extend(records_from_rows(rows, master_headers))
+        records.extend(worksheet_records(master_sheet))
     except gspread.exceptions.WorksheetNotFound:
         pass
 
@@ -566,14 +563,11 @@ def read_customer_records(spreadsheet) -> List[Dict[str, Any]]:
     campaign_names = []
     try:
         campaign_registry = spreadsheet.worksheet("Campaigns")
-        registry_headers = campaign_registry.row_values(1)
-        if registry_headers:
-            registry_rows = campaign_registry.get_values(f"A2:{column_letter(len(registry_headers))}{campaign_registry.row_count}")
-            campaign_names = [
-                str(record.get("name", "")).strip()
-                for record in records_from_rows(registry_rows, registry_headers)
-                if str(record.get("name", "")).strip()
-            ]
+        campaign_names = [
+            str(record.get("name", "")).strip()
+            for record in worksheet_records(campaign_registry)
+            if str(record.get("name", "")).strip()
+        ]
     except gspread.exceptions.WorksheetNotFound:
         pass
 
@@ -601,12 +595,7 @@ def read_customer_records(spreadsheet) -> List[Dict[str, Any]]:
             except gspread.exceptions.WorksheetNotFound:
                 continue
             try:
-                headers = category_sheet.row_values(1)
-                if not headers:
-                    continue
-                end_column = column_letter(len(headers))
-                rows = category_sheet.get_values(f"A2:{end_column}{category_sheet.row_count}")
-                for record in records_from_rows(rows, headers):
+                for record in worksheet_records(category_sheet):
                     record.setdefault("campaign", category)
                     key = customer_key(record)
                     if key not in existing_keys:
@@ -643,13 +632,9 @@ def find_customer_location(spreadsheet, customer_id: int):
 def read_campaign_names(spreadsheet) -> List[str]:
     try:
         registry = spreadsheet.worksheet("Campaigns")
-        headers = registry.row_values(1)
-        if not headers:
-            return []
-        rows = registry.get_values(f"A2:{column_letter(len(headers))}{registry.row_count}")
         return [
             str(record.get("name", "")).strip()
-            for record in records_from_rows(rows, headers)
+            for record in worksheet_records(registry)
             if str(record.get("name", "")).strip()
         ]
     except gspread.exceptions.WorksheetNotFound:
