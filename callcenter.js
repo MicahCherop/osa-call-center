@@ -25,13 +25,23 @@ let globalStats = { totalCalls: 0, connected: 0, recovered: 0, outcomes: {} };
 
 function rebuildCampaignConfigs() {
     campaignConfigs = {};
+    campaignRecords = campaignRecords.map(normalizeCampaignRecord).filter(campaign => campaign.name);
     campaignRecords.forEach(campaign => {
-        const campaignName = campaign && (campaign.name || campaign.campaignName || campaign.campaign);
-        if (campaignName) {
-            campaign.name = campaignName;
-            campaignConfigs[campaignName] = campaign.type || campaign.campaignType || '';
-        }
+        campaignConfigs[campaign.name] = campaign.type;
     });
+
+}
+
+function normalizeCampaignRecord(campaign) {
+    const value = campaign || {};
+    return {
+        ...value,
+        name: value.name || value.campaignName || value.campaign || value['Campaign Name'] || '',
+        type: value.type || value.campaignType || value['Campaign Type'] || '',
+        priority: value.priority || value.campaignPriority || value.Priority || '',
+        startDate: value.startDate || value.start || value['Start Date'] || '',
+        endDate: value.endDate || value.end || value['End Date'] || ''
+    };
 }
 
 rebuildCampaignConfigs();
@@ -327,9 +337,10 @@ async function fetchAllData() {
             const parsedCampaigns = Array.isArray(campaigns)
                 ? campaigns
                 : (campaigns.campaigns || campaigns.data || []);
-            campaignRecords = parsedCampaigns;
+            campaignRecords = parsedCampaigns.map(normalizeCampaignRecord);
             localStorage.setItem('CALLCENTER_CAMPAIGNS_CACHE', JSON.stringify(campaignRecords));
             rebuildCampaignConfigs();
+            listBody.innerHTML = '<tr><td colspan="6" class="px-5 py-8 text-center text-brandDark/50 italic">No campaigns found. Create one to get started.</td></tr>';
         }
 
         // 3. Customers are deliberately bounded; load more pages on demand.
