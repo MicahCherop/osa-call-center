@@ -320,7 +320,13 @@
 
                 <!-- Select Agents -->
                 <div>
-                  <label class="block text-[11px] font-semibold text-brandDark/60 uppercase mb-1.5">Select Agents</label>
+                  <div class="flex items-center justify-between mb-1.5">
+                    <label class="block text-[11px] font-semibold text-brandDark/60 uppercase">Select Agents</label>
+                    <label class="flex items-center gap-2 text-[11px] font-semibold text-brandDark/60 uppercase cursor-pointer">
+                      <input type="checkbox" id="select-all-agents" onchange="toggleSelectAllAgents(this)" class="w-4 h-4 text-brandAmber rounded border-brandDark/20 focus:ring-brandAmber">
+                      Select all
+                    </label>
+                  </div>
                   <div id="allocate-agents-list" class="rounded-lg border border-brandDark/10 bg-white/50 min-h-[60px]">
                     <p class="text-[13px] text-brandDark/50 font-normal italic p-3">Select a campaign to view available agents.</p>
                   </div>

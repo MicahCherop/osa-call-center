@@ -301,7 +301,11 @@ async function fetchAllData() {
         campaignRecords = parsedCampaigns;
         campaignConfigs = {};
         parsedCampaigns.forEach(c => {
-            if (c && c.name) campaignConfigs[c.name] = c.type;
+            const campaignName = c && (c.name || c.campaignName || c.campaign);
+            if (campaignName) {
+                c.name = campaignName;
+                campaignConfigs[campaignName] = c.type || c.campaignType || '';
+            }
         });
 
         // 3. Customers are deliberately bounded; load more pages on demand.
@@ -366,14 +370,16 @@ function initCurrentPage() {
 }
 
 function restoreClockedInWorkspace() {
-    const toggle = document.getElementById('clock-in-toggle');
+    const toggle = document.getElementById('header-clock-toggle');
     if (!toggle || !LOGGED_IN_AGENT) return;
     toggle.checked = true;
-    const label = document.getElementById('clock-status-label');
+    const label = document.getElementById('header-clock-label');
     const idleMsg = document.getElementById('idle-overlay');
     const queuePanel = document.getElementById('workspace-queue');
     const emptyState = document.getElementById('empty-call-state');
     if (label) { label.innerText = 'Clocked In'; label.classList.add('text-green-600'); }
+    const workspaceLabel = document.getElementById('clock-status-label');
+    if (workspaceLabel) workspaceLabel.innerText = 'Clocked In';
     if (idleMsg) idleMsg.classList.add('hidden');
     if (queuePanel) { queuePanel.classList.remove('hidden'); queuePanel.classList.add('flex'); }
     if (emptyState) { emptyState.classList.remove('hidden'); emptyState.classList.add('flex'); }
@@ -1108,7 +1114,11 @@ async function distributeCustomers() {
       const res = await fetch(`${API_BASE}/distribute`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ campaign, requesterRole: CURRENT_USER_ROLE })
+          body: JSON.stringify({
+              campaign,
+              selectedAgents: Array.from(document.querySelectorAll('input[name="selected-agents"]:checked')).map(box => box.value),
+              requesterRole: CURRENT_USER_ROLE
+          })
       });
       const data = await res.json();
       
@@ -1138,8 +1148,10 @@ window.updateAvailableAgents = function() {
 
     // Find all Control Agents safely handling case-sensitivity
     const controlAgents = agents.filter(a => {
-        const role = a.Role || a.role;
-        return role === 'Control Agent';
+        const role = String(a.Role || a.role || '').trim().toLowerCase();
+        const status = String(a.Status || a.status || '').trim().toLowerCase();
+        const campaign = a.Campaign || a.campaign || '';
+        return role === 'control agent' && status === 'clocked in' && !String(campaign).trim();
     });
 
     if (controlAgents.length === 0) {
@@ -1153,7 +1165,7 @@ window.updateAvailableAgents = function() {
         const name = a.Name || a.name;
         html += `
             <label class="flex items-center gap-3 p-2 hover:bg-white/80 rounded-md cursor-pointer transition">
-                <input type="checkbox" name="selected-agents" value="${escapeHtml(name)}" class="w-4 h-4 text-brandAmber rounded border-brandDark/20 focus:ring-brandAmber">
+                <input type="checkbox" name="selected-agents" value="${escapeHtml(name)}" onchange="syncSelectAllAgents()" class="w-4 h-4 text-brandAmber rounded border-brandDark/20 focus:ring-brandAmber">
                 <span class="text-[13px] font-bold text-brandDark">${escapeHtml(name)}</span>
             </label>
         `;
@@ -1161,6 +1173,20 @@ window.updateAvailableAgents = function() {
     html += '</div>';
 
     agentsContainer.innerHTML = html;
+    const selectAll = document.getElementById('select-all-agents');
+    if (selectAll) selectAll.checked = false;
+};
+
+window.toggleSelectAllAgents = function(selectAll) {
+    document.querySelectorAll('input[name="selected-agents"]').forEach(box => {
+        box.checked = selectAll.checked;
+    });
+};
+
+window.syncSelectAllAgents = function() {
+    const boxes = Array.from(document.querySelectorAll('input[name="selected-agents"]'));
+    const selectAll = document.getElementById('select-all-agents');
+    if (selectAll) selectAll.checked = boxes.length > 0 && boxes.every(box => box.checked);
 };
 
 // 2. Handle the form submission and distribute customers
@@ -1195,16 +1221,18 @@ window.submitAllocation = function(e) {
         return;
     }
 
-    // Distribute customers evenly using a round-robin approach
-    unassignedCustomers.forEach((customer, index) => {
-        const assignedAgent = selectedAgents[index % selectedAgents.length];
-        customer.agentId = assignedAgent; 
-        
-        // Note: If you have an API endpoint to save this to Google Sheets, you would trigger it here.
-        // e.g., fetch(`/api/customers/${customer.id}/assign`, { method: 'POST', body: JSON.stringify({ agent: assignedAgent }) })
-    });
-
-    showAppAlert(`Successfully distributed ${unassignedCustomers.length} customers across ${selectedAgents.length} agent(s)!`, "Allocation Complete");
+    fetch(`${API_BASE}/distribute`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ campaign, selectedAgents, requesterRole: CURRENT_USER_ROLE })
+    }).then(async response => {
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.detail || 'Allocation failed');
+        await fetchAllData();
+        renderShiftManager();
+        updateAvailableAgents();
+        showAppAlert(data.message || `Successfully distributed ${data.assignedCount} customers.`, "Allocation Complete");
+    }).catch(error => showAppAlert(error.message, "Allocation Failed"));
     
     // Reset the UI
     e.target.reset();

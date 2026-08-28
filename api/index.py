@@ -193,6 +193,12 @@ class CustomerAssignModel(BaseModel):
     agentName: str
     requesterRole: str = ""
 
+
+class DistributionModel(BaseModel):
+    campaign: str
+    selectedAgents: List[str] = []
+    requesterRole: str = ""
+
 class CustomerUploadModel(BaseModel):
     id: int
     name: str
@@ -526,25 +532,26 @@ def assign_customer(assignment: CustomerAssignModel):
 # --- ALLOCATION ENGINE ---
 @app.post("/distribute")
 @app.post("/api/distribute")
-def distribute_customers(campaign: str = Body(...), requesterRole: str = Body("")):
-    if requesterRole.strip().lower() != "admin":
+def distribute_customers(distribution: DistributionModel):
+    if distribution.requesterRole.strip().lower() != "admin":
         raise HTTPException(status_code=403, detail="Only Admin users can assign accounts")
     sh = get_google_sheet()
     cust_sheet = sh.worksheet("Customers")
     agent_sheet = sh.worksheet("Agents")
     
-    customers = cust_sheet.get_all_records()
-    agents = [
-        a for a in agent_sheet.get_all_records() 
-        if str(a.get("Status", a.get("status", ""))).lower() == "active"
-    ]
+    customers = [normalize_record(record) for record in cust_sheet.get_all_records()]
+    agents = [normalize_record(record) for record in agent_sheet.get_all_records()
+        if str(record.get("status", "")).strip().lower() == "clocked in"
+        and str(record.get("role", "")).strip().lower() == "control agent"
+        and not str(record.get("campaign", "")).strip()
+        and record.get("name") in distribution.selectedAgents]
     
     if not agents:
         raise HTTPException(status_code=400, detail="No active agents found")
     
     unassigned = [
         i + 2 for i, c in enumerate(customers) 
-        if c.get("campaign") == campaign and not c.get("agentId") and str(c.get("worked")).upper() != "TRUE"
+        if c.get("campaign") == distribution.campaign and not c.get("agentId") and str(c.get("worked")).upper() != "TRUE"
     ]
     
     if not unassigned:
@@ -555,12 +562,14 @@ def distribute_customers(campaign: str = Body(...), requesterRole: str = Body(""
     assigned_count = 0
     
     for row_idx in unassigned:
-        assigned_agent = agents[agent_idx].get("Name", agents[agent_idx].get("name"))
+        assigned_agent = agents[agent_idx].get("name")
         cells_to_update.append(gspread.Cell(row_idx, 8, assigned_agent))  # Col 8 = agentId
         assigned_count += 1
         agent_idx = (agent_idx + 1) % len(agents)
         
     cust_sheet.update_cells(cells_to_update)
+    with _customer_queue_cache_lock:
+        _customer_queue_cache.clear()
         
     return {"status": "success", "assignedCount": assigned_count}
 
