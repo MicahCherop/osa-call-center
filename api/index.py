@@ -18,6 +18,9 @@ _sheet_cache_lock = threading.Lock()
 _category_sheet_lock = threading.Lock()
 _campaign_registry_cache = None
 _campaign_sheet_cache = {}
+_agents_data_cache = None
+_agents_data_cache_time = 0
+_agents_data_cache_lock = threading.Lock()
 _customer_queue_cache = {}
 _customer_queue_cache_lock = threading.Lock()
 
@@ -405,15 +408,29 @@ def login(creds: LoginModel):
 @app.get("/agents")
 @app.get("/api/agents")
 def get_agents():
+    global _agents_data_cache, _agents_data_cache_time
+    cache_ttl = 30
+    with _agents_data_cache_lock:
+        if _agents_data_cache is not None and time.time() - _agents_data_cache_time < cache_ttl:
+            return _agents_data_cache
     try:
         sheet = get_google_sheet().worksheet("Agents")
         records = worksheet_records(sheet)
         for record in records:
             record.pop("password", None)
+        with _agents_data_cache_lock:
+            _agents_data_cache = records
+            _agents_data_cache_time = time.time()
         return records
     except HTTPException:
+        with _agents_data_cache_lock:
+            if _agents_data_cache is not None:
+                return _agents_data_cache
         raise
     except Exception as error:
+        with _agents_data_cache_lock:
+            if _agents_data_cache is not None:
+                return _agents_data_cache
         raise HTTPException(status_code=503, detail=f"Google Sheets connection failed: {error}")
 
 @app.post("/api/users/add")

@@ -37,9 +37,21 @@ function invalidateApiCache(match) {
 async function cachedApiGet(url, request) {
     const cached = readApiCache(url);
     if (cached !== null) return cached;
-    const data = await request();
-    writeApiCache(url, data);
-    return data;
+    let lastError;
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+        try {
+            const data = await request();
+            writeApiCache(url, data);
+            return data;
+        } catch (error) {
+            lastError = error;
+            if (attempt === 2 || !String(error.message || '').match(/\b(429|500|502|503|504)\b/)) {
+                throw error;
+            }
+            await new Promise(resolve => setTimeout(resolve, (attempt + 1) * 1000));
+        }
+    }
+    throw lastError;
 }
 
 // Persistent Local UI States
