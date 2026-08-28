@@ -148,10 +148,10 @@ CUSTOMER_HEADERS = [
 ]
 
 CATEGORY_HEADERS = {
-    "Defaulted": ["Name", "Mobile No", "Due Date", "Branch", "Pair", "Sector", "Disb Amount", "Total Paid", "Balance"],
-    "Upcoming Dues": ["Name", "Mobile No", "Due Date", "Branch", "Pair", "Sector", "Disb Amount", "Total Paid", "Balance"],
-    "Active No Loan": ["Name", "Mobile No", "Due Date", "Branch", "Pair", "Sector", "Disb Amount"],
-    "Dormant": ["Name", "Mobile No", "Due Date", "Branch", "Pair", "Sector", "Disb Amount"],
+    "Defaulted": ["Name", "Mobile No", "Due Date", "Branch", "Pair", "Sector", "Disb Amount", "Total Paid", "Balance", "Campaign"],
+    "Upcoming Dues": ["Name", "Mobile No", "Due Date", "Branch", "Pair", "Sector", "Disb Amount", "Total Paid", "Balance", "Campaign"],
+    "Active No Loan": ["Name", "Mobile No", "Due Date", "Branch", "Pair", "Sector", "Disb Amount", "Campaign"],
+    "Dormant": ["Name", "Mobile No", "Due Date", "Branch", "Pair", "Sector", "Disb Amount", "Campaign"],
 }
 
 CATEGORY_SHEET_ALIASES = {
@@ -177,8 +177,10 @@ def get_or_create_category_sheet(spreadsheet, category: str):
         worksheet = spreadsheet.worksheet(title)
         if worksheet.col_count < len(headers):
             worksheet.resize(cols=len(headers))
-        if worksheet.row_values(1) != headers:
-            worksheet.update("A1", [headers])
+        current_headers = worksheet.row_values(1)
+        missing = [header for header in headers if header not in current_headers]
+        for index, header in enumerate(missing, start=len(current_headers) + 1):
+            worksheet.update_cell(1, index, header)
         return worksheet
     except gspread.exceptions.WorksheetNotFound:
         with _category_sheet_lock:
@@ -186,8 +188,10 @@ def get_or_create_category_sheet(spreadsheet, category: str):
                 worksheet = spreadsheet.worksheet(title)
                 if worksheet.col_count < len(headers):
                     worksheet.resize(cols=len(headers))
-                if worksheet.row_values(1) != headers:
-                    worksheet.update("A1", [headers])
+                current_headers = worksheet.row_values(1)
+                missing = [header for header in headers if header not in current_headers]
+                for index, header in enumerate(missing, start=len(current_headers) + 1):
+                    worksheet.update_cell(1, index, header)
                 return worksheet
             except gspread.exceptions.WorksheetNotFound:
                 worksheet = spreadsheet.add_worksheet(
@@ -238,7 +242,7 @@ def get_or_create_campaign_sheet(spreadsheet, campaign: str):
 
 def get_or_create_campaign_registry(spreadsheet):
     global _campaign_registry_cache
-    headers = ["name", "type", "priority", "startDate", "endDate"]
+    headers = ["name", "type", "priority", "startDate", "endDate", "dateAdded"]
     if _campaign_registry_cache is not None:
         return _campaign_registry_cache
     try:
@@ -338,6 +342,7 @@ def category_row(customer: CustomerUploadModel, category: str) -> List[Any]:
         "Disb Amount": customer.disbAmount,
         "Total Paid": customer.totalPaid,
         "Balance": customer.balance,
+        "Campaign": customer.campaign,
     }
     headers = CATEGORY_HEADERS.get(category_sheet_name(category), CUSTOMER_HEADERS)
     return [values.get(header, "") for header in headers]
@@ -534,12 +539,22 @@ def get_campaigns():
         campaign_records = [
             normalize_record(record)
             for record in worksheet_records(sheet)
-            if any(str(record.get(key, "")).strip() for key in ("name", "campaignName", "campaign"))
+            if str(record.get("name", record.get("campaign", ""))).strip()
         ]
     except gspread.exceptions.WorksheetNotFound:
         pass
 
+    customer_records = read_customer_records(spreadsheet)
+    account_counts = {}
+    for customer in customer_records:
+        campaign_name = str(customer.get("campaign", "")).strip()
+        if campaign_name:
+            account_counts[campaign_name] = account_counts.get(campaign_name, 0) + 1
+
     if campaign_records:
+        for campaign in campaign_records:
+            campaign["accountCount"] = account_counts.get(str(campaign.get("name", "")).strip(), 0)
+            campaign["dateAdded"] = campaign.get("dateAdded") or campaign.get("startDate") or ""
         return campaign_records
 
     # Some deployments store campaign uploads only in Customers/category sheets.
@@ -554,6 +569,8 @@ def get_campaigns():
                 "priority": "",
                 "startDate": "",
                 "endDate": "",
+                "accountCount": account_counts.get(campaign_name, 0),
+                "dateAdded": "",
             }
     return list(derived.values())
 
@@ -577,15 +594,12 @@ def create_campaign(
             stage = "campaign registry"
             camp_sheet = get_or_create_campaign_registry(sh)
             if not campaign_registry_has_name(camp_sheet, name):
-                camp_sheet.append_row([name, type, priority, startDate, endDate])
+                camp_sheet.append_row([name, type, priority, startDate, endDate, time.strftime("%Y-%m-%d")])
                 campaign_registry_has_name.names.add(name)
 
         stage = "campaign worksheet"
-        campaign_sheet = get_or_create_campaign_sheet(sh, name)
-        rows = [[
-            c.id, c.name, c.phone, c.branch, c.sector, c.balance, name, "", "FALSE", "", "",
-            c.dueDate, c.pair, c.disbAmount, c.totalPaid, "", "", "",
-        ] for c in customers]
+        campaign_sheet = get_or_create_category_sheet(sh, type)
+        rows = [category_row(customer, type) for customer in customers]
 
         if rows:
             stage = "customer upload"

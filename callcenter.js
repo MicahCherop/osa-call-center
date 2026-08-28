@@ -151,7 +151,9 @@ function normalizeCampaignRecord(campaign) {
         type: value.type || value.campaignType || value['Campaign Type'] || '',
         priority: value.priority || value.campaignPriority || value.Priority || '',
         startDate: value.startDate || value.start || value['Start Date'] || '',
-        endDate: value.endDate || value.end || value['End Date'] || ''
+        endDate: value.endDate || value.end || value['End Date'] || '',
+        accountCount: value.accountCount ?? value.accounts ?? value['Account Count'] ?? 0,
+        dateAdded: value.dateAdded || value.createdAt || value['Date Added'] || ''
     };
 }
 
@@ -386,18 +388,16 @@ window.renderCampaignList = function() {
     if (!listBody) return;
     
     if (campaignRecords.length === 0) {
-        listBody.innerHTML = '<tr><td colspan="6" class="px-5 py-8 text-center text-brandDark/50 italic">No campaigns found. Create one to get started.</td></tr>';
+        listBody.innerHTML = '<tr><td colspan="4" class="px-5 py-8 text-center text-brandDark/50 italic">No campaigns found. Create one to get started.</td></tr>';
         return;
     }
 
     listBody.innerHTML = campaignRecords.map(c => `
         <tr class="border-b border-brandDark/5 hover:bg-white/40 transition">
-            <td class="px-5 py-4"><i class="fa-solid fa-bullhorn text-brandAmber"></i></td>
-            <td class="px-5 py-4 font-medium">${escapeHtml(displayValue(c.name))}</td>
-            <td class="px-5 py-4">${escapeHtml(displayValue(c.type))}</td>
-            <td class="px-5 py-4">${escapeHtml(displayValue(c.priority))}</td>
-            <td class="px-5 py-4">${escapeHtml(displayValue(c.startDate))}</td>
-            <td class="px-5 py-4">${escapeHtml(displayValue(c.endDate))}</td>
+            <td class="px-5 py-4"><span class="inline-flex items-center gap-2 text-brandAmber"><i class="fa-solid fa-bullhorn"></i>${escapeHtml(displayValue(c.type))}</span></td>
+            <td class="px-5 py-4"><div class="font-medium">${escapeHtml(displayValue(c.name))}</div><div class="text-xs text-brandDark/50">${escapeHtml(displayValue(c.priority))}</div></td>
+            <td class="px-5 py-4 text-right font-medium">${escapeHtml(displayValue(c.accountCount))}</td>
+            <td class="px-5 py-4">${escapeHtml(displayValue(c.dateAdded || c.startDate))}</td>
         </tr>
     `).join('');
 };

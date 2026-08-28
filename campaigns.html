@@ -150,7 +150,7 @@
       <button class="text-brandDark/60 hover:text-brandAmber transition"><i class="fa-regular fa-bell text-lg"></i></button>
       <label class="relative inline-flex items-center cursor-pointer ml-3" title="Toggle Dark Mode">
         <input type="checkbox" class="dark-mode-toggle sr-only peer" onchange="toggleDarkMode(this.checked)">
-        <div class="relative w-11 h-6 rounded-full bg-slate-300 peer-checked:bg-brandAmber"></div>
+        <div class="relative w-11 h-6 rounded-full bg-slate-300 peer-checked:bg-brandAmber"><span class="theme-icon-sun">&#9728;</span><span class="theme-icon-moon">&#9790;</span></div>
       </label>
       <div class="flex items-center gap-3 pl-4 border-l border-brandDark/10">
         <!-- Clickable Profile Section -->
@@ -239,12 +239,10 @@
             <table class="w-full text-left border-collapse">
               <thead class="bg-white/90 sticky top-0 z-10 border-b border-brandDark/5">
                 <tr class="text-[11px] font-semibold uppercase tracking-wider text-brandDark/50">
-                  <th class="px-5 py-4 w-10"></th>
-                  <th class="px-5 py-4">Campaign Name</th>
-                  <th class="px-5 py-4">Type</th>
-                  <th class="px-5 py-4">Priority</th>
-                  <th class="px-5 py-4">Start Date</th>
-                  <th class="px-5 py-4">End Date</th>
+                  <th class="px-5 py-4">Campaign Type</th>
+                  <th class="px-5 py-4">Campaign Details</th>
+                  <th class="px-5 py-4 text-right">Accounts</th>
+                  <th class="px-5 py-4">Date Added</th>
                 </tr>
               </thead>
               <tbody class="text-sm font-normal text-brandDark/80" id="campaign-list-tbody">

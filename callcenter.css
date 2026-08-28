@@ -259,6 +259,12 @@ html.dark ::-webkit-scrollbar-thumb:hover { background: rgba(251, 191, 36, 0.58)
 .dark-mode-toggle + div { transition: background-color 0.2s ease, box-shadow 0.2s ease; }
 .dark-mode-toggle + div::after { content: ''; position: absolute; left: 2px; top: 2px; width: 20px; height: 20px; border-radius: 9999px; background: #fff; box-shadow: 0 1px 3px rgba(15, 23, 42, 0.25); transition: transform 0.2s ease; }
 .dark-mode-toggle:checked + div::after { transform: translateX(20px); }
+.theme-icon-sun,
+.theme-icon-moon { position: absolute; top: 4px; z-index: 1; width: 18px; font-size: 11px; line-height: 18px; text-align: center; pointer-events: none; }
+.theme-icon-sun { left: 3px; color: #92400e; }
+.theme-icon-moon { right: 3px; display: none; color: #fef3c7; }
+html.dark .theme-icon-sun { display: none; }
+html.dark .theme-icon-moon { display: block; }
 
 /* ==========================================
    RESPONSIVE APP LAYOUT & TYPE RHYTHM
