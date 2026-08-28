@@ -211,9 +211,9 @@
       <!-- ========================================== -->
       <!-- VIEW 2: CAMPAIGNS & SHIFT MANAGER -->
       <!-- ========================================== -->
-      <div id="view-campaigns" class="h-full flex flex-col">
+      <div id="view-campaigns" class="h-full flex flex-col min-h-0">
         <!-- STATE A: CAMPAIGN LIST -->
-        <div id="campaign-list-state" class="glass-card rounded-2xl p-6 flex-1 flex flex-col h-full border border-brandDark/5">
+        <div id="campaign-list-state" class="glass-card rounded-2xl p-6 flex-1 flex flex-col h-full min-h-0 border border-brandDark/5">
           <div class="flex justify-between items-end mb-6">
             <div>
               <h2 class="text-xl font-medium mb-1 text-brandDark">Campaign Management</h2>
@@ -248,7 +248,7 @@
         </div>
 
         <!-- STATE B: CAMPAIGN DETAILS (HIDDEN) -->
-        <div id="campaign-details-state" class="glass-card rounded-2xl p-6 flex-1 flex-col hidden overflow-hidden relative border border-brandDark/5">
+        <div id="campaign-details-state" class="glass-card rounded-2xl p-6 flex-1 flex-col hidden min-h-0 overflow-hidden relative border border-brandDark/5">
           <button onclick="closeSecondaryState()" class="self-start text-[13px] font-medium text-brandDark/60 hover:text-brandAmber transition ease-in flex items-center gap-2 mb-3">
             <i class="fa-solid fa-arrow-left"></i> Back to Campaigns
           </button>

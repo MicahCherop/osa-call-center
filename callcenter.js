@@ -448,10 +448,10 @@ window.renderCampaignAgentSelector = function() {
     // Optional: Add specific Agent Selector UI updates here if needed
 };
 
-async function fetchAllData() {
+async function fetchAllData(forceCampaignRefresh = false) {
     try {
-        const fetchJson = async (url) => {
-            const cached = readApiCache(url);
+        const fetchJson = async (url, bypassCache = false) => {
+            const cached = bypassCache ? null : readApiCache(url);
             if (cached !== null) return cached;
             let lastError;
             for (let attempt = 0; attempt < 3; attempt += 1) {
@@ -480,7 +480,7 @@ async function fetchAllData() {
         const customerPages = new Set(['workspace', 'teamleader', 'campaigns', 'overview', 'dashboard']);
         const requests = [
             fetchJson(`${API_BASE}/agents`),
-            fetchJson(`${API_BASE}/campaigns`),
+            fetchJson(`${API_BASE}/campaigns${forceCampaignRefresh ? '?fresh=1' : ''}`, forceCampaignRefresh),
             customerPages.has(currentPage)
                 ? fetchJson(`${API_BASE}/customers?limit=200${currentPage === 'workspace' && LOGGED_IN_AGENT ? `&agentName=${encodeURIComponent(LOGGED_IN_AGENT)}` : ''}`)
                 : Promise.resolve({ items: [] })
@@ -1325,7 +1325,9 @@ async function submitAddCampaign(e) {
                 localStorage.setItem('CALLCENTER_CUSTOMERS_CACHE', JSON.stringify(mockCustomers));
                 rebuildCampaignConfigs();
         updateCampaignDropdowns();
-        renderCampaignList(); 
+        renderCampaignList();
+        await fetchAllData(true);
+        renderCampaignList();
         
         submitBtn.innerHTML = originalText;
         closeAddCampaignModal();

@@ -582,10 +582,10 @@ def update_agent_status(name: str = Body(...), status: str = Body(...)):
 # --- CAMPAIGNS & CUSTOMERS ---
 @app.get("/campaigns")
 @app.get("/api/campaigns")
-def get_campaigns():
+def get_campaigns(fresh: bool = False):
     global _campaign_response_cache, _campaign_response_cache_time
     with _agents_data_cache_lock:
-        if _campaign_response_cache is not None and time.time() - _campaign_response_cache_time < 30:
+        if not fresh and _campaign_response_cache is not None and time.time() - _campaign_response_cache_time < 30:
             return _campaign_response_cache
 
     spreadsheet = get_google_sheet()
