@@ -18,6 +18,7 @@ _sheet_cache_lock = threading.Lock()
 _category_sheet_lock = threading.Lock()
 _campaign_registry_cache = None
 _campaign_sheet_cache = {}
+_category_sheet_cache = {}
 _campaign_response_cache = None
 _campaign_response_cache_time = 0
 _agents_data_cache = None
@@ -180,27 +181,22 @@ def category_sheet_name(category: str) -> str:
 
 
 def get_or_create_category_sheet(spreadsheet, category: str):
+    global _category_sheet_cache
     title = category_sheet_name(category)
     headers = TYPE_SHEET_HEADERS
+    if title in _category_sheet_cache:
+        return _category_sheet_cache[title]
     try:
         worksheet = spreadsheet.worksheet(title)
-        if worksheet.col_count < len(headers):
-            worksheet.resize(cols=len(headers))
-        current_headers = worksheet.row_values(1)
-        missing = [header for header in headers if header not in current_headers]
-        for index, header in enumerate(missing, start=len(current_headers) + 1):
-            worksheet.update_cell(1, index, header)
+        worksheet.update("A1", [headers])
+        _category_sheet_cache[title] = worksheet
         return worksheet
     except gspread.exceptions.WorksheetNotFound:
         with _category_sheet_lock:
             try:
                 worksheet = spreadsheet.worksheet(title)
-                if worksheet.col_count < len(headers):
-                    worksheet.resize(cols=len(headers))
-                current_headers = worksheet.row_values(1)
-                missing = [header for header in headers if header not in current_headers]
-                for index, header in enumerate(missing, start=len(current_headers) + 1):
-                    worksheet.update_cell(1, index, header)
+                worksheet.update("A1", [headers])
+                _category_sheet_cache[title] = worksheet
                 return worksheet
             except gspread.exceptions.WorksheetNotFound:
                 worksheet = spreadsheet.add_worksheet(
@@ -209,6 +205,7 @@ def get_or_create_category_sheet(spreadsheet, category: str):
                     cols=len(headers),
                 )
                 worksheet.append_row(headers)
+                _category_sheet_cache[title] = worksheet
                 return worksheet
 
 
@@ -659,29 +656,27 @@ def create_campaign(
     name: str = Body(...), 
     type: str = Body(...), 
     priority: str = Body(...), 
-    startDate: str = Body(...), 
-    endDate: str = Body(...), 
+    startDate: str = Body(""),
+    endDate: str = Body(""),
     customers: List[CustomerUploadModel] = Body(...),
     chunkIndex: int = Body(0)
 ):
-    if len(customers) > 2000:
-        raise HTTPException(status_code=413, detail="Each upload request may contain at most 2,000 accounts")
+    if len(customers) > 4000:
+        raise HTTPException(status_code=413, detail="Each upload request may contain at most 4,000 accounts")
     stage = "Google Sheets connection"
     try:
         sh = get_google_sheet()
         if chunkIndex == 0:
             stage = "campaign registry"
             camp_sheet = get_or_create_campaign_registry(sh)
-            if not campaign_registry_has_name(camp_sheet, name):
-                camp_sheet.append_row([name, type, priority, startDate, endDate, time.strftime("%Y-%m-%d")])
-                campaign_registry_has_name.names.add(name)
+            camp_sheet.append_row([name, type, priority, startDate, endDate, time.strftime("%Y-%m-%d")])
             global _campaign_response_cache, _campaign_response_cache_time
             _campaign_response_cache = None
             _campaign_response_cache_time = 0
 
         stage = "campaign worksheet"
         campaign_sheet = get_or_create_category_sheet(sh, type)
-        rows = [type_sheet_row(customer, type, campaign_sheet.row_values(1)) for customer in customers]
+        rows = [type_sheet_row(customer, type, TYPE_SHEET_HEADERS) for customer in customers]
 
         if rows:
             stage = "customer upload"

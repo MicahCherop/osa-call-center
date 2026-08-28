@@ -1263,7 +1263,7 @@ async function submitAddCampaign(e) {
     });
 
     try {
-        const CHUNK_SIZE = 2000; // Ten requests are enough for the maximum 20,000-account upload
+        const CHUNK_SIZE = 4000; // Five requests are enough for the maximum 20,000-account upload
         
         // Loop through the data and send it in smaller batches
         for (let i = 0; i < formattedCustomers.length; i += CHUNK_SIZE) {
@@ -1286,7 +1286,7 @@ async function submitAddCampaign(e) {
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload)
                 });
-                if (res.status !== 429 || attempt === 2) break;
+                if (![429, 500, 502, 503, 504].includes(res.status) || attempt === 2) break;
                 const retryAfter = Number(res.headers.get('Retry-After')) || (attempt + 1) * 2;
                 await new Promise(resolve => setTimeout(resolve, retryAfter * 1000));
             }
