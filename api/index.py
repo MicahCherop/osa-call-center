@@ -225,6 +225,10 @@ class CustomerUploadModel(BaseModel):
         extra = "allow"
 
 
+def can_allocate(requester_role: str) -> bool:
+    return requester_role.strip().lower() in {"admin", "ops manager", "team leader"}
+
+
 def category_row(customer: CustomerUploadModel, category: str) -> List[Any]:
     values = {
         "Name": customer.name,
@@ -409,7 +413,11 @@ def get_campaigns():
         headers = sheet.row_values(1)
         if headers:
             rows = sheet.get_values(f"A2:{column_letter(len(headers))}{sheet.row_count}")
-            campaign_records = records_from_rows(rows, headers)
+            campaign_records = [
+                normalize_record(record)
+                for record in records_from_rows(rows, headers)
+                if any(str(record.get(key, "")).strip() for key in ("name", "campaignName", "campaign"))
+            ]
     except gspread.exceptions.WorksheetNotFound:
         pass
 
@@ -576,8 +584,8 @@ def get_customers(
 @app.post("/assign")
 @app.post("/api/assign")
 def assign_customer(assignment: CustomerAssignModel):
-    if assignment.requesterRole.strip().lower() != "admin":
-        raise HTTPException(status_code=403, detail="Only Admin users can assign accounts")
+    if not can_allocate(assignment.requesterRole):
+        raise HTTPException(status_code=403, detail="Only managers can assign accounts")
     sheet = get_google_sheet().worksheet("Customers")
     cell = sheet.find(str(assignment.customerId))
     headers = sheet.row_values(1)
@@ -599,13 +607,15 @@ def assign_customer(assignment: CustomerAssignModel):
 @app.post("/distribute")
 @app.post("/api/distribute")
 def distribute_customers(distribution: DistributionModel):
-    if distribution.requesterRole.strip().lower() != "admin":
-        raise HTTPException(status_code=403, detail="Only Admin users can assign accounts")
+    if not can_allocate(distribution.requesterRole):
+        raise HTTPException(status_code=403, detail="Only managers can assign accounts")
     sh = get_google_sheet()
     cust_sheet = sh.worksheet("Customers")
     agent_sheet = sh.worksheet("Agents")
     
     customers = [normalize_record(record) for record in cust_sheet.get_all_records()]
+    headers = cust_sheet.row_values(1)
+    agent_column = next((index + 1 for index, header in enumerate(headers) if str(header).strip().lower() in {"agentid", "assignedagent", "agent"}), 8)
     agents = [normalize_record(record) for record in agent_sheet.get_all_records()
         if str(record.get("status", record.get("Status", ""))).strip().lower() in {"active", "clocked in", "online"}
         and str(record.get("role", record.get("Role", ""))).strip().lower() == "control agent"
@@ -629,7 +639,7 @@ def distribute_customers(distribution: DistributionModel):
     
     for row_idx in unassigned:
         assigned_agent = agents[agent_idx].get("name")
-        cells_to_update.append(gspread.Cell(row_idx, 8, assigned_agent))  # Col 8 = agentId
+        cells_to_update.append(gspread.Cell(row_idx, agent_column, assigned_agent))
         assigned_count += 1
         agent_idx = (agent_idx + 1) % len(agents)
         

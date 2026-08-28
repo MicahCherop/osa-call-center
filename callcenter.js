@@ -1152,8 +1152,8 @@ async function submitAddCampaign(e) {
 }
 
 async function distributeCustomers() {
-    if (CURRENT_USER_ROLE !== 'Admin') {
-        showAppAlert('Only Admin users can assign accounts.', 'Permission Denied');
+    if (!['Admin', 'Ops Manager', 'Team Leader'].includes(CURRENT_USER_ROLE)) {
+        showAppAlert('Only managers can assign accounts.', 'Permission Denied');
         return;
     }
     const campEl = document.getElementById('allocate-campaign');
@@ -1245,8 +1245,8 @@ window.syncSelectAllAgents = function() {
 // 2. Handle the form submission and distribute customers
 window.submitAllocation = function(e) {
     e.preventDefault();
-    if (CURRENT_USER_ROLE !== 'Admin') {
-        showAppAlert('Only Admin users can assign accounts.', 'Permission Denied');
+    if (!['Admin', 'Ops Manager', 'Team Leader'].includes(CURRENT_USER_ROLE)) {
+        showAppAlert('Only managers can assign accounts.', 'Permission Denied');
         return;
     }
     
