@@ -23,6 +23,19 @@ let agents = readCachedArray('CALLCENTER_AGENTS_CACHE');
 let campaignRecords = readCachedArray('CALLCENTER_CAMPAIGNS_CACHE');
 let globalStats = { totalCalls: 0, connected: 0, recovered: 0, outcomes: {} };
 
+function rebuildCampaignConfigs() {
+    campaignConfigs = {};
+    campaignRecords.forEach(campaign => {
+        const campaignName = campaign && (campaign.name || campaign.campaignName || campaign.campaign);
+        if (campaignName) {
+            campaign.name = campaignName;
+            campaignConfigs[campaignName] = campaign.type || campaign.campaignType || '';
+        }
+    });
+}
+
+rebuildCampaignConfigs();
+
 // --- RBAC: SECURITY & ENFORCEMENT ---
 const CURRENT_USER_EMAIL = localStorage.getItem('USER_EMAIL');
 const CURRENT_USER_ROLE = localStorage.getItem('USER_ROLE');
@@ -110,10 +123,10 @@ window.onload = async () => {
     // Stop execution if they are unauthorized or on the login page
     if (!isAuthorized || currentPage === 'login') return; 
     
-    await fetchAllData();
     if (!Array.isArray(agents)) agents = [];
     if (!Array.isArray(mockCustomers)) mockCustomers = [];
-    
+    initCurrentPage();
+    await fetchAllData();
     initCurrentPage();
 };
 // --- USER PROFILE & LOGOUT LOGIC ---
@@ -316,14 +329,7 @@ async function fetchAllData() {
                 : (campaigns.campaigns || campaigns.data || []);
             campaignRecords = parsedCampaigns;
             localStorage.setItem('CALLCENTER_CAMPAIGNS_CACHE', JSON.stringify(campaignRecords));
-            campaignConfigs = {};
-            parsedCampaigns.forEach(c => {
-                const campaignName = c && (c.name || c.campaignName || c.campaign);
-                if (campaignName) {
-                    c.name = campaignName;
-                    campaignConfigs[campaignName] = c.type || c.campaignType || '';
-                }
-            });
+            rebuildCampaignConfigs();
         }
 
         // 3. Customers are deliberately bounded; load more pages on demand.
