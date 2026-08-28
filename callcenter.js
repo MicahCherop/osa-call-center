@@ -1315,7 +1315,9 @@ async function submitAddCampaign(e) {
                         type: campaignType,
                         priority,
                         startDate,
-                        endDate
+                        endDate,
+                        accountCount: formattedCustomers.length,
+                        dateAdded: new Date().toISOString().slice(0, 10)
                     }));
                 }
                 mockCustomers = [...mockCustomers, ...formattedCustomers];

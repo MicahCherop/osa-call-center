@@ -256,8 +256,13 @@ def get_or_create_campaign_registry(spreadsheet):
         return _campaign_registry_cache
     try:
         worksheet = spreadsheet.worksheet("Campaigns")
-        if not worksheet.row_values(1):
+        current_headers = worksheet.row_values(1)
+        if not current_headers:
             worksheet.update("A1", [headers])
+        else:
+            missing = [header for header in headers if header not in current_headers]
+            for index, header in enumerate(missing, start=len(current_headers) + 1):
+                worksheet.update_cell(1, index, header)
         _campaign_registry_cache = worksheet
         return worksheet
     except gspread.exceptions.WorksheetNotFound:
@@ -383,7 +388,18 @@ def type_sheet_row(customer: CustomerUploadModel, campaign_type: str, headers: L
         "loyalty": "",
         "lastloanamount": "",
     }
-    return [values.get(str(header).strip().lower().replace(" ", ""), "") for header in headers]
+    aliases = {
+        "mobileno": "phone", "phonenumber": "phone", "customername": "name",
+        "campaignname": "campaign", "assignedagent": "agentid", "agent": "agentid",
+        "agentid": "agentid", "accountstatus": "status", "isworked": "worked",
+        "startdate": "", "enddate": "", "station": "branch", "stations": "branch",
+    }
+    row = []
+    for header in headers:
+        key = str(header).strip().lower().replace(" ", "")
+        key = aliases.get(key, key)
+        row.append(values.get(key, ""))
+    return row
 
 
 # --- ROOT & HEALTH ENDPOINTS ---
@@ -580,7 +596,7 @@ def get_campaigns():
     try:
         sheet = spreadsheet.worksheet("Campaigns")
         campaign_records = [
-            normalize_record(record)
+            normalize_campaign_record(record)
             for record in worksheet_records(sheet)
             if str(record.get("name", record.get("campaign", ""))).strip()
         ]
@@ -629,6 +645,14 @@ def get_campaigns():
         _campaign_response_cache_time = time.time()
     return response
 
+
+def normalize_campaign_record(record: Dict[str, Any]) -> Dict[str, Any]:
+    normalized = normalize_record(record)
+    normalized["name"] = normalized.get("name") or normalized.get("campaign", "")
+    normalized["type"] = normalized.get("type") or normalized.get("campaignType", "")
+    normalized["dateAdded"] = normalized.get("dateAdded") or normalized.get("createdAt", "")
+    return normalized
+
 @app.post("/campaigns")
 @app.post("/api/campaigns")
 def create_campaign(
@@ -648,7 +672,12 @@ def create_campaign(
         if chunkIndex == 0:
             stage = "campaign registry"
             camp_sheet = get_or_create_campaign_registry(sh)
-            camp_sheet.append_row([name, type, priority, startDate, endDate, time.strftime("%Y-%m-%d")])
+            if not campaign_registry_has_name(camp_sheet, name):
+                camp_sheet.append_row([name, type, priority, startDate, endDate, time.strftime("%Y-%m-%d")])
+                campaign_registry_has_name.names.add(name)
+            global _campaign_response_cache, _campaign_response_cache_time
+            _campaign_response_cache = None
+            _campaign_response_cache_time = 0
 
         stage = "campaign worksheet"
         campaign_sheet = get_or_create_category_sheet(sh, type)
@@ -697,22 +726,27 @@ def read_customer_records(spreadsheet) -> List[Dict[str, Any]]:
         return ("id", str(record.get("id", "")).strip())
 
     existing_keys = {customer_key(record) for record in records}
-    campaign_names = []
+    campaign_specs = []
     try:
         campaign_registry = spreadsheet.worksheet("Campaigns")
-        campaign_names = [
-            str(record.get("name", "")).strip()
+        campaign_specs = [
+            (str(record.get("name", "")).strip(), str(record.get("type", record.get("campaignType", ""))).strip())
             for record in worksheet_records(campaign_registry)
             if str(record.get("name", "")).strip()
         ]
     except gspread.exceptions.WorksheetNotFound:
         pass
 
-    for campaign in campaign_names:
+    visited_campaign_sheets = set()
+    for campaign, campaign_type in campaign_specs:
+        sheet_title = category_sheet_name(campaign_type or campaign)
+        if sheet_title in visited_campaign_sheets:
+            continue
+        visited_campaign_sheets.add(sheet_title)
         try:
-            campaign_sheet = spreadsheet.worksheet(campaign_sheet_name(campaign))
+            campaign_sheet = spreadsheet.worksheet(sheet_title)
             for record in worksheet_records(campaign_sheet):
-                record.setdefault("campaign", campaign)
+                record.setdefault("campaign", campaign if campaign_type else sheet_title)
                 key = customer_key(record)
                 if key not in existing_keys:
                     records.append(record)
