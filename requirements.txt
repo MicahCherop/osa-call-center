@@ -1,6 +1,5 @@
 fastapi
 uvicorn
 pydantic
-gspread
-google-auth
 python-dotenv
+supabase

@@ -1,14 +1,13 @@
-const CACHE_NAME = 'osa-call-center-shell-v4';
+const CACHE_NAME = 'osa-call-center-shell-v6';
 const APP_SHELL = [
   '/',
-  '/index.html',
-  '/login.html',
-  '/overview.html',
-  '/workspace.html',
-  '/campaigns.html',
-  '/teamleader.html',
-  '/analytics.html',
-  '/admin.html',
+  '/login',
+  '/overview',
+  '/workspace',
+  '/campaigns',
+  '/teamleader',
+  '/analytics',
+  '/admin',
   '/callcenter.js',
   '/callcenter.css',
   '/callcenter-tailwind.css',
@@ -40,7 +39,7 @@ self.addEventListener('fetch', event => {
       caches.open(CACHE_NAME).then(cache => cache.put(request, copy));
       return response;
     }).catch(() => caches.match(request).then(
-      cached => cached || caches.match('/index.html')
+      cached => cached || caches.match('/')
     ))
   );
 });

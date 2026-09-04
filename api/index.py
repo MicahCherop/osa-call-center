@@ -1,301 +1,111 @@
 import os
-import json
-import base64
-import threading
 import time
-from typing import Any, Dict, List, Optional
-from fastapi import FastAPI, HTTPException, Body
-from fastapi.staticfiles import StaticFiles
+from datetime import date, datetime, timezone
+from typing import Any, Callable, Dict, List, Optional, TypeVar
+
+from fastapi import Body, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
-import gspread
-from google.oauth2.service_account import Credentials
+from supabase import Client, create_client
+
+T = TypeVar("T")
 
 app = FastAPI(title="OSA Call Center API")
-
-_sheet_cache = None
-_sheet_cache_lock = threading.Lock()
-_category_sheet_lock = threading.Lock()
-_campaign_registry_cache = None
-_campaign_sheet_cache = {}
-_category_sheet_cache = {}
-_campaign_response_cache = None
-_campaign_response_cache_time = 0
-_agents_data_cache = None
-_agents_data_cache_time = 0
-_agents_data_cache_lock = threading.Lock()
-_customer_queue_cache = {}
-_customer_queue_cache_lock = threading.Lock()
-
-# Enable CORS for Vercel Frontend
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-SCOPE = [
-    "https://www.googleapis.com/auth/spreadsheets",
-    "https://www.googleapis.com/auth/drive"
-]
+app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
+_supabase: Optional[Client] = None
 
 
-def get_google_sheet():
-    global _sheet_cache
-
-    if _sheet_cache is not None:
-        return _sheet_cache
-
-    try:
-        creds_json = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON", "").strip()
-        if not creds_json:
-            raise ValueError("GOOGLE_SERVICE_ACCOUNT_JSON is not configured")
-
-        if creds_json.startswith('"') and creds_json.endswith('"'):
-            creds_json = json.loads(creds_json)
-        if creds_json.startswith("{") and creds_json.endswith("}"):
-            creds_dict = json.loads(creds_json)
-        else:
-            creds_dict = json.loads(base64.b64decode(creds_json).decode("utf-8"))
-        if not creds_dict.get("client_email") or not creds_dict.get("private_key"):
-            raise ValueError("service account JSON is missing client_email or private_key")
-
-        sheet_id = os.getenv("GOOGLE_SHEET_ID", "1VmLCg_6iY0QsjPbDjgDRNugFyyNRWABtPIASGDepZeU").strip()
-        if not sheet_id:
-            raise ValueError("GOOGLE_SHEET_ID is not configured")
-
-        creds = Credentials.from_service_account_info(creds_dict, scopes=SCOPE)
-        client = gspread.authorize(creds)
-        with _sheet_cache_lock:
-            if _sheet_cache is None:
-                _sheet_cache = client.open_by_key(sheet_id)
-            return _sheet_cache
-    except HTTPException:
-        raise
-    except json.JSONDecodeError as error:
-        raise HTTPException(status_code=503, detail=f"Google credentials are not valid JSON: {error.msg}")
-    except Exception as error:
-        raise HTTPException(status_code=503, detail=f"Google Sheets connection failed: {error}")
+def get_supabase() -> Client:
+    global _supabase
+    if _supabase is not None:
+        return _supabase
+    url, key = os.getenv("SUPABASE_URL", "").strip(), os.getenv("SUPABASE_SERVICE_ROLE_KEY", "").strip()
+    if not url or not key:
+        raise HTTPException(503, "Supabase is not configured. Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY.")
+    _supabase = create_client(url, key)
+    return _supabase
 
 
-def normalize_record(record: Dict[str, Any]) -> Dict[str, Any]:
-    """Expose stable keys regardless of worksheet header spelling or casing."""
-    normalized = {}
-    for key, value in record.items():
-        if key:
-            compact_key = "".join(char.lower() for char in str(key) if char.isalnum())
-            aliases = {
-                "customerid": "id", "customername": "name", "phonenumber": "phone",
-                "campaignname": "campaign", "assignedagent": "agentId", "agent": "agentId",
-                "agentid": "agentId", "isworked": "worked", "accountstatus": "status",
-                "campaignpriority": "priority", "startdate": "startDate", "enddate": "endDate",
-                "callsmade": "callsMade", "calls": "callsMade", "connectedcalls": "connected",
-                "amountrecovered": "conversion", "recovered": "conversion",
-                "daysinactive": "daysInactive", "daysdormant": "daysDormant",
-                "lastloanamount": "lastLoanAmount", "loyalty": "loyalty", "feedback": "feedback",
-            }
-            if compact_key in aliases:
-                normalized[aliases[compact_key]] = value
-                continue
-
-            words = "".join(char if char.isalnum() else " " for char in str(key)).split()
-            camel_key = words[0].lower() + "".join(word.title() for word in words[1:])
-            normalized[camel_key] = value
-    if not normalized.get("branch"):
-        normalized["branch"] = normalized.get("station") or normalized.get("stations", "")
-    normalized.pop("station", None)
-    normalized.pop("stations", None)
-    return normalized
+def db_error(error: Exception) -> HTTPException:
+    print(f"[db_error] {error}")  # full detail stays server-side; clients only see a generic message
+    return HTTPException(503, "A database request failed. Please try again or contact support.")
 
 
-def records_from_rows(rows: List[List[Any]], headers: List[str]) -> List[Dict[str, Any]]:
-    return [
-        normalize_record(dict(zip(headers, row + [""] * (len(headers) - len(row)))))
-        for row in rows
-        if any(str(value).strip() for value in row)
-    ]
+_TRANSIENT_MARKERS = ("timeout", "temporarily unavailable", "connection", "reset", "429", "502", "503", "504")
 
 
-def worksheet_records(worksheet) -> List[Dict[str, Any]]:
-    last_error = None
-    for attempt in range(2):
+def with_retry(operation: Callable[[], T], attempts: int = 3, base_delay: float = 0.4) -> T:
+    """Retries a Supabase call with backoff so brief DB blips don't surface as request failures."""
+    last_error: Optional[Exception] = None
+    for attempt in range(attempts):
         try:
-            values = worksheet.get_all_values()
-            break
+            return operation()
         except Exception as error:
             last_error = error
-            if attempt == 0:
-                time.sleep(0.25)
-    else:
-        raise last_error
-    if not values:
-        return []
-    headers = values[0]
-    return records_from_rows(values[1:], headers)
+            if attempt == attempts - 1 or not any(marker in str(error).lower() for marker in _TRANSIENT_MARKERS):
+                raise
+            time.sleep(base_delay * (2 ** attempt))
+    raise last_error
 
 
-def column_letter(number: int) -> str:
-    result = ""
-    while number:
-        number, remainder = divmod(number - 1, 26)
-        result = chr(65 + remainder) + result
-    return result
+def text(value: Any) -> str:
+    return str(value or "").strip()
 
 
-CUSTOMER_HEADERS = [
-    "id", "name", "phone", "branch", "sector", "balance", "campaign",
-    "agentId", "worked", "outcome", "status", "dueDate",
-    "pair", "disbAmount", "totalPaid", "businessStatus", "ptpAmount", "ptpTime"
-]
-
-CATEGORY_HEADERS = {
-    "Defaulted": ["Name", "Mobile No", "Due Date", "Branch", "Pair", "Sector", "Disb Amount", "Total Paid", "Balance", "Campaign"],
-    "Upcoming Dues": ["Name", "Mobile No", "Due Date", "Branch", "Pair", "Sector", "Disb Amount", "Total Paid", "Balance", "Campaign"],
-    "Active No Loan": ["Name", "Mobile No", "Due Date", "Branch", "Pair", "Sector", "Disb Amount", "Campaign"],
-    "Dormant": ["Name", "Mobile No", "Due Date", "Branch", "Pair", "Sector", "Disb Amount", "Campaign"],
-}
-
-CATEGORY_SHEET_ALIASES = {
-    "Defaulted": ("Defaulted", "Defaulters"),
-    "Upcoming Dues": ("Upcoming Dues",),
-    "Active No Loan": ("Active No Loan", "Active With No Loans", "Active No Loans"),
-    "Dormant": ("Dormant",),
-}
-
-TYPE_SHEET_HEADERS = [
-    "id", "name", "phone", "branch", "sector", "balance", "campaign",
-    "agentId", "worked", "outcome", "status", "dueDate", "pair",
-    "disbAmount", "totalPaid", "businessStatus", "ptpAmount", "ptpTime",
-    "feedback", "daysInactive", "daysDormant", "loyalty", "lastLoanAmount",
-]
-
-
-def category_sheet_name(category: str) -> str:
-    """Convert an upload category into a safe, stable worksheet title."""
-    cleaned = " ".join(str(category or "Uncategorized").strip().split())
-    for source in ("_", "-"):
-        cleaned = cleaned.replace(source, " ")
-    return " ".join(cleaned.split()).title()[:100] or "Uncategorized"
-
-
-def get_or_create_category_sheet(spreadsheet, category: str):
-    global _category_sheet_cache
-    title = category_sheet_name(category)
-    headers = TYPE_SHEET_HEADERS
-    if title in _category_sheet_cache:
-        return _category_sheet_cache[title]
+def optional_number(value: Any) -> Optional[float]:
     try:
-        worksheet = spreadsheet.worksheet(title)
-        worksheet.update("A1", [headers])
-        _category_sheet_cache[title] = worksheet
-        return worksheet
-    except gspread.exceptions.WorksheetNotFound:
-        with _category_sheet_lock:
-            try:
-                worksheet = spreadsheet.worksheet(title)
-                worksheet.update("A1", [headers])
-                _category_sheet_cache[title] = worksheet
-                return worksheet
-            except gspread.exceptions.WorksheetNotFound:
-                worksheet = spreadsheet.add_worksheet(
-                    title=title,
-                    rows=1000,
-                    cols=len(headers),
-                )
-                worksheet.append_row(headers)
-                _category_sheet_cache[title] = worksheet
-                return worksheet
+        return float(text(value).replace(",", "")) if text(value) else None
+    except ValueError:
+        return None
 
 
-def campaign_sheet_name(campaign: str) -> str:
-    cleaned = " ".join(str(campaign or "Campaign").strip().split())
-    for character in ("/", "\\", "?", "*", "[", "]", ":"):
-        cleaned = cleaned.replace(character, " ")
-    return " ".join(cleaned.split())[:100] or "Campaign"
+def optional_integer(value: Any) -> Optional[int]:
+    number = optional_number(value)
+    return int(number) if number is not None else None
 
 
-def get_or_create_campaign_sheet(spreadsheet, campaign: str):
-    global _campaign_sheet_cache
-    title = campaign_sheet_name(campaign)
-    if title in _campaign_sheet_cache:
-        return _campaign_sheet_cache[title]
+def optional_date(value: Any) -> Optional[str]:
     try:
-        worksheet = spreadsheet.worksheet(title)
-        if worksheet.col_count < len(CUSTOMER_HEADERS):
-            worksheet.resize(cols=len(CUSTOMER_HEADERS))
-        if worksheet.row_values(1) != CUSTOMER_HEADERS:
-            worksheet.update("A1", [CUSTOMER_HEADERS])
-        _campaign_sheet_cache[title] = worksheet
-        return worksheet
-    except gspread.exceptions.WorksheetNotFound:
-        with _category_sheet_lock:
-            try:
-                worksheet = spreadsheet.worksheet(title)
-                if worksheet.col_count < len(CUSTOMER_HEADERS):
-                    worksheet.resize(cols=len(CUSTOMER_HEADERS))
-                if worksheet.row_values(1) != CUSTOMER_HEADERS:
-                    worksheet.update("A1", [CUSTOMER_HEADERS])
-                _campaign_sheet_cache[title] = worksheet
-                return worksheet
-            except gspread.exceptions.WorksheetNotFound:
-                worksheet = spreadsheet.add_worksheet(title=title, rows=1000, cols=len(CUSTOMER_HEADERS))
-                worksheet.append_row(CUSTOMER_HEADERS)
-                _campaign_sheet_cache[title] = worksheet
-                return worksheet
+        return date.fromisoformat(text(value)).isoformat() if text(value) else None
+    except ValueError:
+        return None
 
 
-def get_or_create_campaign_registry(spreadsheet):
-    global _campaign_registry_cache
-    headers = ["name", "type", "priority", "startDate", "endDate", "dateAdded"]
-    if _campaign_registry_cache is not None:
-        return _campaign_registry_cache
-    try:
-        worksheet = spreadsheet.worksheet("Campaigns")
-        current_headers = worksheet.row_values(1)
-        if not current_headers:
-            worksheet.update("A1", [headers])
-        else:
-            missing = [header for header in headers if header not in current_headers]
-            for index, header in enumerate(missing, start=len(current_headers) + 1):
-                worksheet.update_cell(1, index, header)
-        _campaign_registry_cache = worksheet
-        return worksheet
-    except gspread.exceptions.WorksheetNotFound:
-        worksheet = spreadsheet.add_worksheet(title="Campaigns", rows=100, cols=len(headers))
-        worksheet.append_row(headers)
-        _campaign_registry_cache = worksheet
-        return worksheet
+def agent_response(row: Dict[str, Any]) -> Dict[str, Any]:
+    performance = row.get("performance") or {}
+    return {"id": row["id"], "name": row["name"], "email": row["email"], "role": row["role"], "status": row["status"], "callsMade": performance.get("calls_made", 0), "connected": performance.get("connected", 0), "conversion": float(performance.get("conversion") or 0)}
 
 
-def ensure_customer_headers(worksheet) -> None:
-    if worksheet.col_count < len(CUSTOMER_HEADERS):
-        worksheet.resize(cols=len(CUSTOMER_HEADERS))
-    headers = worksheet.row_values(1)
-    missing = [header for header in CUSTOMER_HEADERS if header not in headers]
-    for index, header in enumerate(missing, start=len(headers) + 1):
-        worksheet.update_cell(1, index, header)
+def customer_response(row: Dict[str, Any]) -> Dict[str, Any]:
+    campaign, agent = row.get("campaign") or {}, row.get("assigned_agent") or {}
+    return {"id": row["customer_id"], "name": row["name"], "phone": row["phone"], "branch": row["branch"], "sector": row["sector"], "balance": row["balance"] or "", "campaign": campaign.get("name", ""), "agentId": agent.get("name", ""), "worked": "TRUE" if row["worked"] else "FALSE", "outcome": row["outcome"], "status": row["status"], "dueDate": row["due_date"] or "", "pair": row["pair"], "disbAmount": row["disb_amount"] or "", "totalPaid": row["total_paid"] or "", "businessStatus": row["business_status"], "ptpAmount": row["ptp_amount"] or "", "ptpTime": row["ptp_time"], "feedback": row["feedback"], "daysInactive": row["days_inactive"] or "", "daysDormant": row["days_dormant"] or "", "loyalty": row["loyalty"], "lastLoanAmount": row["last_loan_amount"] or "", "sourceData": row.get("source_data") or {}}
 
-# --- PYDANTIC SCHEMAS ---
 
 class UserCreateModel(BaseModel):
     name: str
     email: str
     role: str
     status: str = "Active"
-    # No password required!
+    requesterRole: str = ""
+
 
 class UserEditModel(BaseModel):
     email: str
     name: str
     role: str
+    status: str = "Active"
+    requesterRole: str = ""
+
 
 class UserDeleteModel(BaseModel):
     email: str
+    requesterRole: str = ""
+
 
 class LoginModel(BaseModel):
     email: str
+
 
 class DispositionModel(BaseModel):
     customerId: str
@@ -314,10 +124,50 @@ class CustomerAssignModel(BaseModel):
     requesterRole: str = ""
 
 
+class ClaimNextCustomerModel(BaseModel):
+    agentName: str
+    requesterRole: str
+
+
+class AdminCampaignUpdateModel(BaseModel):
+    name: str
+    type: str
+    priority: str
+    startDate: str = ""
+    endDate: str = ""
+    archived: bool = False
+    requesterRole: str = ""
+
+
+class AdminCustomerUpdateModel(BaseModel):
+    campaignName: str
+    customerId: str
+    name: str
+    phone: str = ""
+    branch: str = ""
+    sector: str = ""
+    balance: str = ""
+    outcome: str = ""
+    status: str = ""
+    requesterRole: str = ""
+
+
+class AdminDispositionUpdateModel(BaseModel):
+    id: str
+    outcome: str
+    status: str = ""
+    amountRec: float = 0.0
+    comments: str = ""
+    businessStatus: str = ""
+    ptpTime: str = ""
+    requesterRole: str = ""
+
+
 class DistributionModel(BaseModel):
     campaign: str
     selectedAgents: List[str] = []
     requesterRole: str = ""
+
 
 class CustomerUploadModel(BaseModel):
     id: int
@@ -333,648 +183,365 @@ class CustomerUploadModel(BaseModel):
     pair: str = ""
     disbAmount: str = ""
     totalPaid: str = ""
+    url: str = ""
+    disbDate: str = ""
+    loanCode: str = ""
+    ddDays: str = ""
+    accountStatus: str = ""
+    bfcBlc: str = ""
+    numberOfLoans: str = ""
+    riskBand: str = ""
+    incrementStatus: str = ""
+    affordability: str = ""
+    loanLimit: str = ""
+    interest: str = ""
+    totalDue: str = ""
+    penalty: str = ""
 
     class Config:
         extra = "allow"
 
 
-def can_allocate(requester_role: str) -> bool:
-    return requester_role.strip().lower() in {"admin", "ops manager", "team leader"}
+def can_allocate(role: str) -> bool:
+    return text(role).lower() in {"admin", "ops manager", "team leader"}
 
 
-def category_row(customer: CustomerUploadModel, category: str) -> List[Any]:
-    values = {
-        "Name": customer.name,
-        "Mobile No": customer.phone,
-        "Due Date": customer.dueDate,
-        "Branch": customer.branch,
-        "Pair": customer.pair,
-        "Sector": customer.sector,
-        "Disb Amount": customer.disbAmount,
-        "Total Paid": customer.totalPaid,
-        "Balance": customer.balance,
-        "Campaign": customer.campaign,
-    }
-    headers = CATEGORY_HEADERS.get(category_sheet_name(category), CUSTOMER_HEADERS)
-    return [values.get(header, "") for header in headers]
+def can_administer(role: str) -> bool:
+    return text(role).lower() in {"admin", "ops manager"}
 
 
-def type_sheet_row(customer: CustomerUploadModel, campaign_type: str, headers: List[str]) -> List[Any]:
-    values = {
-        "id": customer.id,
-        "name": customer.name,
-        "phone": customer.phone,
-        "branch": customer.branch,
-        "sector": customer.sector,
-        "balance": customer.balance,
-        "campaign": customer.campaign,
-        "agentid": "",
-        "worked": "FALSE",
-        "outcome": "",
-        "status": "",
-        "duedate": customer.dueDate,
-        "pair": customer.pair,
-        "disbamount": customer.disbAmount,
-        "totalpaid": customer.totalPaid,
-        "businessstatus": "",
-        "ptpamount": "",
-        "ptptime": "",
-        "feedback": "",
-        "daysinactive": "",
-        "daysdormant": "",
-        "loyalty": "",
-        "lastloanamount": "",
-    }
-    aliases = {
-        "mobileno": "phone", "phonenumber": "phone", "customername": "name",
-        "campaignname": "campaign", "assignedagent": "agentid", "agent": "agentid",
-        "agentid": "agentid", "accountstatus": "status", "isworked": "worked",
-        "startdate": "", "enddate": "", "station": "branch", "stations": "branch",
-    }
-    row = []
-    for header in headers:
-        key = str(header).strip().lower().replace(" ", "")
-        key = aliases.get(key, key)
-        row.append(values.get(key, ""))
-    return row
+def upload_value(raw_data: Dict[str, Any], *headers: str) -> Any:
+    normalized_headers = {"".join(character for character in header.lower() if character.isalnum()) for header in headers}
+    for key, value in reversed(list(raw_data.items())):
+        normalized_key = "".join(character for character in key.lower() if character.isalnum())
+        if normalized_key in normalized_headers and text(value):
+            return value
+    return ""
 
 
-# --- ROOT & HEALTH ENDPOINTS ---
+def upload_row(customer: CustomerUploadModel, campaign_id: str) -> Dict[str, Any]:
+    raw_data = customer.model_dump() if hasattr(customer, "model_dump") else customer.dict()
+    name = upload_value(raw_data, "name", "customer", "customer_name") or customer.name
+    phone = upload_value(raw_data, "phone", "mobile no", "mobile_no", "mobile number") or customer.phone
+    branch = upload_value(raw_data, "branch", "station", "stations") or customer.branch or customer.station or customer.stations
+    sector = upload_value(raw_data, "sector") or customer.sector
+    balance = upload_value(raw_data, "balance", "balance today") or customer.balance
+    return {"campaign_id": campaign_id, "customer_id": str(customer.id), "name": text(name), "phone": text(phone), "branch": text(branch), "sector": text(sector), "balance": optional_number(balance), "due_date": optional_date(upload_value(raw_data, "due_date", "due date") or customer.dueDate), "pair": text(upload_value(raw_data, "pair") or customer.pair), "disb_amount": optional_number(upload_value(raw_data, "disb_amount", "disb amount") or customer.disbAmount), "total_paid": optional_number(upload_value(raw_data, "total_paid", "total paid") or customer.totalPaid), "source_url": text(upload_value(raw_data, "url", "shujaa_url", "merlin_url") or customer.url), "disb_date": text(upload_value(raw_data, "disb_date", "disb date", "loan_date") or customer.disbDate), "loan_code": text(upload_value(raw_data, "loan_code") or customer.loanCode), "dd_days": optional_integer(upload_value(raw_data, "dd_days", "dd days") or customer.ddDays), "account_status": text(upload_value(raw_data, "account_status", "status") or customer.accountStatus), "bfc_blc": text(upload_value(raw_data, "bfc_blc", "bfc/blc") or customer.bfcBlc), "number_of_loans": optional_integer(upload_value(raw_data, "number_of_loans", "no of loans", "loan_num") or customer.numberOfLoans), "risk_band": text(upload_value(raw_data, "risk_band", "risk band") or customer.riskBand), "increment_status": text(upload_value(raw_data, "increment_status", "increment") or customer.incrementStatus), "affordability": optional_number(upload_value(raw_data, "affordability") or customer.affordability), "loan_limit": optional_number(upload_value(raw_data, "loan_limit", "loan limit") or customer.loanLimit), "interest": optional_number(upload_value(raw_data, "interest") or customer.interest), "total_due": optional_number(upload_value(raw_data, "total_due", "total due") or customer.totalDue), "penalty": optional_number(upload_value(raw_data, "penalty") or customer.penalty), "feedback": text(raw_data.get("feedback")), "days_inactive": optional_integer(upload_value(raw_data, "days_inactive", "days_to_s", "days_since") or raw_data.get("daysInactive")), "days_dormant": optional_integer(upload_value(raw_data, "days_dormant", "days_dorm") or raw_data.get("daysDormant")), "loyalty": text(upload_value(raw_data, "loyalty") or raw_data.get("loyalty")), "last_loan_amount": optional_number(upload_value(raw_data, "last_loan_amount", "lastloan amount") or raw_data.get("lastLoanAmount")), "source_data": raw_data}
+
+
 @app.get("/")
 @app.get("/api")
 def read_root():
-    return {"message": "FastAPI Server is running successfully on Vercel!"}
+    return {"message": "FastAPI Server is running successfully on Supabase!"}
+
 
 @app.get("/health")
 @app.get("/api/health")
 def health_check():
-    return {
-        "status": "ok",
-        "message": "Call Center API is running",
-        "googleCredentialsConfigured": bool(os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON", "").strip()),
-        "googleSheetConfigured": bool(os.getenv("GOOGLE_SHEET_ID", "").strip()),
-    }
+    configured = bool(os.getenv("SUPABASE_URL", "").strip() and os.getenv("SUPABASE_SERVICE_ROLE_KEY", "").strip())
+    return {"status": "ok" if configured else "configuration_required", "message": "Call Center API is running", "supabaseConfigured": configured}
 
 
-# --- AUTHENTICATION ---
 @app.post("/login")
 @app.post("/api/login")
 def login(creds: LoginModel):
+    email = text(creds.email).lower()
+    if not email.endswith("@4g-capital.com"):
+        raise HTTPException(403, "Only corporate @4g-capital.com accounts are permitted.")
     try:
-        email_lower = creds.email.lower().strip()
-        
-        # 1. DOMAIN FIREWALL: Require company email domain
-        if not email_lower.endswith("@4g-capital.com"):
-            raise HTTPException(status_code=403, detail="Unauthorized network. Only corporate @4g-capital.com accounts are permitted.")
-            
-        sheet = get_google_sheet().worksheet("Agents")
-        agents = sheet.get_all_records()
-        
-        # 2. DATABASE CHECK: Does this exact email exist in the sheet?
-        user = next((a for a in agents if str(a.get("Email", a.get("email", ""))).lower().strip() == email_lower), None)
-        
-        # 3. STRICT BLOCK: Not in the database
-        if not user:
-            raise HTTPException(status_code=403, detail="ACCESS DENIED: Your email is not registered in the active users database. Contact your Ops Manager.")
-            
-        # 4. ACTIVE STATUS CHECK: Ensure they haven't been deactivated
-        status = str(user.get("Status", user.get("status", "Active"))).strip().lower()
-        if status == "inactive":
-             raise HTTPException(status_code=403, detail="ACCOUNT SUSPENDED: Your access to the system has been revoked.")
+        result = get_supabase().table("agents").select("*").eq("email", email).limit(1).execute()
+    except Exception as error:
+        raise db_error(error)
+    if not result.data:
+        raise HTTPException(403, "ACCESS DENIED: Your email is not registered in the active users database.")
+    agent = result.data[0]
+    if text(agent["status"]).lower() == "inactive":
+        raise HTTPException(403, "ACCOUNT SUSPENDED: Your access has been revoked.")
+    return {"success": True, "email": agent["email"], "role": agent["role"], "name": agent["name"]}
 
-        role = user.get("Role", user.get("role", "Control Agent"))
-        name = user.get("Name", user.get("name", "Unknown"))
-
-        return {
-            "success": True,
-            "email": creds.email,
-            "role": role,
-            "name": name
-        }
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        print(f"Database Login Error: {str(e)}")
-        raise HTTPException(status_code=500, detail="Secure database connection failed. Please try again later.")
-
-
-# --- USER MANAGEMENT (ADMIN ENDPOINTS) ---
 
 @app.get("/agents")
 @app.get("/api/agents")
 def get_agents():
-    global _agents_data_cache, _agents_data_cache_time
-    cache_ttl = 30
-    with _agents_data_cache_lock:
-        if _agents_data_cache is not None and time.time() - _agents_data_cache_time < cache_ttl:
-            return _agents_data_cache
     try:
-        sheet = get_google_sheet().worksheet("Agents")
-        records = worksheet_records(sheet)
-        for record in records:
-            record.pop("password", None)
-        with _agents_data_cache_lock:
-            _agents_data_cache = records
-            _agents_data_cache_time = time.time()
-        return records
-    except HTTPException:
-        with _agents_data_cache_lock:
-            if _agents_data_cache is not None:
-                return _agents_data_cache
-        raise
+        return [agent_response(row) for row in get_supabase().table("agents").select("*,performance:control_agent_performance(calls_made,connected,conversion)").order("name").execute().data]
     except Exception as error:
-        with _agents_data_cache_lock:
-            if _agents_data_cache is not None:
-                return _agents_data_cache
-        raise HTTPException(status_code=503, detail=f"Google Sheets connection failed: {error}")
+        raise db_error(error)
+
 
 @app.post("/api/users/add")
 def add_user(user: UserCreateModel):
+    if not can_allocate(user.requesterRole):
+        raise HTTPException(403, "Only managers can create users")
+    if text(user.requesterRole).lower() == "team leader" and text(user.role).lower() != "control agent":
+        raise HTTPException(403, "Team Leaders may only create Control Agents")
     try:
-        sheet = get_google_sheet().worksheet("Agents")
-        
-        # Check if user already exists
-        existing_users = sheet.get_all_records()
-        for u in existing_users:
-            if str(u.get("Email", "")).lower().strip() == user.email.lower().strip():
-                raise HTTPException(status_code=400, detail="A user with this email already exists.")
-        
-        # Get headers to ensure we map correctly, or just append standard columns
-        # Structure assuming: Status | Name | Email | Role
-        row_data = [user.status, user.name, user.email, user.role]
-        sheet.append_row(row_data)
-        
-        return {"status": "success", "message": f"User {user.name} created successfully"}
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        get_supabase().table("agents").insert({"name": text(user.name), "email": text(user.email).lower(), "role": text(user.role), "status": text(user.status)}).execute()
+    except Exception as error:
+        if "duplicate" in str(error).lower():
+            raise HTTPException(400, "A user with this email already exists.")
+        raise db_error(error)
+    return {"status": "success", "message": f"User {user.name} created successfully"}
+
 
 @app.post("/api/users/edit")
 def edit_user(user: UserEditModel):
+    if not can_administer(user.requesterRole):
+        raise HTTPException(403, "Only Admin or Ops Manager can edit users")
     try:
-        sheet = get_google_sheet().worksheet("Agents")
-        records = sheet.get_all_records()
-        
-        row_idx = None
-        for idx, record in enumerate(records):
-            if str(record.get("Email", record.get("email", ""))).lower().strip() == user.email.lower().strip():
-                row_idx = idx + 2  # +2 because header is row 1, and index starts at 0
-                break
-                
-        if not row_idx:
-            raise HTTPException(status_code=404, detail="User not found in database.")
-            
-        # Dynamically find column numbers based on headers
-        headers = sheet.row_values(1)
-        name_col = headers.index("Name") + 1 if "Name" in headers else 2
-        role_col = headers.index("Role") + 1 if "Role" in headers else 4
-        
-        # Update specific cells
-        sheet.update_cell(row_idx, name_col, user.name)
-        sheet.update_cell(row_idx, role_col, user.role)
-        
-        return {"success": True}
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        result = get_supabase().table("agents").update({"name": text(user.name), "role": text(user.role), "status": text(user.status)}).eq("email", text(user.email).lower()).execute()
+    except Exception as error:
+        raise db_error(error)
+    if not result.data:
+        raise HTTPException(404, "User not found in database.")
+    return {"success": True}
+
 
 @app.post("/api/users/delete")
 def delete_user(user: UserDeleteModel):
+    if not can_administer(user.requesterRole):
+        raise HTTPException(403, "Only Admin or Ops Manager can delete users")
     try:
-        sheet = get_google_sheet().worksheet("Agents")
-        records = sheet.get_all_records()
-        
-        row_idx = None
-        for idx, record in enumerate(records):
-            if str(record.get("Email", record.get("email", ""))).lower().strip() == user.email.lower().strip():
-                row_idx = idx + 2
-                break
-                
-        if not row_idx:
-            raise HTTPException(status_code=404, detail="User not found in database.")
-            
-        sheet.delete_rows(row_idx)
-        return {"success": True}
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        result = get_supabase().table("agents").delete().eq("email", text(user.email).lower()).execute()
+    except Exception as error:
+        raise db_error(error)
+    if not result.data:
+        raise HTTPException(404, "User not found in database.")
+    return {"success": True}
+
 
 @app.put("/agents/status")
 @app.put("/api/agents/status")
 def update_agent_status(name: str = Body(...), status: str = Body(...)):
-    sheet = get_google_sheet().worksheet("Agents")
     try:
-        cell = sheet.find(name)
-        if not cell:
-            raise HTTPException(status_code=404, detail="Agent not found")
-        headers = sheet.row_values(1)
-        status_column = next((index + 1 for index, header in enumerate(headers) if str(header).strip().lower() in {"status", "agentstatus", "shiftstatus"}), 1)
-        sheet.update_cell(cell.row, status_column, status)
-        return {"status": "success"}
-    except gspread.exceptions.CellNotFound:
-        raise HTTPException(status_code=404, detail="Agent not found in database")
+        result = get_supabase().table("agents").update({"status": text(status)}).eq("name", text(name)).execute()
+    except Exception as error:
+        raise db_error(error)
+    if not result.data:
+        raise HTTPException(404, "Agent not found in database")
+    return {"status": "success"}
 
 
-# --- CAMPAIGNS & CUSTOMERS ---
-@app.get("/campaigns")
 @app.get("/api/campaigns")
 def get_campaigns(fresh: bool = False):
-    global _campaign_response_cache, _campaign_response_cache_time
-    with _agents_data_cache_lock:
-        if not fresh and _campaign_response_cache is not None and time.time() - _campaign_response_cache_time < 30:
-            return _campaign_response_cache
-
-    spreadsheet = get_google_sheet()
-    campaign_records = []
     try:
-        sheet = spreadsheet.worksheet("Campaigns")
-        campaign_records = [
-            normalize_campaign_record(record)
-            for record in worksheet_records(sheet)
-            if str(record.get("name", record.get("campaign", ""))).strip()
-        ]
-    except gspread.exceptions.WorksheetNotFound:
-        pass
-
-    account_counts = {}
-    try:
-        for customer in read_customer_records(spreadsheet):
-            campaign_name = str(customer.get("campaign", "")).strip()
-            if campaign_name:
-                account_counts[campaign_name] = account_counts.get(campaign_name, 0) + 1
+        rows = get_supabase().table("campaign_summary").select("*").order("date_added", desc=True).execute().data
+        return [{"name": row["name"], "type": row["type"], "priority": row["priority"], "startDate": row["start_date"] or "", "endDate": row["end_date"] or "", "dateAdded": row["date_added"] or "", "archivedAt": row["archived_at"] or "", "accountCount": row["account_count"]} for row in rows]
     except Exception as error:
-        print(f"Campaign account counts unavailable: {error}")
+        raise db_error(error)
 
-    if campaign_records:
-        for campaign in campaign_records:
-            campaign["accountCount"] = account_counts.get(str(campaign.get("name", "")).strip(), 0)
-            campaign["dateAdded"] = campaign.get("dateAdded") or campaign.get("startDate") or ""
-        with _agents_data_cache_lock:
-            _campaign_response_cache = campaign_records
-            _campaign_response_cache_time = time.time()
-        return campaign_records
-
-    # Some deployments store campaign uploads only in Customers/category sheets.
-    # Derive a registry response so the campaign page and allocation dropdown stay usable.
-    derived = {}
-    try:
-        for customer in read_customer_records(spreadsheet):
-            campaign_name = str(customer.get("campaign", "")).strip()
-            if campaign_name and campaign_name not in derived:
-                derived[campaign_name] = {
-                    "name": campaign_name,
-                    "type": campaign_name if campaign_name in CATEGORY_HEADERS else "",
-                    "priority": "",
-                    "startDate": "",
-                    "endDate": "",
-                    "accountCount": account_counts.get(campaign_name, 0),
-                    "dateAdded": "",
-                }
-    except Exception as error:
-        print(f"Campaign discovery unavailable: {error}")
-    response = list(derived.values())
-    with _agents_data_cache_lock:
-        _campaign_response_cache = response
-        _campaign_response_cache_time = time.time()
-    return response
-
-
-def normalize_campaign_record(record: Dict[str, Any]) -> Dict[str, Any]:
-    normalized = normalize_record(record)
-    normalized["name"] = normalized.get("name") or normalized.get("campaign", "")
-    normalized["type"] = normalized.get("type") or normalized.get("campaignType", "")
-    normalized["dateAdded"] = normalized.get("dateAdded") or normalized.get("createdAt", "")
-    return normalized
 
 @app.post("/campaigns")
 @app.post("/api/campaigns")
-def create_campaign(
-    name: str = Body(...), 
-    type: str = Body(...), 
-    priority: str = Body(...), 
-    startDate: str = Body(""),
-    endDate: str = Body(""),
-    customers: List[CustomerUploadModel] = Body(...),
-    chunkIndex: int = Body(0)
-):
+def create_campaign(name: str = Body(...), type: str = Body(...), priority: str = Body(...), startDate: str = Body(""), endDate: str = Body(""), customers: List[CustomerUploadModel] = Body(...), chunkIndex: int = Body(0)):
     if len(customers) > 4000:
-        raise HTTPException(status_code=413, detail="Each upload request may contain at most 4,000 accounts")
-    stage = "Google Sheets connection"
+        raise HTTPException(413, "Each upload request may contain at most 4,000 accounts")
     try:
-        sh = get_google_sheet()
-        if chunkIndex == 0:
-            stage = "campaign registry"
-            camp_sheet = get_or_create_campaign_registry(sh)
-            camp_sheet.append_row([name, type, priority, startDate, endDate, time.strftime("%Y-%m-%d")])
-            global _campaign_response_cache, _campaign_response_cache_time
-            _campaign_response_cache = None
-            _campaign_response_cache_time = 0
-
-        stage = "campaign worksheet"
-        campaign_sheet = get_or_create_category_sheet(sh, type)
-        rows = [type_sheet_row(customer, type, TYPE_SHEET_HEADERS) for customer in customers]
-
+        db = get_supabase()
+        campaign = with_retry(lambda: db.table("campaigns").upsert({"name": text(name), "type": text(type), "priority": text(priority), "start_date": optional_date(startDate), "end_date": optional_date(endDate)}, on_conflict="name").execute()).data[0]
+        rows = [upload_row(customer, campaign["id"]) for customer in customers]
         if rows:
-            stage = "customer upload"
-            campaign_sheet.append_rows(rows)
+            with_retry(lambda: db.table("customers").upsert(rows, on_conflict="campaign_id,customer_id").execute())
+    except Exception as error:
+        raise db_error(error)
+    return {"status": "success", "imported": len(customers), "campaignSheet": text(name)}
 
-        return {
-            "status": "success",
-            "imported": len(customers),
-            "campaignSheet": campaign_sheet_name(name),
-        }
+
+@app.get("/api/admin/dispositions")
+def get_admin_dispositions(campaignName: Optional[str] = None, requesterRole: str = ""):
+    if not can_administer(requesterRole):
+        raise HTTPException(403, "Only Admin or Ops Manager can view disposition history")
+    try:
+        query = get_supabase().table("dispositions").select("id,customer_id,outcome,status,amount_rec,comments,business_status,ptp_time,created_at,campaign:campaigns(name),agent:agents(name)").order("created_at", desc=True).limit(200)
+        if campaignName:
+            campaigns = get_supabase().table("campaigns").select("id").eq("name", text(campaignName)).limit(1).execute().data
+            if not campaigns:
+                return []
+            query = query.eq("campaign_id", campaigns[0]["id"])
+        return query.execute().data
+    except Exception as error:
+        raise db_error(error)
+
+
+@app.patch("/api/admin/campaigns/{campaign_name}")
+def update_admin_campaign(campaign_name: str, campaign: AdminCampaignUpdateModel):
+    if not can_administer(campaign.requesterRole):
+        raise HTTPException(403, "Only Admin or Ops Manager can modify campaigns")
+    try:
+        result = get_supabase().table("campaigns").update({"name": text(campaign.name), "type": text(campaign.type), "priority": text(campaign.priority), "start_date": optional_date(campaign.startDate), "end_date": optional_date(campaign.endDate), "archived_at": datetime.now(timezone.utc).isoformat() if campaign.archived else None}).eq("name", text(campaign_name)).execute()
+    except Exception as error:
+        raise db_error(error)
+    if not result.data:
+        raise HTTPException(404, "Campaign not found")
+    return {"status": "success"}
+
+
+@app.patch("/api/admin/customers")
+def update_admin_customer(customer: AdminCustomerUpdateModel):
+    if not can_administer(customer.requesterRole):
+        raise HTTPException(403, "Only Admin or Ops Manager can modify customers")
+    try:
+        db = get_supabase()
+        campaigns = db.table("campaigns").select("id").eq("name", text(customer.campaignName)).limit(1).execute().data
+        if not campaigns:
+            raise HTTPException(404, "Campaign not found")
+        result = db.table("customers").update({"name": text(customer.name), "phone": text(customer.phone), "branch": text(customer.branch), "sector": text(customer.sector), "balance": optional_number(customer.balance), "outcome": text(customer.outcome), "status": text(customer.status)}).eq("campaign_id", campaigns[0]["id"]).eq("customer_id", text(customer.customerId)).execute()
     except HTTPException:
         raise
-    except gspread.exceptions.WorksheetNotFound as error:
-        raise HTTPException(status_code=503, detail=f"{stage} worksheet was not found: {error}")
     except Exception as error:
-        print(f"Campaign upload failed during {stage}: {error}")
-        raise HTTPException(status_code=503, detail=f"Campaign upload failed during {stage}: {error}")
+        raise db_error(error)
+    if not result.data:
+        raise HTTPException(404, "Customer not found")
+    return {"status": "success"}
 
 
-def campaign_registry_has_name(worksheet, campaign_name: str) -> bool:
-    names = getattr(campaign_registry_has_name, "names", None)
-    if names is None:
-        names = {str(value).strip() for value in worksheet.col_values(1) if str(value).strip()}
-        campaign_registry_has_name.names = names
-    return campaign_name in names
-
-
-def read_customer_records(spreadsheet) -> List[Dict[str, Any]]:
-    """Read the master customer sheet and supplement it with category sheets."""
-    records = []
+@app.patch("/api/admin/dispositions/{disposition_id}")
+def update_admin_disposition(disposition_id: str, disposition: AdminDispositionUpdateModel):
+    if not can_administer(disposition.requesterRole):
+        raise HTTPException(403, "Only Admin or Ops Manager can modify dispositions")
     try:
-        master_sheet = spreadsheet.worksheet("Customers")
-        records.extend(worksheet_records(master_sheet))
-    except gspread.exceptions.WorksheetNotFound:
-        pass
-
-    def customer_key(record: Dict[str, Any]):
-        phone = str(record.get("phone", "")).strip()
-        name = str(record.get("name", "")).strip().lower()
-        if phone or name:
-            return (phone, name)
-        return ("id", str(record.get("id", "")).strip())
-
-    existing_keys = {customer_key(record) for record in records}
-    campaign_specs = []
-    try:
-        campaign_registry = spreadsheet.worksheet("Campaigns")
-        campaign_specs = [
-            (str(record.get("name", "")).strip(), str(record.get("type", record.get("campaignType", ""))).strip())
-            for record in worksheet_records(campaign_registry)
-            if str(record.get("name", "")).strip()
-        ]
-    except gspread.exceptions.WorksheetNotFound:
-        pass
-
-    visited_campaign_sheets = set()
-    for campaign, campaign_type in campaign_specs:
-        sheet_title = category_sheet_name(campaign_type or campaign)
-        if sheet_title in visited_campaign_sheets:
-            continue
-        visited_campaign_sheets.add(sheet_title)
-        try:
-            campaign_sheet = spreadsheet.worksheet(sheet_title)
-            for record in worksheet_records(campaign_sheet):
-                record.setdefault("campaign", campaign if campaign_type else sheet_title)
-                key = customer_key(record)
-                if key not in existing_keys:
-                    records.append(record)
-                    existing_keys.add(key)
-        except gspread.exceptions.WorksheetNotFound:
-            continue
-
-    for category, sheet_names in CATEGORY_SHEET_ALIASES.items():
-        for sheet_name in sheet_names:
-            try:
-                category_sheet = spreadsheet.worksheet(sheet_name)
-            except gspread.exceptions.WorksheetNotFound:
-                continue
-            try:
-                for record in worksheet_records(category_sheet):
-                    record.setdefault("campaign", category)
-                    key = customer_key(record)
-                    if key not in existing_keys:
-                        records.append(record)
-                        existing_keys.add(key)
-            except Exception as error:
-                print(f"Skipping unavailable category sheet {sheet_name}: {error}")
-                continue
-    return records
+        result = get_supabase().table("dispositions").update({"outcome": text(disposition.outcome), "status": text(disposition.status), "amount_rec": disposition.amountRec, "comments": text(disposition.comments), "business_status": text(disposition.businessStatus), "ptp_time": text(disposition.ptpTime)}).eq("id", disposition_id).execute()
+    except Exception as error:
+        raise db_error(error)
+    if not result.data:
+        raise HTTPException(404, "Disposition not found")
+    return {"status": "success"}
 
 
-def find_customer_location(spreadsheet, customer_id: str):
-    sheets = []
-    try:
-        sheets.append(spreadsheet.worksheet("Customers"))
-    except gspread.exceptions.WorksheetNotFound:
-        pass
-    for campaign in read_campaign_names(spreadsheet):
-        try:
-            sheet = spreadsheet.worksheet(campaign_sheet_name(campaign))
-            if sheet not in sheets:
-                sheets.append(sheet)
-        except gspread.exceptions.WorksheetNotFound:
-            continue
-    for sheet in sheets:
-        try:
-            cell = sheet.find(str(customer_id).strip())
-            return sheet, cell
-        except gspread.exceptions.CellNotFound:
-            continue
-    raise gspread.exceptions.CellNotFound(customer_id)
+CUSTOMER_SELECT = "campaign_id,customer_id,name,phone,branch,sector,balance,due_date,pair,disb_amount,total_paid,worked,outcome,status,business_status,ptp_amount,ptp_time,feedback,days_inactive,days_dormant,loyalty,last_loan_amount,source_data,campaign:campaigns(name),assigned_agent:agents!customers_assigned_agent_id_fkey(name)"
 
-
-def read_campaign_names(spreadsheet) -> List[str]:
-    try:
-        registry = spreadsheet.worksheet("Campaigns")
-        return [
-            str(record.get("name", "")).strip()
-            for record in worksheet_records(registry)
-            if str(record.get("name", "")).strip()
-        ]
-    except gspread.exceptions.WorksheetNotFound:
-        return []
 
 @app.get("/customers")
 @app.get("/api/customers")
-def get_customers(
-    agentName: Optional[str] = None,
-    offset: int = 0,
-    limit: int = 200,
-):
+def get_customers(agentName: Optional[str] = None, campaignName: Optional[str] = None, pending: bool = False, offset: int = 0, limit: int = 200):
     if offset < 0 or limit < 1 or limit > 500:
-        raise HTTPException(status_code=400, detail="offset must be >= 0 and limit must be between 1 and 500")
-
+        raise HTTPException(400, "offset must be >= 0 and limit must be between 1 and 500")
     try:
-        spreadsheet = get_google_sheet()
-        records = read_customer_records(spreadsheet)
-    except gspread.exceptions.WorksheetNotFound:
-        raise HTTPException(status_code=404, detail="Customers worksheet was not found")
+        db, agent_id = get_supabase(), None
+        if agentName:
+            agents = db.table("agents").select("id").eq("name", text(agentName)).limit(1).execute().data
+            if not agents:
+                return {"items": [], "offset": offset, "limit": limit, "total": 0, "hasMore": False}
+            agent_id = agents[0]["id"]
+        campaign_id = None
+        if campaignName:
+            campaigns = db.table("campaigns").select("id").eq("name", text(campaignName)).limit(1).execute().data
+            if not campaigns:
+                return {"items": [], "offset": offset, "limit": limit, "total": 0, "hasMore": False}
+            campaign_id = campaigns[0]["id"]
+        query = db.table("customers").select(CUSTOMER_SELECT, count="exact")
+        if agent_id:
+            query = query.eq("assigned_agent_id", agent_id)
+            query = query.eq("worked", True) if pending else query.eq("worked", False)
+        if campaign_id:
+            query = query.eq("campaign_id", campaign_id)
+        result = query.order("created_at").range(offset, offset + limit - 1).execute()
     except Exception as error:
-        raise HTTPException(status_code=503, detail=f"Google Sheets connection failed: {error}")
-    if not records:
-        return {"items": [], "offset": offset, "limit": limit, "total": 0, "hasMore": False}
+        raise db_error(error)
+    rows = [row for row in result.data if not pending or text(row.get("outcome")).lower() not in {"", "answered"}]
+    total = len(rows) if pending else result.count or 0
+    return {"items": [customer_response(row) for row in rows], "offset": offset, "limit": limit, "total": total, "hasMore": offset + len(rows) < total}
 
-    if agentName:
-        cache_key = agentName.strip().lower()
-        with _customer_queue_cache_lock:
-            cached = _customer_queue_cache.get(cache_key)
-            if cached and cached[0] > time.time():
-                matches = cached[1]
-                return {
-                    "items": matches[offset:offset + limit], "offset": offset,
-                    "limit": limit, "total": len(matches),
-                    "hasMore": offset + limit < len(matches),
-                }
 
-        matches = [
-            record for record in records
-            if str(record.get("agentId", "")).strip() == agentName
-            and str(record.get("worked", "")).upper() != "TRUE"
-        ]
-        with _customer_queue_cache_lock:
-            _customer_queue_cache[cache_key] = (time.time() + 20, matches)
-        total = len(matches)
-        items = matches[offset:offset + limit]
-    else:
-        total = len(records)
-        items = records[offset:offset + limit]
-
-    return {
-        "items": items,
-        "offset": offset,
-        "limit": limit,
-        "total": total,
-        "hasMore": offset + len(items) < total,
-    }
+@app.get("/api/ptps")
+def get_agent_ptps(agentName: str, campaignName: Optional[str] = None):
+    try:
+        db = get_supabase()
+        agents = db.table("agents").select("id").eq("name", text(agentName)).limit(1).execute().data
+        if not agents:
+            return []
+        query = db.table("customers").select(CUSTOMER_SELECT).eq("assigned_agent_id", agents[0]["id"]).eq("status", "Promise to Pay (PTP)")
+        if campaignName:
+            campaigns = db.table("campaigns").select("id").eq("name", text(campaignName)).limit(1).execute().data
+            if not campaigns:
+                return []
+            query = query.eq("campaign_id", campaigns[0]["id"])
+        return [customer_response(row) for row in query.order("ptp_time").execute().data]
+    except Exception as error:
+        raise db_error(error)
 
 
 @app.post("/assign")
 @app.post("/api/assign")
 def assign_customer(assignment: CustomerAssignModel):
     if not can_allocate(assignment.requesterRole):
-        raise HTTPException(status_code=403, detail="Only managers can assign accounts")
-    spreadsheet = get_google_sheet()
+        raise HTTPException(403, "Only managers can assign accounts")
     try:
-        sheet, cell = find_customer_location(spreadsheet, assignment.customerId)
-    except gspread.exceptions.CellNotFound:
-        raise HTTPException(status_code=404, detail="Customer not found")
-    headers = sheet.row_values(1)
-    agent_column = next((index + 1 for index, header in enumerate(headers) if str(header).strip().lower() in {"agentid", "assignedagent", "agent"}), 0)
-    if not agent_column:
-        raise HTTPException(status_code=500, detail="Campaign worksheet is missing the agentId column")
-
-    sheet.update_cell(cell.row, agent_column, assignment.agentName)
-    with _customer_queue_cache_lock:
-        _customer_queue_cache.clear()
+        result = with_retry(lambda: get_supabase().rpc("assign_customer", {"p_customer_id": assignment.customerId, "p_agent_name": assignment.agentName}).execute())
+    except Exception as error:
+        raise db_error(error)
+    if not result.data:
+        raise HTTPException(404, "Customer or agent not found")
     return {"status": "success", "customerId": assignment.customerId, "agentName": assignment.agentName}
 
 
-# --- ALLOCATION ENGINE ---
+@app.post("/api/claim-next-customer")
+def claim_next_customer(claim: ClaimNextCustomerModel):
+    if text(claim.requesterRole) != "Admin":
+        raise HTTPException(403, "Only Admin users can take accounts")
+    try:
+        db = get_supabase()
+        agents = db.table("agents").select("id").eq("name", text(claim.agentName)).limit(1).execute().data
+        if not agents:
+            raise HTTPException(404, "Agent not found")
+        available = db.table("customers").select(CUSTOMER_SELECT).is_("assigned_agent_id", "null").eq("worked", False).order("created_at").limit(1).execute().data
+        if not available:
+            raise HTTPException(404, "No unassigned accounts are available")
+        customer = available[0]
+        result = db.table("customers").update({"assigned_agent_id": agents[0]["id"]}).eq("campaign_id", customer["campaign_id"]).eq("customer_id", customer["customer_id"]).is_("assigned_agent_id", "null").execute()
+        if not result.data:
+            raise HTTPException(409, "That account was just assigned. Try again.")
+        customer["assigned_agent"] = {"name": text(claim.agentName)}
+        return customer_response(customer)
+    except HTTPException:
+        raise
+    except Exception as error:
+        raise db_error(error)
+
+
 @app.post("/distribute")
 @app.post("/api/distribute")
 def distribute_customers(distribution: DistributionModel):
     if not can_allocate(distribution.requesterRole):
-        raise HTTPException(status_code=403, detail="Only managers can assign accounts")
-    sh = get_google_sheet()
+        raise HTTPException(403, "Only managers can assign accounts")
+    if not distribution.selectedAgents:
+        raise HTTPException(400, "Select at least one active agent")
     try:
-        cust_sheet = sh.worksheet(campaign_sheet_name(distribution.campaign))
-    except gspread.exceptions.WorksheetNotFound:
-        raise HTTPException(status_code=404, detail="Campaign worksheet was not found")
-    agent_sheet = sh.worksheet("Agents")
-    
-    customers = [normalize_record(record) for record in cust_sheet.get_all_records()]
-    headers = cust_sheet.row_values(1)
-    agent_column = next((index + 1 for index, header in enumerate(headers) if str(header).strip().lower() in {"agentid", "assignedagent", "agent"}), 8)
-    assigned_agents = {
-        str(customer.get("agentId", "")).strip()
-        for customer in read_customer_records(sh)
-        if str(customer.get("agentId", "")).strip()
-        and str(customer.get("campaign", "")).strip()
-    }
-    agents = [normalize_record(record) for record in agent_sheet.get_all_records()
-        if str(record.get("status", record.get("Status", ""))).strip().lower() in {"clocked in", "online"}
-        and str(record.get("role", record.get("Role", ""))).strip().lower() == "control agent"
-        and str(record.get("name", record.get("Name", ""))).strip() not in assigned_agents
-        and record.get("name", record.get("Name")) in distribution.selectedAgents]
-    
-    if not agents:
-        raise HTTPException(status_code=400, detail="No active agents found")
-    
-    unassigned = [
-        i + 2 for i, c in enumerate(customers) 
-        if c.get("campaign") == distribution.campaign and not c.get("agentId") and str(c.get("worked")).upper() != "TRUE"
-    ]
-    
-    if not unassigned:
-        return {"status": "info", "message": "No unassigned customers remaining"}
-    
-    cells_to_update = []
-    agent_idx = 0
-    assigned_count = 0
-    
-    for row_idx in unassigned:
-        assigned_agent = agents[agent_idx].get("name")
-        cells_to_update.append(gspread.Cell(row_idx, agent_column, assigned_agent))
-        assigned_count += 1
-        agent_idx = (agent_idx + 1) % len(agents)
-        
-    cust_sheet.update_cells(cells_to_update)
-    with _customer_queue_cache_lock:
-        _customer_queue_cache.clear()
-        
-    return {"status": "success", "assignedCount": assigned_count}
+        assigned = int(with_retry(lambda: get_supabase().rpc("distribute_campaign", {"p_campaign_name": distribution.campaign, "p_agent_names": distribution.selectedAgents}).execute()).data or 0)
+    except Exception as error:
+        raise db_error(error)
+    return {"status": "success", "assignedCount": assigned} if assigned else {"status": "info", "message": "No unassigned customers remaining"}
 
 
-# --- DISPOSITION LOGGING ---
 @app.post("/disposition")
 @app.post("/api/disposition")
 def submit_disposition(disp: DispositionModel):
-    sh = get_google_sheet()
-    agent_sheet = sh.worksheet("Agents")
-    
-    # 1. Update Customer Record
     try:
-        cust_sheet, cust_cell = find_customer_location(sh, disp.customerId)
-        r = cust_cell.row
-        headers = cust_sheet.row_values(1)
-        columns = {str(header).strip().lower(): index + 1 for index, header in enumerate(headers)}
-        customer_updates = []
-        for key, value in (("worked", "TRUE"), ("outcome", disp.outcome), ("status", disp.status), ("businessstatus", disp.businessStatus), ("ptpamount", disp.amountRec), ("ptptime", disp.ptpTime)):
-            column = columns.get(key)
-            if column:
-                customer_updates.append(gspread.Cell(r, column, value))
-        cust_sheet.update_cells(customer_updates)
-    except gspread.exceptions.CellNotFound:
-        pass
-        
-    # 2. Update Agent Metrics
-    try:
-        agent_cell = agent_sheet.find(disp.agentName)
-        ar = agent_cell.row
-        calls = int(agent_sheet.cell(ar, 5).value or 0) + 1
-        connected = int(agent_sheet.cell(ar, 6).value or 0) + (1 if disp.outcome == "Answered" else 0)
-        conversion = float(agent_sheet.cell(ar, 7).value or 0) + disp.amountRec
-        
-        agent_updates = [
-            gspread.Cell(ar, 5, calls),
-            gspread.Cell(ar, 6, connected),
-            gspread.Cell(ar, 7, conversion)
-        ]
-        agent_sheet.update_cells(agent_updates)
-    except gspread.exceptions.CellNotFound:
-        pass
-        
-    with _customer_queue_cache_lock:
-        _customer_queue_cache.clear()
+        result = with_retry(lambda: get_supabase().rpc("record_disposition", {"p_customer_id": disp.customerId, "p_outcome": disp.outcome, "p_status": disp.status, "p_amount_rec": disp.amountRec, "p_agent_name": disp.agentName, "p_comments": disp.comments, "p_business_status": disp.businessStatus, "p_ptp_time": disp.ptpTime}).execute())
+    except Exception as error:
+        raise db_error(error)
+    if not result.data:
+        raise HTTPException(404, "Customer or agent not found")
     return {"status": "success"}
 
-# --- LOCALHOST STATIC FILE SERVING ---
+
+CLEAN_PAGES = ["login", "overview", "workspace", "campaigns", "teamleader", "analytics", "admin", "index"]
+
 if os.getenv("VERCEL") is None:
+    from fastapi.responses import FileResponse, RedirectResponse
+
+    def _register_clean_page_routes() -> None:
+        for page in CLEAN_PAGES:
+            file_name = f"{page}.html"
+
+            def serve_page(file_name: str = file_name) -> FileResponse:
+                return FileResponse(file_name)
+
+            def redirect_to_clean_url(page: str = page) -> RedirectResponse:
+                return RedirectResponse(url=f"/{page}", status_code=307)
+
+            app.get(f"/{page}", include_in_schema=False)(serve_page)
+            app.get(f"/{file_name}", include_in_schema=False)(redirect_to_clean_url)
+
+    _register_clean_page_routes()
     app.mount("/", StaticFiles(directory=".", html=True), name="static")

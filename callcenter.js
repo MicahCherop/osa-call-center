@@ -112,6 +112,8 @@ let campaignConfigs = {};
 let agents = readCachedArray('CALLCENTER_AGENTS_CACHE');
 let campaignRecords = readCachedArray('CALLCENTER_CAMPAIGNS_CACHE');
 let globalStats = { totalCalls: 0, connected: 0, recovered: 0, outcomes: {} };
+let ptpCustomers = [];
+let pendingCustomers = [];
 
 function agentName(agent) {
     return String(agent?.name || agent?.Name || '').trim();
@@ -190,7 +192,8 @@ function normalizeCampaignRecord(campaign) {
         startDate: value.startDate || value.start || value['Start Date'] || '',
         endDate: value.endDate || value.end || value['End Date'] || '',
         accountCount: value.accountCount ?? value.accounts ?? value['Account Count'] ?? 0,
-        dateAdded: value.dateAdded || value.createdAt || value['Date Added'] || ''
+        dateAdded: value.dateAdded || value.createdAt || value['Date Added'] || '',
+        archivedAt: value.archivedAt || value.archived_at || ''
     };
 }
 
@@ -215,7 +218,7 @@ function enforceSecurity() {
 
     // 1. Unauthenticated users are sent straight to login
     if ((!role || !email) && currentPage !== 'login') {
-        window.location.replace('/login.html');
+        window.location.replace('/login');
         return;
     }
 
@@ -254,9 +257,9 @@ function enforceSecurity() {
 // Helper: Routes users to their specific default dashboard
 function routeUserByRole(role) {
     if (['Admin', 'Ops Manager', 'Team Leader'].includes(role)) {
-        window.location.replace('/overview.html');
+        window.location.replace('/overview');
     } else {
-        window.location.replace('/workspace.html'); 
+        window.location.replace('/workspace'); 
     }
 }
 
@@ -275,7 +278,7 @@ function hideUnauthorizedMenuLinks(allowedPages) {
 document.addEventListener('DOMContentLoaded', enforceSecurity);
 window.logout = function() {
     localStorage.clear();
-    window.location.replace('/login.html');
+    window.location.replace('/login');
 };
 
 
@@ -306,12 +309,12 @@ function loadUserProfile() {
     if (roleEl) roleEl.innerText = role;
     if (emailEl) emailEl.innerText = email;
 
-    // FIX: Only show the Offline/Online status for Control Agents
+    // Clock controls are available to agents and administrators.
     if (statusIndicator) {
-        if (role === 'Control Agent') {
-            statusIndicator.style.display = 'flex'; // Show it
+        if (role === 'Control Agent' || role === 'Admin') {
+            statusIndicator.style.display = 'flex';
         } else {
-            statusIndicator.style.display = 'none'; // Hide it for Admins/TLs
+            statusIndicator.style.display = 'none';
         }
     }
     ensureHeaderClockControl();
@@ -430,13 +433,35 @@ window.renderCampaignList = function() {
     }
 
     listBody.innerHTML = campaignRecords.map(c => `
-        <tr class="border-b border-brandDark/5 hover:bg-white/40 transition">
+        <tr class="border-b border-brandDark/5 hover:bg-white/40 transition cursor-pointer" onclick="openCampaignCustomers(${inlineString(c.name)})" title="View customers in this campaign">
             <td class="px-5 py-4"><span class="inline-flex items-center gap-2 text-brandAmber"><i class="fa-solid fa-bullhorn"></i>${escapeHtml(displayValue(c.type))}</span></td>
             <td class="px-5 py-4"><div class="font-medium">${escapeHtml(displayValue(c.name))}</div><div class="text-xs text-brandDark/50">${escapeHtml(displayValue(c.priority))}</div></td>
             <td class="px-5 py-4 text-right font-medium">${escapeHtml(displayValue(c.accountCount))}</td>
             <td class="px-5 py-4">${escapeHtml(displayValue(c.dateAdded || c.startDate))}</td>
         </tr>
     `).join('');
+};
+
+window.openCampaignCustomers = async function(campaignName) {
+    const listState = document.getElementById('campaign-list-state');
+    const detailsState = document.getElementById('campaign-details-state');
+    const title = document.getElementById('campaign-detail-title');
+    const tbody = document.getElementById('campaign-customers-tbody');
+    if (!listState || !detailsState || !tbody) return;
+    listState.classList.add('hidden');
+    detailsState.classList.remove('hidden');
+    detailsState.classList.add('flex');
+    if (title) title.innerText = `${campaignName} Customers`;
+    tbody.innerHTML = '<tr><td colspan="5" class="px-5 py-8 text-center text-brandDark/50">Loading customers...</td></tr>';
+    try {
+        const response = await fetch(`${API_BASE}/customers?campaignName=${encodeURIComponent(campaignName)}&limit=500`);
+        if (!response.ok) throw new Error(`Status ${response.status}`);
+        const result = await response.json();
+        const customers = result.items || [];
+        tbody.innerHTML = customers.length ? customers.map(customer => `<tr class="border-b border-brandDark/5 hover:bg-white/40 transition"><td class="px-5 py-4 font-medium">${escapeHtml(customer.name)}</td><td class="px-5 py-4">${escapeHtml(customer.phone || '--')}</td><td class="px-5 py-4">${escapeHtml(customer.sector || '--')}</td><td class="px-5 py-4 text-brandAmber">${escapeHtml(customer.agentId || 'Unassigned')}</td><td class="px-5 py-4">${escapeHtml(customer.outcome || '--')}</td></tr>`).join('') : '<tr><td colspan="5" class="px-5 py-8 text-center text-brandDark/50">No customers in this campaign.</td></tr>';
+    } catch (error) {
+        tbody.innerHTML = '<tr><td colspan="5" class="px-5 py-8 text-center text-red-600">Could not load campaign customers.</td></tr>';
+    }
 };
 
 window.renderTeamLeaderWorkspace = function() {
@@ -477,7 +502,7 @@ async function fetchAllData(forceCampaignRefresh = false) {
             throw lastError;
         };
 
-        const customerPages = new Set(['workspace', 'teamleader', 'campaigns', 'overview', 'dashboard']);
+        const customerPages = new Set(['workspace', 'teamleader', 'campaigns', 'overview', 'dashboard', 'admin']);
         const requests = [
             fetchJson(`${API_BASE}/agents`),
             fetchJson(`${API_BASE}/campaigns${forceCampaignRefresh ? '?fresh=1' : ''}`, forceCampaignRefresh),
@@ -571,7 +596,7 @@ function initCurrentPage() {
 
 function syncGlobalClockStatus() {
     const globalText = document.getElementById('global-status-text');
-    if (!globalText || CURRENT_USER_ROLE !== 'Control Agent') return;
+    if (!globalText || !['Control Agent', 'Admin'].includes(CURRENT_USER_ROLE)) return;
     globalText.innerHTML = isClockedIn
         ? '<span class="w-2 h-2 rounded-full bg-green-500"></span> ONLINE'
         : '<span class="w-2 h-2 rounded-full bg-gray-400"></span> OFFLINE';
@@ -861,17 +886,36 @@ window.switchTeamLeaderTab = function(tabName, element) {
   }
 };
 window.parseCSV = function(text) {
-  const lines = text.split(/\r\n|\n/);
-  if (lines.length === 0) return [];
+    const rows = [];
+    let row = [], field = '', quoted = false;
+    const source = String(text || '').replace(/^\uFEFF/, '');
+    const firstLine = source.split(/\r?\n/, 1)[0] || '';
+    const delimiter = (firstLine.match(/\t/g) || []).length > (firstLine.match(/,/g) || []).length ? '\t' : ',';
+    for (let index = 0; index < source.length; index += 1) {
+        const character = source[index];
+        if (character === '"') {
+            if (quoted && source[index + 1] === '"') { field += '"'; index += 1; }
+            else quoted = !quoted;
+        } else if (character === delimiter && !quoted) {
+            row.push(field.trim()); field = '';
+        } else if ((character === '\n' || character === '\r') && !quoted) {
+            if (character === '\r' && source[index + 1] === '\n') index += 1;
+            row.push(field.trim());
+            if (row.some(value => value !== '')) rows.push(row);
+            row = []; field = '';
+        } else {
+            field += character;
+        }
+    }
+    row.push(field.trim());
+    if (row.some(value => value !== '')) rows.push(row);
+    if (rows.length < 2) return [];
 
-  const headers = lines[0].split(',').map(h => h.trim().replace(/^["']|["']$/g, ''));
+    const headers = rows[0].map(header => header.trim());
   const results = [];
 
-  for (let i = 1; i < lines.length; i++) {
-    const line = lines[i].trim();
-    if (!line) continue;
-
-    const values = line.split(',').map(v => v.trim().replace(/^["']|["']$/g, ''));
+    for (let i = 1; i < rows.length; i++) {
+        const values = rows[i];
     const row = {};
 
     headers.forEach((header, index) => {
@@ -930,6 +974,101 @@ window.renderAdminUserList = function() {
         `;
     });
 };
+
+window.switchAdminTab = function(tab) {
+    const usersPanel = document.getElementById('admin-users-panel');
+    const campaignsPanel = document.getElementById('admin-campaigns-panel');
+    if (!usersPanel || !campaignsPanel) return;
+    const showUsers = tab === 'users';
+    usersPanel.classList.toggle('hidden', !showUsers);
+    campaignsPanel.classList.toggle('hidden', showUsers);
+    document.getElementById('admin-tab-users').className = showUsers ? 'pb-3 border-b-2 border-brandAmber text-brandAmber text-sm font-medium' : 'pb-3 border-b-2 border-transparent text-brandDark/60 hover:text-brandDark text-sm font-medium';
+    document.getElementById('admin-tab-campaigns').className = showUsers ? 'pb-3 border-b-2 border-transparent text-brandDark/60 hover:text-brandDark text-sm font-medium' : 'pb-3 border-b-2 border-brandAmber text-brandAmber text-sm font-medium';
+    if (!showUsers) renderAdminCampaignManagement();
+};
+
+function renderAdminCampaignManagement() {
+    const campaignBody = document.getElementById('admin-campaigns-tbody');
+    const campaignFilter = document.getElementById('admin-campaign-filter');
+    if (!campaignBody || !campaignFilter) return;
+    campaignFilter.innerHTML = '<option value="">Select campaign...</option>' + campaignRecords.map(campaign => `<option value="${escapeHtml(campaign.name)}">${escapeHtml(campaign.name)}</option>`).join('');
+    campaignBody.innerHTML = campaignRecords.length ? campaignRecords.map((campaign, index) => `
+        <tr class="border-b border-brandDark/5 hover:bg-white/40 transition">
+          <td class="px-5 py-4 font-medium">${escapeHtml(campaign.name)}</td><td class="px-5 py-4">${escapeHtml(displayValue(campaign.type))}</td><td class="px-5 py-4">${escapeHtml(displayValue(campaign.priority))}</td><td class="px-5 py-4 text-right">${escapeHtml(displayValue(campaign.accountCount))}</td>
+          <td class="px-5 py-4 ${campaign.archivedAt ? 'text-gray-500' : 'text-green-600'}">${campaign.archivedAt ? 'Archived' : 'Active'}</td>
+          <td class="px-5 py-4 text-right"><button onclick="editAdminCampaign(${index})" title="Edit campaign" class="text-brandDark/40 hover:text-brandAmber px-2"><i class="fa-solid fa-pen"></i></button>${campaign.archivedAt ? '' : `<button onclick="archiveAdminCampaign(${index})" title="Archive campaign" class="text-brandDark/40 hover:text-red-600 px-2"><i class="fa-solid fa-box-archive"></i></button>`}</td>
+        </tr>`).join('') : '<tr><td colspan="6" class="px-5 py-8 text-center text-brandDark/50 italic">No campaigns found.</td></tr>';
+}
+
+window.refreshAdminManagement = async function() {
+    await fetchAllData(true);
+    renderAdminCampaignManagement();
+};
+
+window.editAdminCampaign = async function(index) {
+    const campaign = campaignRecords[index];
+    const name = prompt('Campaign name:', campaign.name);
+    if (name === null || !name.trim()) return;
+    const type = prompt('Campaign type:', campaign.type);
+    if (type === null || !type.trim()) return;
+    const priority = prompt('Priority:', campaign.priority);
+    if (priority === null || !priority.trim()) return;
+    const response = await fetch(`${API_BASE}/admin/campaigns/${encodeURIComponent(campaign.name)}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, type, priority, startDate: campaign.startDate, endDate: campaign.endDate, archived: Boolean(campaign.archivedAt), requesterRole: CURRENT_USER_ROLE }) });
+    if (!response.ok) return showAppAlert((await response.json()).detail || 'Campaign could not be updated.', 'Update failed');
+    await refreshAdminManagement();
+};
+
+window.archiveAdminCampaign = async function(index) {
+    const campaign = campaignRecords[index];
+    if (!confirm(`Archive ${campaign.name}? Its customers and dispositions will be retained.`)) return;
+    const response = await fetch(`${API_BASE}/admin/campaigns/${encodeURIComponent(campaign.name)}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: campaign.name, type: campaign.type, priority: campaign.priority, startDate: campaign.startDate, endDate: campaign.endDate, archived: true, requesterRole: CURRENT_USER_ROLE }) });
+    if (!response.ok) return showAppAlert((await response.json()).detail || 'Campaign could not be archived.', 'Archive failed');
+    await refreshAdminManagement();
+};
+
+window.loadAdminCampaignRecords = async function() {
+    const campaignName = document.getElementById('admin-campaign-filter')?.value;
+    const customersBody = document.getElementById('admin-customers-tbody');
+    const dispositionsBody = document.getElementById('admin-dispositions-tbody');
+    if (!customersBody || !dispositionsBody) return;
+    const campaignCustomers = mockCustomers.filter(customer => customer.campaign === campaignName);
+    customersBody.innerHTML = campaignCustomers.length ? campaignCustomers.map((customer, index) => `<tr class="border-b border-brandDark/5"><td class="px-4 py-3 font-medium">${escapeHtml(customer.name)}</td><td class="px-4 py-3">${escapeHtml(customer.phone)}</td><td class="px-4 py-3">${escapeHtml(customer.outcome || '--')}</td><td class="px-4 py-3 text-right"><button onclick="editAdminCustomer(${index})" class="text-brandDark/40 hover:text-brandAmber" title="Edit customer"><i class="fa-solid fa-pen"></i></button></td></tr>`).join('') : '<tr><td colspan="4" class="px-4 py-6 text-center text-brandDark/50 italic">Select a campaign with loaded customers.</td></tr>';
+    dispositionsBody.innerHTML = '<tr><td colspan="4" class="px-4 py-6 text-center text-brandDark/50 italic">Loading dispositions...</td></tr>';
+    if (!campaignName) { dispositionsBody.innerHTML = '<tr><td colspan="4" class="px-4 py-6 text-center text-brandDark/50 italic">Select a campaign.</td></tr>'; return; }
+    try {
+        window.adminDispositions = await (await fetch(`${API_BASE}/admin/dispositions?campaignName=${encodeURIComponent(campaignName)}&requesterRole=${encodeURIComponent(CURRENT_USER_ROLE)}`)).json();
+        dispositionsBody.innerHTML = adminDispositions.length ? adminDispositions.map((disposition, index) => `<tr class="border-b border-brandDark/5"><td class="px-4 py-3 font-medium">${escapeHtml(disposition.customer_id)}</td><td class="px-4 py-3">${escapeHtml(disposition.outcome || '--')}</td><td class="px-4 py-3">${escapeHtml(String(disposition.amount_rec ?? 0))}</td><td class="px-4 py-3 text-right"><button onclick="editAdminDisposition(${index})" class="text-brandDark/40 hover:text-brandAmber" title="Edit disposition"><i class="fa-solid fa-pen"></i></button></td></tr>`).join('') : '<tr><td colspan="4" class="px-4 py-6 text-center text-brandDark/50 italic">No dispositions recorded.</td></tr>';
+    } catch (error) { dispositionsBody.innerHTML = '<tr><td colspan="4" class="px-4 py-6 text-center text-red-600">Could not load dispositions.</td></tr>'; }
+};
+
+window.editAdminCustomer = async function(index) {
+    const campaignName = document.getElementById('admin-campaign-filter')?.value;
+    const customer = mockCustomers.filter(item => item.campaign === campaignName)[index];
+    const name = prompt('Customer name:', customer.name);
+    if (name === null || !name.trim()) return;
+    const phone = prompt('Phone:', customer.phone || '');
+    if (phone === null) return;
+    const outcome = prompt('Outcome:', customer.outcome || '');
+    if (outcome === null) return;
+    const response = await fetch(`${API_BASE}/admin/customers`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ campaignName, customerId: customer.id, name, phone, branch: customer.branch, sector: customer.sector, balance: customer.balance, outcome, status: customer.status, requesterRole: CURRENT_USER_ROLE }) });
+    if (!response.ok) return showAppAlert((await response.json()).detail || 'Customer could not be updated.', 'Update failed');
+    await fetchAllData(true);
+    loadAdminCampaignRecords();
+};
+
+window.editAdminDisposition = async function(index) {
+    const disposition = (window.adminDispositions || [])[index];
+    if (!disposition) return;
+    const outcome = prompt('Outcome:', disposition.outcome || '');
+    if (outcome === null || !outcome.trim()) return;
+    const amountRec = prompt('Amount recovered:', disposition.amount_rec ?? 0);
+    if (amountRec === null || Number.isNaN(Number(amountRec))) return showAppAlert('Enter a valid amount.', 'Invalid amount');
+    const comments = prompt('Comments:', disposition.comments || '');
+    if (comments === null) return;
+    const response = await fetch(`${API_BASE}/admin/dispositions/${encodeURIComponent(disposition.id)}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: disposition.id, outcome, status: disposition.status || '', amountRec: Number(amountRec), comments, businessStatus: disposition.business_status || '', ptpTime: disposition.ptp_time || '', requesterRole: CURRENT_USER_ROLE }) });
+    if (!response.ok) return showAppAlert((await response.json()).detail || 'Disposition could not be updated.', 'Update failed');
+    loadAdminCampaignRecords();
+};
 // ==========================================
 // USER MANAGEMENT: EDIT & DELETE
 // ==========================================
@@ -938,6 +1077,7 @@ function openEditUserModal(email, name, role) {
     document.getElementById('edit-user-email').value = email;
     document.getElementById('edit-user-name').value = name;
     document.getElementById('edit-user-role').value = role;
+    document.getElementById('edit-user-status').value = agents.find(agent => (agent.email || agent.Email) === email)?.status || 'Active';
 
     const backdrop = document.getElementById('edit-user-modal-backdrop');
     backdrop.classList.remove('hidden');
@@ -956,13 +1096,13 @@ async function submitEditUser(e) {
     const email = document.getElementById('edit-user-email').value;
     const name = document.getElementById('edit-user-name').value;
     const role = document.getElementById('edit-user-role').value;
+    const status = document.getElementById('edit-user-status').value;
 
     try {
-        // Adjust this endpoint to match your Python FastAPI route
         const res = await fetch('/api/users/edit', { 
-            method: 'POST', // or PUT depending on your backend
+            method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email, name, role })
+            body: JSON.stringify({ email, name, role, status, requesterRole: CURRENT_USER_ROLE })
         });
         
         if (res.ok) {
@@ -970,11 +1110,11 @@ async function submitEditUser(e) {
             location.reload(); // Refresh the page to see changes
         } else {
             const data = await res.json();
-            alert(data.detail || 'Failed to update user.');
+            showAppAlert(data.detail || 'Failed to update user.', 'Update failed');
         }
     } catch (err) {
         console.error(err);
-        alert('Error communicating with the server.');
+        showAppAlert('Error communicating with the server.', 'Network error');
     }
 }
 
@@ -982,22 +1122,21 @@ async function deleteUserAction(email) {
     if (!confirm(`Are you absolutely sure you want to completely remove ${email} from the system? This action cannot be undone.`)) return;
     
     try {
-        // Adjust this endpoint to match your Python FastAPI route
         const res = await fetch(`/api/users/delete`, { 
-            method: 'POST', // or DELETE depending on your backend
+            method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email })
+            body: JSON.stringify({ email, requesterRole: CURRENT_USER_ROLE })
         });
         
         if (res.ok) {
             location.reload(); // Refresh the page to see changes
         } else {
              const data = await res.json();
-             alert(data.detail || 'Failed to delete user.');
+             showAppAlert(data.detail || 'Failed to delete user.', 'Delete failed');
         }
     } catch (err) {
         console.error(err);
-        alert('Error communicating with the server.');
+        showAppAlert('Error communicating with the server.', 'Network error');
     }
 }
 
@@ -1020,7 +1159,6 @@ window.createUser = async function(event, context) {
     }
 
     try {
-        // Change '/api/users/add' if your Python route is named differently!
         const res = await fetch('/api/users/add', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -1029,7 +1167,8 @@ window.createUser = async function(event, context) {
                 name: name.trim(), 
                 email: email.trim().toLowerCase(), 
                 role: role,
-                status: 'Active' 
+                status: 'Active',
+                requesterRole: CURRENT_USER_ROLE
             })
         });
 
@@ -1187,7 +1326,7 @@ async function submitDisposition(e) {
       }
 
       submitBtn.innerHTML = originalText;
-      showAppAlert("Disposition saved to Google Sheets!", "Success");
+      showAppAlert("Disposition saved!", "Success");
   } catch (err) {
       submitBtn.innerHTML = originalText;
       showAppAlert("Failed to save disposition to database.", "Network Error");
@@ -1244,20 +1383,39 @@ async function submitAddCampaign(e) {
     // Capture CSV columns dynamically
     const formattedCustomers = rawCustomers.map((row, index) => {
         const customer = { ...row }; 
-        const csvValue = (...keys) => keys.map(key => row[key] || row[key.toLowerCase()]).find(value => value !== undefined) || '';
-        const parsedId = parseInt(row.id, 10);
+        const normalizeHeader = value => String(value || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+        const normalizedRow = Object.fromEntries(Object.entries(row).map(([key, value]) => [normalizeHeader(key), value]));
+        const csvValue = (...keys) => keys.map(key => normalizedRow[normalizeHeader(key)]).find(value => value !== undefined && value !== '') || '';
+        const parsedId = parseInt(csvValue('id', 'customer_id', 'customer id'), 10);
         customer.id = Number.isFinite(parsedId) ? parsedId : (index + 1);
-        customer.name = row.name || row.Name || row.NAME || "Unknown";
-        customer.phone = String(row.phone || row.Phone || row.PHONE || row['mobile no'] || row['Mobile No'] || "");
-        customer.branch = row.branch || row.Branch || row.BRANCH || "Not Specified";
-        customer.sector = row.sector || row.Sector || row.SECTOR || "Not Specified";
-        customer.balance = String(row.balance || row.Balance || row.BALANCE || "0");
+        customer.name = String(csvValue('name', 'customer', 'customer_name') || "Unknown");
+        customer.phone = String(csvValue('phone', 'mobile no', 'mobile_no', 'mobile number') || "");
+        customer.branch = String(csvValue('branch', 'station', 'stations') || "Not Specified");
+        customer.sector = String(csvValue('sector') || "Not Specified");
+        customer.balance = String(csvValue('balance', 'balance today') || "0");
         customer.dueDate = String(csvValue('dueDate', 'due_date', 'Due Date', 'duedate'));
         customer.station = String(csvValue('station', 'Station'));
         customer.stations = String(csvValue('stations', 'Stations'));
         customer.pair = String(csvValue('pair', 'Pair'));
         customer.disbAmount = String(csvValue('disbAmount', 'disb_amount', 'Disb Amount', 'disbursedAmount'));
         customer.totalPaid = String(csvValue('totalPaid', 'total_paid', 'Total Paid'));
+        customer.url = String(csvValue('url', 'URL'));
+        customer.disbDate = String(csvValue('disbDate', 'disb_date', 'Disb Date'));
+        customer.loanCode = String(csvValue('loanCode', 'loan_code', 'Loan Code'));
+        customer.ddDays = String(csvValue('ddDays', 'dd_days', 'DD Days'));
+        customer.accountStatus = String(csvValue('accountStatus', 'account_status', 'Status'));
+        customer.bfcBlc = String(csvValue('bfcBlc', 'bfc_blc', 'BFC/BLC'));
+        customer.numberOfLoans = String(csvValue('numberOfLoans', 'number_of_loans', 'No of loans', 'No Of Loans'));
+        customer.riskBand = String(csvValue('riskBand', 'risk_band', 'Risk_band', 'Risk Band'));
+        customer.incrementStatus = String(csvValue('incrementStatus', 'increment_status', 'Increment', 'Increment Status'));
+        customer.affordability = String(csvValue('affordability', 'Affordability'));
+        customer.loanLimit = String(csvValue('loanLimit', 'loan_limit', 'Loan Limit'));
+        customer.interest = String(csvValue('interest', 'Interest'));
+        customer.totalDue = String(csvValue('totalDue', 'total_due', 'Total Due'));
+        customer.penalty = String(csvValue('penalty', 'Penalty'));
+        customer.daysDormant = String(csvValue('daysDormant', 'days_dormant', 'Days_dorm', 'Days Dormant'));
+        customer.daysInactive = String(csvValue('daysInactive', 'days_inactive', 'days_to_s', 'days_since'));
+        customer.lastLoanAmount = String(csvValue('lastLoanAmount', 'last_loan_amount', 'Lastloan A', 'Lastloan Amount'));
         customer.campaign = campaignName;
         return customer;
     });
@@ -1305,6 +1463,9 @@ async function submitAddCampaign(e) {
             
             // Update the button text to show progress for massive files
             submitBtn.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin"></i> Uploading ${Math.min(i + CHUNK_SIZE, formattedCustomers.length)} of ${formattedCustomers.length}...`;
+
+            // Small stagger between chunks so the DB never receives back-to-back bulk upserts
+            if (i + CHUNK_SIZE < formattedCustomers.length) await new Promise(resolve => setTimeout(resolve, 250));
         }
         
                 // Update local state without immediately issuing three more Sheets reads.
@@ -1512,9 +1673,29 @@ function formatMoney(value) {
   return `Sh ${numericValue.toLocaleString()}`;
 }
 
+function campaignTypeLabel(type) {
+        return ({ active_no_loan: 'Active With No Loans', upcoming_dues: 'Upcoming Dues', defaulted: 'Defaulted', dormant: 'Dormant' })[normalizeCampaignType(type)] || String(type || 'Campaign');
+}
+
+function activeCampaignRecord(name) {
+        return campaignRecords.find(campaign => campaign.name === name);
+}
+
+function updateWorkspaceQueueControls(campaignName) {
+        const campaign = activeCampaignRecord(campaignName);
+        const supportsPtp = ['upcoming_dues', 'defaulted'].includes(normalizeCampaignType(campaign?.type));
+        const takeAccountButton = document.getElementById('take-account-button');
+        const ptpButton = document.getElementById('ws-queue-tab-ptp');
+        const tabs = document.getElementById('workspace-queue-tabs');
+        if (takeAccountButton) takeAccountButton.classList.toggle('hidden', CURRENT_USER_ROLE !== 'Admin');
+        if (ptpButton) ptpButton.classList.toggle('hidden', !supportsPtp);
+        if (tabs) tabs.classList.toggle('grid-cols-3', supportsPtp);
+        if (!supportsPtp && activeWorkspaceQueueTab === 'ptp') activeWorkspaceQueueTab = 'active';
+}
+
 function switchWorkspaceQueueTab(tab) {
   activeWorkspaceQueueTab = tab;
-  ['active', 'pending'].forEach(tabName => {
+    ['active', 'pending', 'ptp'].forEach(tabName => {
     const isActive = tabName === tab;
     const btn = document.getElementById(`ws-queue-tab-${tabName}`);
     if (!btn) return;
@@ -1528,16 +1709,25 @@ function switchWorkspaceQueueTab(tab) {
   renderAgentQueue();
 }
 
-function toggleAgentStatus(checkbox) {
+async function toggleAgentStatus(checkbox) {
   isClockedIn = checkbox.checked;
     localStorage.setItem('IS_CLOCKED_IN', String(isClockedIn));
     syncHeaderClockControl();
-    const status = isClockedIn ? 'Clocked In' : 'Clocked Out';
-    fetch(`${API_BASE}/agents/status`, {
+        const status = isClockedIn ? 'Online' : 'Clocked Out';
+        const currentAgent = agents.find(agent => agentName(agent) === LOGGED_IN_AGENT);
+        if (currentAgent) currentAgent.status = status;
+        try {
+            const response = await fetch(`${API_BASE}/agents/status`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: LOGGED_IN_AGENT, status })
-    }).then(() => invalidateApiCache()).catch(error => console.error('Failed to persist agent status:', error));
+            });
+            if (!response.ok) throw new Error(`Status ${response.status}`);
+            invalidateApiCache();
+        } catch (error) {
+            console.error('Failed to persist agent status:', error);
+            showAppAlert('Your clock status could not be saved. Please try again.', 'Status update failed');
+        }
   const label = document.getElementById('clock-status-label');
   const globalText = document.getElementById('global-status-text');
   const idleMsg = document.getElementById('idle-overlay');
@@ -1562,7 +1752,6 @@ function toggleAgentStatus(checkbox) {
     if (queuePanel) { queuePanel.classList.remove('hidden'); queuePanel.classList.add('flex'); }
     
     if (!activeCustomerId && emptyState) { emptyState.classList.remove('hidden'); emptyState.classList.add('flex'); }
-    claimNextCustomer();
     renderAgentQueue();
   } else {
     if (label) { label.innerText = "Clocked Out"; label.classList.remove('text-green-600'); }
@@ -1579,31 +1768,52 @@ function toggleAgentStatus(checkbox) {
 }
 
 // 1. OPTIMIZED AGENT QUEUE (Fixes Workspace Freeze)
-function renderAgentQueue() {
+async function renderAgentQueue() {
     const queueDiv = document.getElementById('agent-customer-list');
     if (!queueDiv || !LOGGED_IN_AGENT) return;
     const countSpan = document.getElementById('queue-count');
         const activeCampaign = getAgentQueueCampaign();
     const campaignLabel = document.getElementById('active-queue-campaign');
-    if (campaignLabel) campaignLabel.innerText = activeCampaign ? `(${activeCampaign})` : '';
+    const campaign = activeCampaignRecord(activeCampaign);
+    if (campaignLabel) campaignLabel.innerText = activeCampaign ? `${activeCampaign} - ${campaignTypeLabel(campaign?.type)}` : '';
+    updateWorkspaceQueueControls(activeCampaign);
 
-    const myCustomers = mockCustomers.filter(c => {
+    if (activeWorkspaceQueueTab === 'ptp') {
+        try {
+            const response = await fetch(`${API_BASE}/ptps?agentName=${encodeURIComponent(LOGGED_IN_AGENT)}&campaignName=${encodeURIComponent(activeCampaign)}`);
+            if (!response.ok) throw new Error(`Status ${response.status}`);
+            ptpCustomers = await response.json();
+        } catch (error) {
+            queueDiv.innerHTML = '<div class="p-4 text-center text-red-600 text-sm font-medium">Could not load PTP records.</div>';
+            return;
+        }
+    }
+    if (activeWorkspaceQueueTab === 'pending') {
+        try {
+            const response = await fetch(`${API_BASE}/customers?agentName=${encodeURIComponent(LOGGED_IN_AGENT)}&campaignName=${encodeURIComponent(activeCampaign)}&pending=true&limit=500`);
+            if (!response.ok) throw new Error(`Status ${response.status}`);
+            pendingCustomers = (await response.json()).items || [];
+        } catch (error) {
+            queueDiv.innerHTML = '<div class="p-4 text-center text-red-600 text-sm font-medium">Could not load pending callbacks.</div>';
+            return;
+        }
+    }
+
+    const myCustomers = activeWorkspaceQueueTab === 'ptp' ? ptpCustomers : activeWorkspaceQueueTab === 'pending' ? pendingCustomers : mockCustomers.filter(c => {
             const customerCampaign = String(c.campaign || c.Campaign || '').trim();
             if (customerCampaign !== activeCampaign) return false;
-      if (activeWorkspaceQueueTab === 'pending') {
-        return c.pendingReschedule && String(c.worked).toUpperCase() !== 'TRUE' && (!c.agentId || c.agentId === LOGGED_IN_AGENT);
-      }
       return c.agentId === LOGGED_IN_AGENT && String(c.worked).toUpperCase() !== 'TRUE' && !c.pendingReschedule;
     });
 
     if (countSpan) {
-      countSpan.innerText = activeWorkspaceQueueTab === 'pending'
+            countSpan.innerText = activeWorkspaceQueueTab === 'pending'
         ? `${myCustomers.length} Pending`
+                : activeWorkspaceQueueTab === 'ptp' ? `${myCustomers.length} PTP`
         : `${myCustomers.length} Remaining`;
     }
 
     if (myCustomers.length === 0) {
-        queueDiv.innerHTML = `<div class="p-4 text-center text-brandDark/50 text-sm font-medium">${activeWorkspaceQueueTab === 'pending' ? 'No pending callbacks.' : 'Your queue is empty.'}</div>`;
+        queueDiv.innerHTML = `<div class="p-4 text-center text-brandDark/50 text-sm font-medium">${activeWorkspaceQueueTab === 'pending' ? 'No pending callbacks.' : activeWorkspaceQueueTab === 'ptp' ? 'No PTPs recorded for this campaign.' : 'Your queue is empty.'}</div>`;
         return;
     }
 
@@ -1611,13 +1821,14 @@ function renderAgentQueue() {
     let htmlString = '';
     myCustomers.slice(0, 100).forEach(c => {
         htmlString += `
-        <div class="bg-white/80 border border-white hover:border-brandAmber/50 hover:shadow-md p-3 rounded-lg cursor-pointer transition flex flex-col gap-1" onclick="startCall(${inlineString(c.id)})">
+        <div class="bg-white/80 border border-white hover:border-brandAmber/50 hover:shadow-md p-3 rounded-lg ${activeWorkspaceQueueTab === 'ptp' ? '' : 'cursor-pointer'} transition flex flex-col gap-1" ${activeWorkspaceQueueTab === 'ptp' ? '' : `onclick="startCall(${inlineString(c.id)})"`}>
             <div class="flex justify-between items-center">
             <button type="button" onclick="event.stopPropagation(); openCustomerDrawer(${inlineString(c.id)})" class="font-bold text-sm text-brandDark text-left hover:text-brandAmber transition">${escapeHtml(c.name)}</button>
                 <i class="fa-solid fa-phone text-brandAmber text-xs"></i>
             </div>
             <div class="text-xs text-brandDark/60">${escapeHtml(c.campaign || '')}</div>
             ${c.pendingReschedule ? '<div class="text-[11px] font-bold text-amber-700">Pending callback</div>' : ''}
+            ${activeWorkspaceQueueTab === 'ptp' ? `<div class="text-[11px] font-bold text-green-700">PTP: ${escapeHtml(c.ptpTime || 'Time not set')}</div>` : ''}
         </div>`;
     });
     
@@ -1733,6 +1944,45 @@ function startCall(id) {
   if (document.getElementById('active-campaign')) document.getElementById('active-campaign').innerText = c.campaign || '--';
   if (document.getElementById('active-debt')) document.getElementById('active-debt').innerText = c.balance || '0';
   if (document.getElementById('active-branch')) document.getElementById('active-branch').innerText = `${c.branch || '--'} / ${c.sector || '--'}`;
+    const sourceData = c.sourceData || {};
+    const sourceValue = (...headers) => {
+        const aliases = headers.map(header => String(header).toLowerCase().replace(/[^a-z0-9]/g, ''));
+        const match = Object.entries(sourceData).find(([key, value]) => aliases.includes(String(key).toLowerCase().replace(/[^a-z0-9]/g, '')) && value !== '');
+        return match ? match[1] : '';
+    };
+    const detailValues = {
+        'active-mobile-no': c.phone,
+        'active-disb-date': sourceValue('disb date', 'loan date', 'current_loan_dormancy_date'),
+        'active-due-date': c.dueDate || sourceValue('loan due', 'due date'),
+        'active-stations': c.branch || sourceValue('stations', 'station'),
+        'active-pair': c.pair,
+        'active-sector': c.sector,
+        'active-loan-code': sourceValue('loan code'),
+        'active-dd-days': sourceValue('dd days'),
+        'active-status': sourceValue('account status', 'status'),
+        'active-loyalty': c.loyalty || sourceValue('loyalty'),
+        'active-no-of-loans': sourceValue('no of loans', 'loan num'),
+        'active-risk-band': sourceValue('risk band'),
+        'active-increment-status': sourceValue('increment status', 'increment'),
+        'active-affordability': sourceValue('affordability'),
+        'active-loan-limit': sourceValue('loan limit'),
+        'active-disb-amount': c.disbAmount || sourceValue('disb amount'),
+        'active-interest': sourceValue('interest'),
+        'active-total-due': sourceValue('total due'),
+        'active-penalty': sourceValue('penalty'),
+        'active-total-paid': c.totalPaid || sourceValue('total paid'),
+        'active-balance-today': c.balance || sourceValue('balance today')
+    };
+    Object.entries(detailValues).forEach(([elementId, value]) => {
+        const element = document.getElementById(elementId);
+        if (element) element.innerText = value || '--';
+    });
+    const sourceUrl = sourceValue('url', 'shujaa url', 'merlin url');
+    const urlElement = document.getElementById('active-url');
+    if (urlElement) {
+        urlElement.innerText = sourceUrl || '--';
+        urlElement.href = sourceUrl && /^https?:\/\//i.test(sourceUrl) ? sourceUrl : '';
+    }
   
   if (!c.agentId) c.agentId = LOGGED_IN_AGENT;
   c.pendingReschedule = false;
@@ -2297,23 +2547,19 @@ async function claimNextCustomer() {
         showAppAlert('Only Admin users can assign accounts.', 'Permission Denied');
         return;
     }
-    const nextCustomer = mockCustomers.find(customer =>
-        String(customer.id ?? '').trim() &&
-        (!customer.agentId || customer.agentId === '') && String(customer.worked).toUpperCase() !== 'TRUE'
-    );
-    if (!nextCustomer) return;
-
     try {
-        const response = await fetch(`${API_BASE}/assign`, {
+        const response = await fetch(`${API_BASE}/claim-next-customer`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ customerId: String(nextCustomer.id ?? '').trim(), agentName: LOGGED_IN_AGENT, requesterRole: CURRENT_USER_ROLE })
+            body: JSON.stringify({ agentName: LOGGED_IN_AGENT, requesterRole: CURRENT_USER_ROLE })
         });
         if (!response.ok) {
             const errorBody = await response.json().catch(() => ({}));
             throw new Error(errorBody.detail || `Status ${response.status}`);
         }
-        nextCustomer.agentId = LOGGED_IN_AGENT;
+        const customer = await response.json();
+        mockCustomers.unshift(customer);
+        window.customers = mockCustomers;
         renderAgentQueue();
     } catch (error) {
         console.error('Failed to assign customer:', error);

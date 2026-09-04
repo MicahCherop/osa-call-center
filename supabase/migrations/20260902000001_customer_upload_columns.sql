@@ -1,0 +1,15 @@
+alter table public.customers
+  add column if not exists source_url text not null default '',
+  add column if not exists disb_date text not null default '',
+  add column if not exists loan_code text not null default '',
+  add column if not exists dd_days integer,
+  add column if not exists account_status text not null default '',
+  add column if not exists bfc_blc text not null default '',
+  add column if not exists number_of_loans integer,
+  add column if not exists risk_band text not null default '',
+  add column if not exists increment_status text not null default '',
+  add column if not exists affordability numeric(14, 2),
+  add column if not exists loan_limit numeric(14, 2),
+  add column if not exists interest numeric(14, 2),
+  add column if not exists total_due numeric(14, 2),
+  add column if not exists penalty numeric(14, 2);

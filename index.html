@@ -94,7 +94,7 @@
     function redirectToGoogle() {
       const isLocalhost = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
       const redirectUri = isLocalhost 
-          ? window.location.origin + "/login.html" 
+          ? window.location.origin + "/login" 
           : "https://osa-call-center.vercel.app/login";
         
       const oauth2Endpoint = "https://accounts.google.com/o/oauth2/v2/auth";
@@ -169,9 +169,9 @@
           localStorage.setItem('LOGGED_IN_AGENT', data.name);
           
           if(data.role === "Control Agent") {
-            window.location.replace('/workspace.html');
-          } else {
-            window.location.replace('/overview.html');
+            window.location.replace('/workspace');
+        } else {
+            window.location.replace('/overview');
           }
 
         } catch (err) {

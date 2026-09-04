@@ -65,7 +65,7 @@
   
   <script>
     const CLIENT_ID = "106325673835-4moq7op50u80oet78ln84t241a88a200.apps.googleusercontent.com";
-    const LOCAL_REDIRECT_URI = "http://localhost:3000/login.html";
+    const LOCAL_REDIRECT_URI = "http://localhost:3000/login";
     const LOGIN_API_BASE = `${window.location.origin}/api`;
     
     function handleLoginClick() {
@@ -186,9 +186,9 @@
           localStorage.setItem('LOGGED_IN_AGENT', data.name);
           
           if(data.role === "Control Agent") {
-            window.location.replace('/workspace.html');
-          } else {
-            window.location.replace('/overview.html');
+            window.location.replace('/workspace');
+        } else {
+            window.location.replace('/overview');
           }
 
         } catch (err) {

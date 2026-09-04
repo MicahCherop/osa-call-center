@@ -48,6 +48,13 @@
             <option value="Admin">Admin</option>
           </select>
         </div>
+        <div>
+          <label class="block text-[11px] font-semibold text-brandDark/70 uppercase mb-1.5">Access Status</label>
+          <select id="edit-user-status" required class="glass-input rounded-lg w-full px-3 py-2 text-sm font-normal">
+            <option value="Active">Active</option>
+            <option value="Inactive">Inactive</option>
+          </select>
+        </div>
         <div class="flex justify-end gap-3 mt-6 pt-4 border-t border-brandDark/10">
           <button type="button" onclick="closeEditUserModal()" class="px-4 py-2 text-sm font-medium text-brandDark/70 hover:text-brandDark transition ease-in">Cancel</button>
           <button type="submit" class="bg-brandAmber hover:bg-amber-600 text-white font-medium px-5 py-2 rounded-lg shadow-sm transition ease-in text-sm flex items-center gap-2">
@@ -103,27 +110,33 @@
   <div class="flex flex-1 overflow-hidden w-full relative z-10">
     <!-- 2. SIDEBAR (Narrower Width) -->
     <aside class="w-48 glass-panel border-r border-brandDark/5 flex flex-col py-4 shrink-0 bg-white/60">
-      <a href="/workspace.html" data-page="workspace" class="flex items-center gap-3 px-5 py-3 text-sm font-normal text-brandDark/70 hover:bg-slate-50 hover:text-brandDark transition-colors">
+      <a href="/workspace" data-page="workspace" class="flex items-center gap-3 px-5 py-3 text-sm font-normal text-brandDark/70 hover:bg-slate-50 hover:text-brandDark transition-colors">
         <i class="fa-solid fa-headset w-5 text-center text-base"></i> Workspace
       </a>
-      <a href="/campaigns.html" data-page="campaigns" class="flex items-center gap-3 px-5 py-3 text-sm font-normal text-brandDark/70 hover:bg-slate-50 hover:text-brandDark transition-colors">
+      <a href="/campaigns" data-page="campaigns" class="flex items-center gap-3 px-5 py-3 text-sm font-normal text-brandDark/70 hover:bg-slate-50 hover:text-brandDark transition-colors">
         <i class="fa-solid fa-bullhorn w-5 text-center text-base"></i> Campaigns
       </a>
-      <a href="/teamleader.html" data-page="teamleader" class="flex items-center gap-3 px-5 py-3 text-sm font-normal text-brandDark/70 hover:bg-slate-50 hover:text-brandDark transition-colors">
+      <a href="/teamleader" data-page="teamleader" class="flex items-center gap-3 px-5 py-3 text-sm font-normal text-brandDark/70 hover:bg-slate-50 hover:text-brandDark transition-colors">
         <i class="fa-solid fa-user-tie w-5 text-center text-base"></i> Team Leader
       </a>
-      <a href="/analytics.html" data-page="dashboard" class="flex items-center gap-3 px-5 py-3 text-sm font-normal text-brandDark/70 hover:bg-slate-50 hover:text-brandDark transition-colors">
+      <a href="/analytics" data-page="dashboard" class="flex items-center gap-3 px-5 py-3 text-sm font-normal text-brandDark/70 hover:bg-slate-50 hover:text-brandDark transition-colors">
         <i class="fa-solid fa-chart-pie w-5 text-center text-base"></i> Analytics
       </a>
-      <a href="/admin.html" data-page="admin" class="flex items-center gap-3 px-5 py-3 text-sm font-normal text-brandDark/70 hover:bg-slate-50 hover:text-brandDark transition-colors mt-auto border-t border-brandDark/5">
+      <a href="/admin" data-page="admin" class="flex items-center gap-3 px-5 py-3 text-sm font-normal text-brandDark/70 hover:bg-slate-50 hover:text-brandDark transition-colors mt-auto border-t border-brandDark/5">
         <i class="fa-solid fa-shield-halved w-5 text-center text-base"></i> Admin
       </a>
     </aside>
 
     <main class="flex-1 p-8 overflow-y-auto page-enter bg-slate-50/30">
-      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div class="max-w-7xl mx-auto">
+        <div class="border-b border-brandDark/10 mb-6 flex gap-6">
+          <button id="admin-tab-users" type="button" onclick="switchAdminTab('users')" class="pb-3 border-b-2 border-brandAmber text-brandAmber text-sm font-medium">User Management</button>
+          <button id="admin-tab-campaigns" type="button" onclick="switchAdminTab('campaigns')" class="pb-3 border-b-2 border-transparent text-brandDark/60 hover:text-brandDark text-sm font-medium">Campaigns &amp; Customers Management</button>
+        </div>
+
+        <section id="admin-users-panel" class="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div class="glass-card p-6 rounded-2xl border border-brandDark/5 h-fit">
-          <h2 class="text-lg font-medium mb-5 border-b border-brandDark/5 pb-3">Add Leadership Role</h2>
+          <h2 class="text-lg font-medium mb-5 border-b border-brandDark/5 pb-3">Add User</h2>
           <form onsubmit="createUser(event, 'admin')" class="space-y-4">
             <div>
               <label class="block text-[11px] font-semibold text-brandDark/60 uppercase mb-1.5">Full Name</label>
@@ -132,7 +145,7 @@
             
             <div>
               <label class="block text-[11px] font-semibold text-brandDark/60 uppercase mb-1.5">Email Address</label>
-              <input type="email" id="new-agent-email" required placeholder="jane@company.com" class="glass-input rounded-lg w-full px-3 py-2 text-sm font-normal">
+              <input type="email" id="new-agent-email" required placeholder="" class="glass-input rounded-lg w-full px-3 py-2 text-sm font-normal">
             </div>
             
             <div>
@@ -152,7 +165,10 @@
         </div>
 
         <div class="glass-card p-6 rounded-2xl border border-brandDark/5 lg:col-span-2">
-          <h2 class="text-lg font-medium mb-5 border-b border-brandDark/5 pb-3">All System Users</h2>
+          <div class="mb-5 border-b border-brandDark/5 pb-3">
+            <h2 class="text-lg font-medium">Users &amp; Access Controls</h2>
+            <p class="text-sm text-brandDark/60 mt-1">Create team leaders, agents, operations managers, and administrators. Use Edit to change role or access status.</p>
+          </div>
           <div class="overflow-x-auto rounded-xl border border-brandDark/5 bg-white/50">
             <table class="w-full text-left border-collapse whitespace-nowrap">
               <thead class="bg-white/80">
@@ -171,6 +187,36 @@
             </table>
           </div>
         </div>
+        </section>
+
+        <section id="admin-campaigns-panel" class="hidden space-y-6">
+          <div class="glass-card p-6 rounded-2xl border border-brandDark/5">
+            <div class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-5 border-b border-brandDark/5 pb-4">
+              <div>
+                <h2 class="text-lg font-medium">Campaign Management</h2>
+                <p class="text-sm text-brandDark/60 mt-1">Edit campaign details or archive completed campaigns without deleting their records.</p>
+              </div>
+              <button type="button" onclick="refreshAdminManagement()" class="bg-white border border-brandDark/10 text-brandDark/70 hover:text-brandDark px-4 py-2 rounded-lg text-sm font-medium"><i class="fa-solid fa-rotate mr-2"></i>Refresh</button>
+            </div>
+            <div class="overflow-x-auto rounded-xl border border-brandDark/5 bg-white/50">
+              <table class="w-full text-left border-collapse whitespace-nowrap">
+                <thead class="bg-white/80"><tr class="text-[11px] font-semibold uppercase tracking-wider text-brandDark/50 border-b border-brandDark/5"><th class="px-5 py-4">Campaign</th><th class="px-5 py-4">Type</th><th class="px-5 py-4">Priority</th><th class="px-5 py-4 text-right">Accounts</th><th class="px-5 py-4">Status</th><th class="px-5 py-4 text-right">Actions</th></tr></thead>
+                <tbody id="admin-campaigns-tbody" class="text-[13px] text-brandDark/80"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="glass-card p-6 rounded-2xl border border-brandDark/5">
+            <div class="flex flex-col sm:flex-row sm:items-end gap-4 mb-5 border-b border-brandDark/5 pb-4">
+              <div class="flex-1"><h2 class="text-lg font-medium">Customers &amp; Dispositions</h2><p class="text-sm text-brandDark/60 mt-1">Select a campaign to inspect and correct customer records and call dispositions.</p></div>
+              <select id="admin-campaign-filter" onchange="loadAdminCampaignRecords()" class="glass-input rounded-lg px-3 py-2 text-sm font-normal min-w-64"><option value="">Select campaign...</option></select>
+            </div>
+            <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
+              <div class="overflow-x-auto rounded-xl border border-brandDark/5 bg-white/50"><table class="w-full text-left border-collapse whitespace-nowrap"><thead class="bg-white/80"><tr class="text-[11px] font-semibold uppercase tracking-wider text-brandDark/50 border-b border-brandDark/5"><th class="px-4 py-3">Customer</th><th class="px-4 py-3">Phone</th><th class="px-4 py-3">Outcome</th><th class="px-4 py-3 text-right">Action</th></tr></thead><tbody id="admin-customers-tbody" class="text-[13px] text-brandDark/80"></tbody></table></div>
+              <div class="overflow-x-auto rounded-xl border border-brandDark/5 bg-white/50"><table class="w-full text-left border-collapse whitespace-nowrap"><thead class="bg-white/80"><tr class="text-[11px] font-semibold uppercase tracking-wider text-brandDark/50 border-b border-brandDark/5"><th class="px-4 py-3">Customer</th><th class="px-4 py-3">Outcome</th><th class="px-4 py-3">Amount</th><th class="px-4 py-3 text-right">Action</th></tr></thead><tbody id="admin-dispositions-tbody" class="text-[13px] text-brandDark/80"></tbody></table></div>
+            </div>
+          </div>
+        </section>
       </div>
     </main>
   </div>

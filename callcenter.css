@@ -313,7 +313,10 @@ aside { min-width: 0; }
 
 table { width: 100%; }
 header select { display: none !important; }
-.overview-kpi-grid { max-width: 56rem; }
+.overview-kpi-grid {
+  max-width: none;
+  grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+}
 
 @media (min-width: 681px) {
   aside.w-48 { width: 10.5rem !important; }
