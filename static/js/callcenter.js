@@ -3587,3 +3587,34 @@ window.fillFullBalance = function() {
         showAppAlert("No balance available for this customer.", "Info");
     }
 };
+
+let deferredPrompt;
+
+// Listen for the browser determining the app is installable
+window.addEventListener('beforeinstallprompt', (e) => {
+    // Prevent the default mini-infobar from appearing on mobile
+    e.preventDefault();
+    // Stash the event so it can be triggered later
+    deferredPrompt = e;
+    
+    // Optional: Reveal a hidden "Install App" button in your HTML here
+    // document.getElementById('custom-install-btn').classList.remove('hidden');
+});
+
+// Attach this function to a button in your HTML: onclick="triggerAppInstall()"
+function triggerAppInstall() {
+    if (deferredPrompt) {
+        // Show the native browser install prompt
+        deferredPrompt.prompt();
+        
+        // Wait for the user to respond to the prompt
+        deferredPrompt.userChoice.then((choiceResult) => {
+            if (choiceResult.outcome === 'accepted') {
+                console.log('Agent installed the PWA successfully');
+            }
+            deferredPrompt = null;
+        });
+    } else {
+        alert("App is already installed or your browser doesn't support this feature.");
+    }
+}
