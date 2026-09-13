@@ -399,7 +399,6 @@ def health_check():
     return {"status": "ok" if configured else "configuration_required", "message": "Call Center API is running", "supabaseConfigured": configured}
 
 
-@app.post("/login")
 @app.post("/api/login")
 def login(creds: LoginModel):
     # This endpoint verifies the JWT token explicitly since it's the gateway
@@ -499,7 +498,6 @@ def get_campaigns(fresh: bool = False, current_user: dict = Depends(get_current_
         raise db_error(error)
 
 
-@app.post("/campaigns")
 @app.post("/api/campaigns")
 def create_campaign(name: str = Body(...), type: str = Body(...), priority: str = Body(...), startDate: str = Body(""), endDate: str = Body(""), customers: List[CustomerUploadModel] = Body(...), chunkIndex: int = Body(0), current_user: dict = Depends(get_current_user)):
     if not can_allocate(current_user["role"]):
@@ -665,7 +663,6 @@ def get_agent_ptps(agentName: str, campaignName: Optional[str] = None, current_u
         raise db_error(error)
 
 
-@app.post("/assign")
 @app.post("/api/assign")
 def assign_customer(assignment: CustomerAssignModel, current_user: dict = Depends(get_current_user)):
     if not can_allocate(current_user["role"]):
@@ -703,7 +700,6 @@ def claim_next_customer(claim: ClaimNextCustomerModel, current_user: dict = Depe
         raise db_error(error)
 
 
-@app.post("/distribute")
 @app.post("/api/distribute")
 def distribute_customers(distribution: DistributionModel, current_user: dict = Depends(get_current_user)):
     if not can_allocate(current_user["role"]):
@@ -1523,7 +1519,6 @@ def get_gspread_client():
         print(f"[sheets_auth_error] {e}")
         raise HTTPException(500, f"Failed to authorize Google Sheets: {str(e)}")
 
-@app.post("/disposition")
 @app.post("/api/disposition")
 def submit_disposition(disp: DispositionModel, current_user: dict = Depends(get_current_user)):
     db = get_supabase()
