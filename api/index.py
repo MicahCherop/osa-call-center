@@ -8,8 +8,8 @@ import urllib.parse
 from google.oauth2.service_account import Credentials
 from datetime import date, datetime, timezone
 from typing import Any, Callable, Dict, List, Optional, TypeVar
-
 from fastapi import Body, FastAPI, HTTPException, Depends
+from fastapi.responses import FileResponse, RedirectResponse # <-- Add this line
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -18,6 +18,7 @@ from supabase import Client, create_client
 from google.oauth2 import id_token
 from google.auth.transport import requests as google_requests
 from fastapi.responses import RedirectResponse
+from pathlib import Path
 
 try:  # Vercel loads this file as a standalone module ("index"), so use a plain import.
     from priority import get_weights, rank_candidates, candidate_key
@@ -1639,37 +1640,74 @@ def export_to_sheets(payload: SheetsExportModel, current_user: dict = Depends(ge
         print(f"[sheets_error] {error}")
         raise HTTPException(500, "Failed to export data to Google Sheets.")
 
-# 4. Static Files and Fallbacks stay at the ABSOLUTE BOTTOM
-CLEAN_PAGES = ["login", "overview", "workspace", "campaigns", "teamleader", "analytics", "admin", "index"]
+# ==============================================================
+# 4. FRONTEND ROUTES & STATIC FILES (Bulletproof Vercel Config)
+# ==============================================================
 
+BASE_DIR = Path(__file__).resolve().parent.parent
+TEMPLATE_DIR = BASE_DIR / "template"
+STATIC_DIR = BASE_DIR / "static"
+
+# Explicit HTML Page Routes (Guaranteed to register on Vercel)
+@app.get("/login", include_in_schema=False)
+def serve_login():
+    return FileResponse(TEMPLATE_DIR / "login.html")
+
+@app.get("/workspace", include_in_schema=False)
+def serve_workspace():
+    return FileResponse(TEMPLATE_DIR / "workspace.html")
+
+@app.get("/overview", include_in_schema=False)
+def serve_overview():
+    return FileResponse(TEMPLATE_DIR / "overview.html")
+
+@app.get("/campaigns", include_in_schema=False)
+def serve_campaigns():
+    return FileResponse(TEMPLATE_DIR / "campaigns.html")
+
+@app.get("/teamleader", include_in_schema=False)
+def serve_teamleader():
+    return FileResponse(TEMPLATE_DIR / "teamleader.html")
+
+@app.get("/analytics", include_in_schema=False)
+def serve_analytics():
+    return FileResponse(TEMPLATE_DIR / "analytics.html")
+
+@app.get("/admin", include_in_schema=False)
+def serve_admin():
+    return FileResponse(TEMPLATE_DIR / "admin.html")
+
+# Redirect root to login
+@app.get("/", include_in_schema=False)
+def serve_frontend_root():
+    return RedirectResponse(url="/login")
+
+# Explicit Static Asset Routes
+@app.get("/callcenter.js", include_in_schema=False)
+def serve_js():
+    return FileResponse(STATIC_DIR / "js" / "callcenter.js")
+
+@app.get("/callcenter-tailwind.css", include_in_schema=False)
+def serve_css_tailwind():
+    return FileResponse(STATIC_DIR / "css" / "callcenter-tailwind.css")
+
+@app.get("/callcenter.css", include_in_schema=False)
+def serve_css_custom():
+    return FileResponse(STATIC_DIR / "css" / "callcenter.css")
+
+@app.get("/static/icon.jpg", include_in_schema=False)
+def serve_icon():
+    return FileResponse(STATIC_DIR / "icon.jpg")
+
+@app.get("/manifest.webmanifest", include_in_schema=False)
+def serve_manifest():
+    return FileResponse(BASE_DIR / "manifest.webmanifest")
+
+@app.get("/service-worker.js", include_in_schema=False)
+def serve_sw():
+    return FileResponse(BASE_DIR / "service-worker.js")
+
+# Fallback for local uvicorn development ONLY
 if os.getenv("VERCEL") is None:
-    from pathlib import Path
-    from fastapi.responses import FileResponse, RedirectResponse
-
-    # Resolve the root directory (one level up from /api)
-    BASE_DIR = Path(__file__).resolve().parent.parent
-    TEMPLATE_DIR = BASE_DIR / "template"
-
-    def _register_clean_page_routes() -> None:
-        for page in CLEAN_PAGES:
-            file_name = f"{page}.html"
-
-            def serve_page(file_name: str = file_name) -> FileResponse:
-                # FIX 1: Point directly to the template folder
-                return FileResponse(TEMPLATE_DIR / file_name)
-
-            def redirect_to_clean_url(page: str = page) -> RedirectResponse:
-                return RedirectResponse(url=f"/{page}", status_code=307)
-
-            app.get(f"/{page}", include_in_schema=False)(serve_page)
-            app.get(f"/{file_name}", include_in_schema=False)(redirect_to_clean_url)
-
-    _register_clean_page_routes()
-    
-    # FIX 2: Explicitly map the CSS and JS files so the HTML can find them
-    app.get("/callcenter.js", include_in_schema=False)(lambda: FileResponse(BASE_DIR / "static/js/callcenter.js"))
-    app.get("/callcenter-tailwind.css", include_in_schema=False)(lambda: FileResponse(BASE_DIR / "static/css/callcenter-tailwind.css"))
-    app.get("/callcenter.css", include_in_schema=False)(lambda: FileResponse(BASE_DIR / "static/css/callcenter.css"))
-    app.get("/manifest.webmanifest", include_in_schema=False)(lambda: FileResponse(BASE_DIR / "manifest.webmanifest"))
-    app.get("/service-worker.js", include_in_schema=False)(lambda: FileResponse(BASE_DIR / "service-worker.js"))
+    from fastapi.staticfiles import StaticFiles
     app.mount("/", StaticFiles(directory=str(BASE_DIR), html=True), name="static")
