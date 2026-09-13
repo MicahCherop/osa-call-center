@@ -17,6 +17,7 @@ from pydantic import BaseModel
 from supabase import Client, create_client
 from google.oauth2 import id_token
 from google.auth.transport import requests as google_requests
+from fastapi.responses import RedirectResponse
 
 try:  # Vercel loads this file as a standalone module ("index"), so use a plain import.
     from priority import get_weights, rank_candidates, candidate_key
@@ -381,11 +382,14 @@ def upload_row(customer: CustomerUploadModel, campaign_id: str) -> Dict[str, Any
     return {"campaign_id": campaign_id, "customer_id": str(customer.id), "name": text(name), "phone": text(phone), "branch": text(branch), "sector": text(sector), "balance": optional_number(balance), "due_date": optional_date(upload_value(raw_data, "due_date", "due date") or customer.dueDate), "pair": text(upload_value(raw_data, "pair") or customer.pair), "disb_amount": optional_number(upload_value(raw_data, "disb_amount", "disb amount") or customer.disbAmount), "total_paid": optional_number(upload_value(raw_data, "total_paid", "total paid") or customer.totalPaid), "source_url": text(upload_value(raw_data, "url", "shujaa_url", "merlin_url") or customer.url), "disb_date": text(upload_value(raw_data, "disb_date", "disb date", "loan_date") or customer.disbDate), "loan_code": text(upload_value(raw_data, "loan_code") or customer.loanCode), "dd_days": optional_integer(upload_value(raw_data, "dd_days", "dd days") or customer.ddDays), "account_status": text(upload_value(raw_data, "account_status", "status") or customer.accountStatus), "bfc_blc": text(upload_value(raw_data, "bfc_blc", "bfc/blc") or customer.bfcBlc), "number_of_loans": optional_integer(upload_value(raw_data, "number_of_loans", "no of loans", "loan_num") or customer.numberOfLoans), "risk_band": text(upload_value(raw_data, "risk_band", "risk band") or customer.riskBand), "increment_status": text(upload_value(raw_data, "increment_status", "increment") or customer.incrementStatus), "affordability": optional_number(upload_value(raw_data, "affordability") or customer.affordability), "loan_limit": optional_number(upload_value(raw_data, "loan_limit", "loan limit") or customer.loanLimit), "interest": optional_number(upload_value(raw_data, "interest") or customer.interest), "total_due": optional_number(upload_value(raw_data, "total_due", "total due") or customer.totalDue), "penalty": optional_number(upload_value(raw_data, "penalty") or customer.penalty), "feedback": text(raw_data.get("feedback")), "days_inactive": optional_integer(upload_value(raw_data, "days_inactive", "days_to_s", "days_since") or raw_data.get("daysInactive")), "days_dormant": optional_integer(upload_value(raw_data, "days_dormant", "days_dorm") or raw_data.get("daysDormant")), "loyalty": text(upload_value(raw_data, "loyalty") or raw_data.get("loyalty")), "last_loan_amount": optional_number(upload_value(raw_data, "last_loan_amount", "lastloan amount") or raw_data.get("lastLoanAmount")), "source_data": raw_data}
 
 
-# --- ROUTES ---
-@app.get("/")
 @app.get("/api")
 def read_root():
     return {"message": "FastAPI Server is running successfully on Supabase!"}
+
+@app.get("/")
+def serve_frontend_root():
+    # Instantly redirect visitors from the root URL to the login page
+    return RedirectResponse(url="/login")
 
 
 @app.get("/health")
