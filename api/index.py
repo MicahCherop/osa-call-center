@@ -1695,9 +1695,9 @@ def serve_css_tailwind():
 def serve_css_custom():
     return FileResponse(STATIC_DIR / "css" / "callcenter.css")
 
-@app.get("/static/icon.jpg", include_in_schema=False)
+@app.get("/static/icon.png", include_in_schema=False)
 def serve_icon():
-    return FileResponse(STATIC_DIR / "icon.jpg")
+    return FileResponse(STATIC_DIR / "icon.png")
 
 @app.get("/manifest.webmanifest", include_in_schema=False)
 def serve_manifest():

@@ -1,4 +1,5 @@
-const CACHE_NAME = 'osa-call-center-shell-v7'; // Bumped to v7 to force an update
+const CACHE_NAME = 'osa-call-center-shell-v9'; 
+
 const APP_SHELL = [
   '/',
   '/login',
@@ -12,8 +13,9 @@ const APP_SHELL = [
   '/callcenter.css',
   '/callcenter-tailwind.css',
   '/manifest.webmanifest',
-  '/static/icon.jpg' // Fixed icon path
+  '/static/icon.png' 
 ];
+
 
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(APP_SHELL)));
