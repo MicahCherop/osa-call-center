@@ -2,6 +2,40 @@
 const API_BASE = `${window.location.origin}/api`;
 let deferredInstallPrompt = null;
 
+// ==========================================
+// SECURE API INTERCEPTOR
+// ==========================================
+const originalFetch = window.fetch;
+window.fetch = async function(resource, config = {}) {
+    const url = typeof resource === 'string' ? resource : resource.url;
+    
+    // Only intercept requests going to your backend API
+    if (url && url.includes('/api')) {
+        const token = localStorage.getItem('AUTH_TOKEN');
+        
+        // Ensure config.headers exists and append the token
+        if (config.headers instanceof Headers) {
+            config.headers.append('Authorization', `Bearer ${token}`);
+        } else {
+            config.headers = {
+                ...config.headers,
+                'Authorization': `Bearer ${token}`
+            };
+        }
+    }
+    
+    const response = await originalFetch(resource, config);
+    
+    // Auto-logout if the backend rejects the token (Expired or Invalid)
+    const currentPage = document.body.dataset.page;
+    if (response.status === 401 && currentPage !== 'login') {
+        console.warn("Session expired or invalid. Redirecting to login.");
+        localStorage.clear();
+        window.location.replace('/login');
+    }
+    
+    return response;
+};
 function setupPwaInstall() {
     if (!('serviceWorker' in navigator)) return;
     navigator.serviceWorker.register('/service-worker.js').catch(error => {
@@ -172,7 +206,11 @@ function customerCampaignType(customer) {
     const campaign = customer?.campaign || customer?.Campaign || '';
     return normalizeCampaignType(campaignConfigs[campaign] || campaign || 'defaulted');
 }
-
+function getCustomerById(id) {
+    return mockCustomers.find(x => x.id === id) || 
+           pendingCustomers.find(x => x.id === id) || 
+           ptpCustomers.find(x => x.id === id);
+}
 function rebuildCampaignConfigs() {
     campaignConfigs = {};
     campaignRecords = campaignRecords.map(normalizeCampaignRecord).filter(campaign => campaign.name);
@@ -214,16 +252,17 @@ const isAuthorized = enforceSecurity();
 function enforceSecurity() {
     const role = localStorage.getItem('USER_ROLE');
     const email = localStorage.getItem('USER_EMAIL');
+    const token = localStorage.getItem('AUTH_TOKEN'); // <-- Added
     const currentPage = document.body.getAttribute('data-page');
 
-    // 1. Unauthenticated users are sent straight to login
-    if ((!role || !email) && currentPage !== 'login') {
+    // 1. Unauthenticated users (missing token, role, or email) are sent straight to login
+    if ((!role || !email || !token) && currentPage !== 'login') {
         window.location.replace('/login');
         return;
     }
 
     // 2. If already logged in but sitting on the login page, auto-forward them
-    if (currentPage === 'login' && role) {
+    if (currentPage === 'login' && role && token) {
         routeUserByRole(role);
         return;
     }
@@ -294,20 +333,44 @@ window.onload = async () => {
 };
 // --- USER PROFILE & LOGOUT LOGIC ---
 
+// Helper function to decode the Google JWT token
+function parseJwt(token) {
+    try {
+        const base64Url = token.split('.')[1];
+        const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+        const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+            return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+        }).join(''));
+        return JSON.parse(jsonPayload);
+    } catch (e) {
+        return null;
+    }
+}
+
 // Populate the header with the logged-in user's details
 function loadUserProfile() {
     const name = localStorage.getItem('LOGGED_IN_AGENT') || 'Unknown User';
     const role = localStorage.getItem('USER_ROLE') || 'Agent';
     const email = localStorage.getItem('USER_EMAIL') || '';
+    const token = localStorage.getItem('AUTH_TOKEN');
 
     const nameEl = document.getElementById('header-user-name');
     const roleEl = document.getElementById('header-user-role');
     const emailEl = document.getElementById('modal-user-email');
     const statusIndicator = document.getElementById('global-status-text');
+    const avatarContainer = document.getElementById('header-user-avatar');
 
     if (nameEl) nameEl.innerText = name;
     if (roleEl) roleEl.innerText = role;
     if (emailEl) emailEl.innerText = email;
+
+    // Inject Google Profile Picture into the header
+    if (avatarContainer && token) {
+        const decoded = parseJwt(token);
+        if (decoded && decoded.picture) {
+            avatarContainer.innerHTML = `<img src="${decoded.picture}" alt="Profile" class="w-full h-full object-cover" referrerpolicy="no-referrer">`;
+        }
+    }
 
     // Clock controls are available to agents and administrators.
     if (statusIndicator) {
@@ -507,7 +570,8 @@ async function fetchAllData(forceCampaignRefresh = false) {
             fetchJson(`${API_BASE}/agents`),
             fetchJson(`${API_BASE}/campaigns${forceCampaignRefresh ? '?fresh=1' : ''}`, forceCampaignRefresh),
             customerPages.has(currentPage)
-                ? fetchJson(`${API_BASE}/customers?limit=200${currentPage === 'workspace' && LOGGED_IN_AGENT ? `&agentName=${encodeURIComponent(LOGGED_IN_AGENT)}` : ''}`)
+                // ---> CHANGED LIMIT FROM 200 TO 1000 HERE <---
+                ? fetchJson(`${API_BASE}/customers?limit=1000${currentPage === 'workspace' && LOGGED_IN_AGENT ? `&agentName=${encodeURIComponent(LOGGED_IN_AGENT)}` : ''}`)
                 : Promise.resolve({ items: [] })
         ];
         const [agentsResult, campaignsResult, customersResult] = await Promise.allSettled(requests);
@@ -590,6 +654,9 @@ function initCurrentPage() {
     }
     if (currentPage === 'workspace' && isClockedIn) {
         restoreClockedInWorkspace();
+    }
+    if (currentPage === 'workspace' && document.getElementById('notification-badge')) {
+        loadNotifications();
     }
     syncGlobalClockStatus();
 }
@@ -802,18 +869,26 @@ window.openCustomerDrawer = function(eOrId) {
   if (typeof eOrId === 'object' && eOrId !== null && eOrId.stopPropagation) {
     eOrId.stopPropagation();
   } else if (typeof eOrId === 'number' || typeof eOrId === 'string') {
-    const c = mockCustomers.find(x => x.id === Number(eOrId));
+    const c = getCustomerById(eOrId) || mockCustomers.find(x => String(x.id) === String(eOrId));
     if (c) {
-      document.getElementById('drawer-initial').innerText = c.name ? c.name.charAt(0).toUpperCase() : '-';
-      document.getElementById('drawer-name').innerText = c.name || 'Unknown';
-      document.getElementById('drawer-phone').innerText = c.phone || '--';
-      document.getElementById('drawer-campaign').innerText = c.campaign || '--';
-      document.getElementById('drawer-balance').innerText = c.balance || '0';
-      document.getElementById('drawer-agent').innerText = c.agentId || '--';
-      document.getElementById('drawer-outcome').innerText = c.outcome || '--';
-      document.getElementById('drawer-status').innerText = c.status || '--';
-      document.getElementById('drawer-sector').innerText = c.sector || '--';
-      document.getElementById('drawer-branch').innerText = c.branch || '--';
+      const setText = (id, value) => { const el = document.getElementById(id); if (el) el.innerText = value; };
+      setText('drawer-initial', c.name ? c.name.charAt(0).toUpperCase() : '-');
+      setText('drawer-name', c.name || 'Unknown');
+      setText('drawer-phone', c.phone || '--');
+      setText('drawer-customer-id', c.id || '--');
+      // Legacy fields kept for campaigns.html/teamleader.html, which still use the simple drawer.
+      setText('drawer-campaign', c.campaign || '--');
+      setText('drawer-balance', c.balance || '0');
+      setText('drawer-agent', c.agentId || '--');
+      setText('drawer-outcome', c.outcome || '--');
+      setText('drawer-status', c.status || '--');
+      setText('drawer-sector', c.sector || '--');
+      setText('drawer-branch', c.branch || '--');
+      if (document.getElementById('drawer-summary-cards')) {
+        drawerCustomerId = c.id;
+        drawerCampaignName = c.campaign || '';
+        loadCustomer360(c.id, drawerCampaignName);
+      }
     }
   }
 
@@ -858,6 +933,519 @@ window.switchDrawerTab = function(tabName, element) {
     element.classList.add('text-brandAmber', 'border-brandAmber');
   }
 };
+
+// --- CUSTOMER 360 ---
+let drawerCustomerId = null;
+let drawerCampaignName = '';
+let drawerHistoryPage = 1;
+let drawerHistoryHasMore = false;
+const DRAWER_PAGE_SIZE = 20;
+let currentCustomer360 = null;
+
+const ACCOUNT_FIELD_LABELS = [
+    ['accountNumber', 'Account Number'], ['loanCode', 'Loan Code'], ['product', 'Product'],
+    ['disbursementDate', 'Disbursement Date'], ['dueDate', 'Due Date'], ['originalAmount', 'Original Amount'],
+    ['outstandingAmount', 'Outstanding Amount'], ['paidAmount', 'Paid Amount'], ['daysInArrears', 'Days In Arrears'],
+    ['riskBand', 'Risk Band'], ['branch', 'Branch'], ['accountStatus', 'Account Status'],
+    ['numberOfLoans', 'Number Of Loans'], ['incrementStatus', 'Increment Status'], ['affordability', 'Affordability'],
+    ['loanLimit', 'Loan Limit'], ['interest', 'Interest'], ['totalDue', 'Total Due'], ['penalty', 'Penalty']
+];
+
+function relativeTime(value) {
+    if (!value) return '--';
+    const date = new Date(value);
+    if (isNaN(date.getTime())) return '--';
+    const diffDays = Math.floor((Date.now() - date.getTime()) / 86400000);
+    if (diffDays <= 0) return 'Today';
+    if (diffDays === 1) return 'Yesterday';
+    if (diffDays < 30) return `${diffDays} days ago`;
+    return displayDate(value);
+}
+
+function formatMoney(value) {
+    const number = Number(value);
+    return `Sh ${(isNaN(number) ? 0 : number).toLocaleString()}`;
+}
+
+async function loadCustomer360(customerId, campaignName) {
+    const errorBox = document.getElementById('drawer-load-error');
+    if (errorBox) errorBox.classList.add('hidden');
+    drawerHistoryPage = 1;
+    try {
+        const response = await fetch(`${API_BASE}/customers/${encodeURIComponent(customerId)}/360?campaignName=${encodeURIComponent(campaignName || '')}&page=1&pageSize=${DRAWER_PAGE_SIZE}`);
+        if (!response.ok) {
+            const body = await response.json().catch(() => ({}));
+            throw new Error(body.detail || 'Could not load this customer.');
+        }
+        const data = await response.json();
+        currentCustomer360 = data;
+        renderCustomer360(data);
+    } catch (error) {
+        console.error('Failed to load Customer 360:', error);
+        if (errorBox) {
+            errorBox.innerText = error.message || 'Could not load this customer. Please try again.';
+            errorBox.classList.remove('hidden');
+        }
+    }
+}
+
+function renderCustomer360(data) {
+    const setText = (id, value) => { const el = document.getElementById(id); if (el) el.innerText = value; };
+
+    setText('drawer-sum-outstanding', formatMoney(data.summary.outstandingBalance));
+    setText('drawer-sum-overdue', data.summary.daysOverdue ?? '--');
+    setText('drawer-sum-last-contact', relativeTime(data.summary.lastContactAt));
+    setText('drawer-sum-total-calls', data.summary.totalCalls);
+    setText('drawer-sum-answered', data.summary.answeredCalls);
+    setText('drawer-sum-contact-rate', `${data.contactability.contactRate}%`);
+
+    renderDrawerTags(data.tags || []);
+    renderDrawerAccount(data.account || {});
+    renderDrawerHistory(data.contact_history || { items: [], hasMore: false });
+    renderDrawerPtp(data.ptp_history || { history: [] });
+    renderDrawerFollowups(data.followups || []);
+    renderDrawerNotes(data.notes || []);
+    renderDrawerFollowupBanner(data.currentFollowUp || null, data.currentPtp || null);
+}
+
+function renderDrawerFollowupBanner(followup, ptp) {
+    const banner = document.getElementById('drawer-followup-banner');
+    if (!banner) return;
+    if (!followup) {
+        banner.classList.add('hidden');
+        return;
+    }
+    banner.classList.remove('hidden');
+    document.getElementById('drawer-followup-title').innerText = followup.status === 'OVERDUE' ? 'FOLLOW-UP OVERDUE' : 'FOLLOW-UP DUE';
+    document.getElementById('drawer-followup-state').innerText = followup.status;
+    document.getElementById('drawer-followup-reason').innerText = followup.reason || followup.type || '--';
+    const ptpLine = document.getElementById('drawer-followup-ptp-line');
+    if (ptpLine) ptpLine.innerText = ptp ? `Promised: ${formatMoney(ptp.promisedAmount)} on ${displayDate(ptp.promisedDate)}` : '';
+    window.currentDrawerFollowup = followup;
+}
+
+function renderDrawerAccount(account) {
+    const grid = document.getElementById('drawer-account-grid');
+    if (!grid) return;
+    grid.innerHTML = ACCOUNT_FIELD_LABELS
+        .filter(([key]) => account[key] !== null && account[key] !== undefined && account[key] !== '')
+        .map(([key, label]) => `<div><p class="text-[10px] font-semibold uppercase text-brandDark/40">${escapeHtml(label)}</p><p class="font-normal text-brandDark">${escapeHtml(String(account[key]))}</p></div>`)
+        .join('') || '<p class="text-sm text-brandDark/50 col-span-2">No account details available.</p>';
+}
+
+function contactHistoryCardHtml(entry) {
+    const answered = String(entry.outcome || '').toLowerCase() === 'answered';
+    return `
+    <div class="glass-card p-4 rounded-xl">
+      <div class="flex justify-between items-center mb-2">
+        <span class="text-xs font-semibold text-brandDark/50">${escapeHtml(displayDate(entry.date))}</span>
+        <span class="text-xs font-medium ${answered ? 'text-green-600' : 'text-red-500'} flex items-center gap-1">
+          <i class="fa-solid ${answered ? 'fa-check' : 'fa-xmark'}"></i> ${escapeHtml(entry.outcome || 'Unspecified')}
+        </span>
+      </div>
+      ${entry.status ? `<div class="text-xs text-brandDark/70 mb-1"><span class="font-semibold">Outcome:</span> ${escapeHtml(entry.status)}</div>` : ''}
+      ${entry.amount ? `<div class="text-xs text-brandDark/70 mb-1"><span class="font-semibold">Amount:</span> ${formatMoney(entry.amount)}</div>` : ''}
+      <div class="text-xs text-brandDark/70 mb-1"><span class="font-semibold">Agent:</span> ${escapeHtml(entry.agent || '--')}</div>
+      ${entry.notes ? `<div class="text-xs text-brandDark/70"><span class="font-semibold">Notes:</span> ${escapeHtml(entry.notes)}</div>` : ''}
+    </div>`;
+}
+
+function renderDrawerHistory(contactHistory) {
+    const list = document.getElementById('drawer-history-list');
+    const empty = document.getElementById('drawer-history-empty');
+    const moreButton = document.getElementById('drawer-history-more');
+    if (!list) return;
+    const items = contactHistory.items || [];
+    drawerHistoryHasMore = Boolean(contactHistory.hasMore);
+    if (items.length === 0) {
+        empty?.classList.remove('hidden');
+        list.innerHTML = '';
+        moreButton?.classList.add('hidden');
+        return;
+    }
+    empty?.classList.add('hidden');
+    list.innerHTML = items.map(contactHistoryCardHtml).join('');
+    moreButton?.classList.toggle('hidden', !drawerHistoryHasMore);
+}
+
+window.loadMoreContactHistory = async function() {
+    if (!drawerCustomerId || !drawerHistoryHasMore) return;
+    drawerHistoryPage += 1;
+    try {
+        const response = await fetch(`${API_BASE}/customers/${encodeURIComponent(drawerCustomerId)}/360?campaignName=${encodeURIComponent(drawerCampaignName || '')}&page=${drawerHistoryPage}&pageSize=${DRAWER_PAGE_SIZE}`);
+        if (!response.ok) throw new Error(`Status ${response.status}`);
+        const data = await response.json();
+        const list = document.getElementById('drawer-history-list');
+        if (list) list.innerHTML += (data.contact_history.items || []).map(contactHistoryCardHtml).join('');
+        drawerHistoryHasMore = Boolean(data.contact_history.hasMore);
+        document.getElementById('drawer-history-more')?.classList.toggle('hidden', !drawerHistoryHasMore);
+    } catch (error) {
+        console.error('Failed to load more contact history:', error);
+    }
+};
+
+function renderDrawerPtp(ptpHistory) {
+    const empty = document.getElementById('drawer-ptp-empty');
+    const content = document.getElementById('drawer-ptp-content');
+    const list = document.getElementById('drawer-ptp-list');
+    if (!empty || !content || !list) return;
+    if (!ptpHistory.history || ptpHistory.history.length === 0) {
+        empty.classList.remove('hidden');
+        content.classList.add('hidden');
+        return;
+    }
+    empty.classList.add('hidden');
+    content.classList.remove('hidden');
+    document.getElementById('drawer-ptp-promised').innerText = formatMoney(ptpHistory.totalPromised);
+    document.getElementById('drawer-ptp-paid').innerText = formatMoney(ptpHistory.paid);
+    document.getElementById('drawer-ptp-outstanding').innerText = formatMoney(ptpHistory.outstanding);
+    list.innerHTML = ptpHistory.history.map(entry => `
+        <div class="flex justify-between items-center bg-white/60 rounded-lg px-3 py-2 text-xs">
+          <span class="font-medium text-brandDark">${escapeHtml(displayDate(entry.date))}</span>
+          <span class="text-brandDark/70">${escapeHtml(entry.ptpTime || '')}</span>
+          <span class="font-semibold text-brandDark">${formatMoney(entry.amount)}</span>
+          <span class="text-brandDark/50">${escapeHtml(entry.agent || '')}</span>
+        </div>`).join('');
+}
+
+function renderDrawerFollowups(followups) {
+    const empty = document.getElementById('drawer-followups-empty');
+    const list = document.getElementById('drawer-followups-list');
+    if (!empty || !list) return;
+    if (!followups.length) {
+        empty.classList.remove('hidden');
+        list.innerHTML = '';
+        return;
+    }
+    empty.classList.add('hidden');
+    const stateColor = {
+        Pending: 'text-amber-700 bg-amber-50', PENDING: 'text-amber-700 bg-amber-50', DUE: 'text-amber-700 bg-amber-50',
+        Completed: 'text-green-700 bg-green-50', COMPLETED: 'text-green-700 bg-green-50',
+        Overdue: 'text-red-700 bg-red-50', OVERDUE: 'text-red-700 bg-red-50',
+        CANCELLED: 'text-brandDark/60 bg-brandDark/5', RESCHEDULED: 'text-blue-700 bg-blue-50',
+    };
+    // Supports both the normalized follow_ups shape (scheduledAt/status/type) and the legacy
+    // disposition-derived shape (followUpAt/state) for customers created before this feature.
+    list.innerHTML = followups.map(entry => {
+        const when = entry.scheduledAt || entry.followUpAt;
+        const state = entry.status || entry.state || 'PENDING';
+        return `
+        <div class="glass-card p-3 rounded-xl flex justify-between items-center">
+          <div>
+            <div class="text-sm font-medium text-brandDark">${escapeHtml(displayDate(when))} ${entry.type ? `<span class="text-[10px] font-semibold text-brandDark/40 uppercase ml-1">${escapeHtml(entry.type)}</span>` : ''}</div>
+            <div class="text-xs text-brandDark/60">Reason: ${escapeHtml(entry.reason || '--')}</div>
+            <div class="text-xs text-brandDark/40">Created by: ${escapeHtml(entry.createdBy || '--')}</div>
+          </div>
+          <span class="text-[10px] font-semibold uppercase px-2 py-1 rounded-full ${stateColor[state] || 'text-brandDark/60 bg-brandDark/5'}">${escapeHtml(state)}</span>
+        </div>`;
+    }).join('');
+}
+
+function renderDrawerNotes(notes) {
+    const empty = document.getElementById('drawer-notes-empty');
+    const list = document.getElementById('drawer-notes-list');
+    if (!empty || !list) return;
+    if (!notes.length) {
+        empty.classList.remove('hidden');
+        list.innerHTML = '';
+        return;
+    }
+    empty.classList.add('hidden');
+    list.innerHTML = notes.map(note => `
+        <div class="glass-card p-3 rounded-xl">
+          <div class="flex justify-between items-center mb-1">
+            <span class="text-xs font-semibold text-brandDark/50">${escapeHtml(displayDate(note.createdAt))}</span>
+            <span class="text-xs font-medium text-brandAmber">${escapeHtml(note.agent || '')}</span>
+          </div>
+          <p class="text-sm text-brandDark/80">${escapeHtml(note.note)}</p>
+        </div>`).join('');
+}
+
+window.submitDrawerNote = async function(event) {
+    event.preventDefault();
+    const input = document.getElementById('drawer-note-input');
+    const note = input?.value.trim();
+    if (!note || !drawerCustomerId) return;
+    try {
+        const response = await fetch(`${API_BASE}/customers/${encodeURIComponent(drawerCustomerId)}/notes`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ campaignName: drawerCampaignName, note })
+        });
+        if (!response.ok) {
+            const body = await response.json().catch(() => ({}));
+            throw new Error(body.detail || 'Could not save note.');
+        }
+        input.value = '';
+        loadCustomer360(drawerCustomerId, drawerCampaignName);
+    } catch (error) {
+        showAppAlert(error.message || 'Could not save note.', 'Note Error');
+    }
+};
+
+function renderDrawerTags(tags) {
+    const container = document.getElementById('drawer-tags-list');
+    if (!container) return;
+    const canManageTags = ['Admin', 'Ops Manager', 'Team Leader'].includes(CURRENT_USER_ROLE);
+    container.innerHTML = tags.map(tag => `
+        <span class="text-[10px] font-semibold uppercase bg-brandAmber/10 text-amber-700 px-2 py-1 rounded-full flex items-center gap-1">
+          ${escapeHtml(tag.label)}
+          ${canManageTags ? `<button type="button" onclick="removeDrawerTag(${inlineString(tag.code)})" class="hover:text-red-600"><i class="fa-solid fa-xmark"></i></button>` : ''}
+        </span>`).join('') + (canManageTags ? `<button type="button" onclick="promptAddDrawerTag()" class="text-[10px] font-semibold uppercase bg-brandDark/5 text-brandDark/60 px-2 py-1 rounded-full">+ Add tag</button>` : '');
+}
+
+window.promptAddDrawerTag = function() {
+    const code = prompt('Tag code (e.g. high_value, high_risk, ptp, follow_up, dormant, repeat_default, callback):');
+    if (!code) return;
+    addDrawerTag(code.trim().toLowerCase());
+};
+
+async function addDrawerTag(tagCode) {
+    if (!drawerCustomerId) return;
+    try {
+        const response = await fetch(`${API_BASE}/customers/${encodeURIComponent(drawerCustomerId)}/tags`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ campaignName: drawerCampaignName, tagCode })
+        });
+        if (!response.ok) throw new Error('Could not add tag.');
+        loadCustomer360(drawerCustomerId, drawerCampaignName);
+    } catch (error) {
+        showAppAlert(error.message, 'Tag Error');
+    }
+}
+
+window.removeDrawerTag = async function(tagCode) {
+    if (!drawerCustomerId) return;
+    try {
+        const response = await fetch(`${API_BASE}/customers/${encodeURIComponent(drawerCustomerId)}/tags/${encodeURIComponent(tagCode)}?campaignName=${encodeURIComponent(drawerCampaignName || '')}`, { method: 'DELETE' });
+        if (!response.ok) throw new Error('Could not remove tag.');
+        loadCustomer360(drawerCustomerId, drawerCampaignName);
+    } catch (error) {
+        showAppAlert(error.message, 'Tag Error');
+    }
+};
+
+window.drawerCallCustomer = function() {
+    if (!drawerCustomerId) return;
+    closeCustomerDrawer();
+    startCall(drawerCustomerId);
+};
+
+function refreshDrawerIfOpen(customerId) {
+    if (drawerCustomerId && String(drawerCustomerId) === String(customerId)) {
+        loadCustomer360(drawerCustomerId, drawerCampaignName);
+    }
+}
+window.refreshDrawerIfOpen = refreshDrawerIfOpen;
+
+// --- FOLLOW-UP / PTP ACTIONS (Customer 360 banner + My Follow-ups modal) ---
+const FOLLOWUP_RESULT_OPTIONS = [
+    'Payment received', 'Payment partially received', 'Promise kept', 'Promise broken',
+    'Customer requested more time', 'Unable to reach customer', 'Other',
+];
+
+window.promptCompleteFollowup = async function(followupId) {
+    const id = followupId || window.currentDrawerFollowup?.id;
+    if (!id) return;
+    const outcome = prompt(`Follow-up result:\n${FOLLOWUP_RESULT_OPTIONS.map((option, index) => `${index + 1}. ${option}`).join('\n')}\n\nEnter the number:`);
+    const selected = FOLLOWUP_RESULT_OPTIONS[Number(outcome) - 1];
+    if (!selected) return;
+    const version = followupId ? findModalFollowupVersion(id) : window.currentDrawerFollowup?.version;
+    try {
+        const response = await fetch(`${API_BASE}/followups/${encodeURIComponent(id)}/complete`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ version: version || 1, outcome: selected, notes: '' }),
+        });
+        if (!response.ok) {
+            const body = await response.json().catch(() => ({}));
+            throw new Error(body.detail || 'Could not complete follow-up.');
+        }
+        showAppAlert('Follow-up completed.', 'Success');
+        window.currentDrawerFollowup = null;
+        if (drawerCustomerId) loadCustomer360(drawerCustomerId, drawerCampaignName);
+        loadFollowupsModalData();
+        loadNotifications();
+    } catch (error) {
+        showAppAlert(error.message, 'Follow-up Error');
+    }
+};
+
+window.promptRescheduleFollowup = async function(followupId) {
+    const id = followupId || window.currentDrawerFollowup?.id;
+    if (!id) return;
+    const newDateTime = prompt('New date/time (YYYY-MM-DDTHH:MM), e.g. 2026-09-15T10:00:');
+    if (!newDateTime) return;
+    const reason = prompt('Reason for rescheduling (optional):') || '';
+    const version = followupId ? findModalFollowupVersion(id) : window.currentDrawerFollowup?.version;
+    try {
+        const response = await fetch(`${API_BASE}/followups/${encodeURIComponent(id)}/reschedule`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ version: version || 1, newScheduledAt: newDateTime, reason, notes: '' }),
+        });
+        if (!response.ok) {
+            const body = await response.json().catch(() => ({}));
+            throw new Error(body.detail || 'Could not reschedule follow-up.');
+        }
+        showAppAlert('Follow-up rescheduled.', 'Success');
+        window.currentDrawerFollowup = null;
+        if (drawerCustomerId) loadCustomer360(drawerCustomerId, drawerCampaignName);
+        loadFollowupsModalData();
+        loadNotifications();
+    } catch (error) {
+        showAppAlert(error.message, 'Follow-up Error');
+    }
+};
+
+let followupsModalData = { today: [], overdue: [], upcoming: [], completed: [] };
+let followupsModalTab = 'today';
+
+function findModalFollowupVersion(id) {
+    const all = [].concat(...Object.values(followupsModalData));
+    return all.find(item => item.id === id)?.version;
+}
+
+window.openFollowupsModal = function() {
+    const backdrop = document.getElementById('followups-modal-backdrop');
+    const modal = document.getElementById('followups-modal');
+    if (!backdrop || !modal) return;
+    backdrop.classList.remove('hidden');
+    backdrop.classList.add('flex');
+    setTimeout(() => backdrop.classList.remove('opacity-0'), 10);
+    document.getElementById('notification-panel')?.classList.add('hidden');
+    loadFollowupsModalData();
+};
+
+window.closeFollowupsModal = function(event) {
+    if (event) event.stopPropagation();
+    const backdrop = document.getElementById('followups-modal-backdrop');
+    if (!backdrop) return;
+    backdrop.classList.add('opacity-0');
+    backdrop.classList.remove('flex');
+    setTimeout(() => backdrop.classList.add('hidden'), 300);
+};
+
+window.switchFollowupsTab = function(tab, element) {
+    followupsModalTab = tab;
+    document.querySelectorAll('.fu-tab').forEach(btn => {
+        btn.classList.remove('bg-brandAmber', 'text-white', 'shadow-sm');
+        btn.classList.add('text-brandDark/60');
+    });
+    if (element) {
+        element.classList.add('bg-brandAmber', 'text-white', 'shadow-sm');
+        element.classList.remove('text-brandDark/60');
+    }
+    renderFollowupsModalList();
+};
+
+async function loadFollowupsModalData() {
+    try {
+        const [summaryResponse, listResponse] = await Promise.all([
+            fetch(`${API_BASE}/followups/summary`),
+            fetch(`${API_BASE}/followups`),
+        ]);
+        if (summaryResponse.ok) {
+            const summary = await summaryResponse.json();
+            document.getElementById('fu-count-today').innerText = summary.dueToday ?? 0;
+            document.getElementById('fu-count-overdue').innerText = summary.overdue ?? 0;
+            document.getElementById('fu-count-tomorrow').innerText = summary.tomorrow ?? 0;
+            document.getElementById('fu-count-completed').innerText = summary.completed ?? 0;
+            const badge = document.getElementById('followups-badge');
+            const urgentCount = (summary.dueToday ?? 0) + (summary.overdue ?? 0);
+            if (badge) {
+                badge.innerText = urgentCount;
+                badge.classList.toggle('hidden', urgentCount === 0);
+            }
+        }
+        if (listResponse.ok) {
+            followupsModalData = await listResponse.json();
+            renderFollowupsModalList();
+        }
+    } catch (error) {
+        console.error('Failed to load follow-ups:', error);
+    }
+}
+window.loadFollowupsModalData = loadFollowupsModalData;
+
+function renderFollowupsModalList() {
+    const list = document.getElementById('followups-modal-list');
+    if (!list) return;
+    const items = followupsModalData[followupsModalTab] || [];
+    if (!items.length) {
+        list.innerHTML = '<div class="text-center text-brandDark/50 text-sm py-8">No follow-ups in this view.</div>';
+        return;
+    }
+    const isOverdue = followupsModalTab === 'overdue';
+    list.innerHTML = items.map(item => `
+        <div class="glass-card p-3 rounded-xl flex justify-between items-center ${isOverdue ? 'border border-red-200' : ''}">
+          <div>
+            <div class="text-sm font-medium text-brandDark">${isOverdue ? '<i class="fa-solid fa-triangle-exclamation text-red-500 mr-1"></i>' : ''}${escapeHtml(displayDate(item.scheduledAt))} &middot; ${escapeHtml(item.type)}</div>
+            <div class="text-xs text-brandDark/60">Customer: ${escapeHtml(item.customerId)} ${item.campaign ? `&middot; ${escapeHtml(item.campaign)}` : ''}</div>
+            ${item.reason ? `<div class="text-xs text-brandDark/50">${escapeHtml(item.reason)}</div>` : ''}
+          </div>
+          <button type="button" onclick="openFollowupCustomer(${inlineString(item.customerId)}, ${inlineString(item.campaign)})" class="text-[11px] font-medium bg-brandAmber text-white px-2.5 py-1.5 rounded-md">OPEN</button>
+        </div>`).join('');
+}
+
+window.openFollowupCustomer = function(customerId, campaignName) {
+    closeFollowupsModal();
+    drawerCampaignName = campaignName || '';
+    openCustomerDrawer(customerId);
+};
+
+// --- NOTIFICATIONS ---
+window.toggleNotificationPanel = function() {
+    const panel = document.getElementById('notification-panel');
+    if (!panel) return;
+    const isHidden = panel.classList.contains('hidden');
+    panel.classList.toggle('hidden', !isHidden);
+    if (isHidden) loadNotifications();
+};
+
+async function loadNotifications() {
+    try {
+        const response = await fetch(`${API_BASE}/notifications`);
+        if (!response.ok) return;
+        const data = await response.json();
+        const list = document.getElementById('notification-list');
+        const badge = document.getElementById('notification-badge');
+        if (badge) {
+            badge.innerText = data.total;
+            badge.classList.toggle('hidden', !data.total);
+        }
+        if (!list) return;
+        if (!data.items.length) {
+            list.innerHTML = '<div class="p-4 text-center text-brandDark/50 text-sm">No notifications.</div>';
+            return;
+        }
+        const labels = {
+            FOLLOWUP_DUE_TODAY: ['fa-calendar-day text-brandAmber', 'Follow-up due today'],
+            OVERDUE_FOLLOWUP: ['fa-triangle-exclamation text-red-500', 'Overdue Follow-up'],
+            PTP_DUE_TODAY: ['fa-hand-holding-dollar text-brandAmber', 'PTP due today'],
+            PTP_OVERDUE: ['fa-triangle-exclamation text-red-500', 'Overdue PTP'],
+            AGENT_HAS_MANY_OVERDUE: ['fa-user-clock text-red-500', 'Agent has many overdue follow-ups'],
+        };
+        list.innerHTML = data.items.map(item => {
+            const [icon, label] = labels[item.type] || ['fa-bell text-brandAmber', item.type];
+            const openButton = item.customerId ? `<button type="button" onclick="openFollowupCustomer(${inlineString(item.customerId)}, ${inlineString(item.campaign || '')})" class="text-[10px] font-medium text-brandAmber hover:underline">OPEN</button>` : '';
+            const detail = item.amount ? formatMoney(item.amount) : (item.count ? `${item.count} overdue` : '');
+            return `<div class="p-3 flex justify-between items-center gap-2">
+              <div class="flex items-center gap-2">
+                <i class="fa-solid ${icon}"></i>
+                <div>
+                  <div class="text-xs font-medium text-brandDark">${escapeHtml(label)}</div>
+                  <div class="text-[11px] text-brandDark/50">${escapeHtml(item.customerId || item.agent || '')} ${detail ? `&middot; ${escapeHtml(detail)}` : ''}</div>
+                </div>
+              </div>
+              ${openButton}
+            </div>`;
+        }).join('');
+    } catch (error) {
+        console.error('Failed to load notifications:', error);
+    }
+}
+window.loadNotifications = loadNotifications;
+
 
 window.switchTeamLeaderTab = function(tabName, element) {
   // Hide all tab contents
@@ -1253,86 +1841,166 @@ function switchActiveAgent() {
 // ----------------------------------------------------------------------
 // WORKSPACE & DISPOSITIONS
 // ----------------------------------------------------------------------
+window.submitDisposition = async function(event) {
+    if (event) event.preventDefault();
 
-async function submitDisposition(e) {
-  e.preventDefault();
-  if (!activeCustomerId) return;
+    const customerIdInput = document.getElementById('disp-customer-id');
+    const customerId = (customerIdInput && customerIdInput.value) 
+        ? customerIdInput.value 
+        : (activeCustomerId || window.activeCustomerId || "");
 
-  const submitBtn = e.target.querySelector('button[type="submit"]');
-  const originalText = submitBtn.innerHTML;
-  submitBtn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Saving...';
-  
-  const outcome = document.getElementById('disp-outcome').value;
-  const activeCustomer = mockCustomers.find(x => x.id === activeCustomerId);
-    const campType = customerCampaignType(activeCustomer);
-  
-  let dispositionSaved = '';
-  let amountRec = 0;
-    let ptpTime = document.getElementById('input-ptp-time')?.value || '';
-  let comments = document.getElementById('disp-comments')?.value.trim() || '';
-  let businessStatus = document.getElementById('disp-business')?.value || '';
-  
-  if (campType === 'active_no_loan' || campType === 'dormant') {
-      dispositionSaved = document.getElementById('disp-response')?.value || (outcome === 'Answered' ? '' : 'Pending Callback');
-  } else {
-      dispositionSaved = document.getElementById('disp-status')?.value || (outcome === 'Answered' ? '' : 'Pending Callback');
-      if (dispositionSaved === 'Promise to Pay (PTP)' || dispositionSaved === 'Settled') {
-          amountRec = parseFloat(document.getElementById('input-amount')?.value) || 0;
-      }
-  }
+    if (!customerId) {
+        showAppAlert("Missing Customer Account Information", "Missing Information");
+        return;
+    }
 
-  const payload = {
-      customerId: activeCustomerId,
-      outcome: outcome,
-      status: dispositionSaved,
-      amountRec: amountRec,
-    ptpTime: ptpTime,
-      agentName: LOGGED_IN_AGENT,
-      comments: comments,
-      businessStatus: businessStatus
-  };
+    const customer = getCustomerById(customerId);
+    const campaignName = customer?.campaign || '';
+    const campType = customerCampaignType(customer);
+    const cleanBalance = Number(String(customer.balance).replace(/[^\d.-]/g, '')) || 0;
 
-  try {
-      const res = await fetch(`${API_BASE}/disposition`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-      });
+    const outcome = document.getElementById('disp-outcome')?.value || "";
 
-      if (!res.ok) throw new Error(`Status ${res.status}`);
-      
-    invalidateApiCache();
-      await fetchAllData();
+    let status = "";
+    if (campType === 'active_no_loan' || campType === 'dormant') {
+        status = document.getElementById('disp-response')?.value || (outcome === 'Answered' ? '' : 'Pending Callback');
+    } else {
+        status = document.getElementById('disp-status')?.value || (outcome === 'Answered' ? '' : 'Pending Callback');
+    }
 
-      activeCustomerId = null;
-      updateWorkspaceStats();
-            if (document.getElementById('active-call-panel')) {
-                document.getElementById('active-call-panel').classList.add('hidden');
-                document.getElementById('active-call-panel').classList.remove('flex');
+    if (!outcome) {
+        showAppAlert("Please select a Call Outcome.", "Missing Information");
+        return;
+    }
+
+    // --- STRICT AMOUNT VALIDATION ---
+    let amountRec = parseFloat(document.getElementById('disp-amount')?.value || document.getElementById('input-amount')?.value) || 0;
+
+    if (status === 'Settled') {
+        amountRec = cleanBalance; // Lock it to full balance
+    } else if (status === 'Partial payment') {
+        if (amountRec >= cleanBalance) {
+            showAppAlert(`Amount must be less than the total balance (Sh ${cleanBalance}). If they paid the full amount, please select 'Settled'.`, "Invalid Partial Payment");
+            return;
+        }
+        if (amountRec <= 0) {
+            showAppAlert("Please enter a valid partial payment amount.", "Invalid Amount");
+            return;
+        }
+    } else if (status !== 'Promise to Pay (PTP)') {
+        amountRec = 0; // Clear amount for standard callbacks
+    }
+
+    const comments = document.getElementById('disp-comments')?.value || "";
+    const businessStatus = document.getElementById('disp-business-status')?.value || document.getElementById('disp-business')?.value || "";
+    const ptpTime = document.getElementById('disp-ptp-time')?.value || document.getElementById('input-ptp-time')?.value || "";
+    const ptpPaymentMethod = document.getElementById('disp-ptp-payment-method')?.value || "";
+
+    const btn = document.getElementById('btn-submit-disposition');
+    const originalText = btn ? btn.innerHTML : '';
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Saving...';
+    }
+
+    try {
+        const response = await fetch(`${API_BASE}/disposition`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                customerId: String(customerId),
+                outcome: outcome,
+                status: status,
+                amountRec: amountRec,
+                agentName: LOGGED_IN_AGENT || CURRENT_USER_NAME || "",
+                comments: comments,
+                businessStatus: businessStatus,
+                ptpTime: ptpTime,
+                ptpPaymentMethod: ptpPaymentMethod,
+                campaignName: campaignName
+            })
+        });
+
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.detail || "Failed to submit disposition.");
+
+        showAppAlert("Disposition recorded successfully!", "Success");
+        if (data.ptp && data.ptp.created) {
+            showAppAlert(data.ptp.warning || 'Promise to Pay recorded and a follow-up was scheduled.', 'PTP Recorded');
+        }
+
+        // --- OPTIMISTIC UI UPDATES & QUEUE ROUTING ---
+        if (typeof mockCustomers !== 'undefined' && Array.isArray(mockCustomers)) {
+            const index = mockCustomers.findIndex(c => String(c.id) === String(customerId) || String(c.customer_id) === String(customerId));
+            
+            if (index > -1) {
+                // FIX: Update IN PLACE so Analytics can still read it. (The UI will naturally hide it from Active because worked = TRUE)
+                const cust = mockCustomers[index];
+                
+                cust.worked = "TRUE";
+                cust.outcome = outcome;
+                cust.status = status;
+                cust.updatedAt = new Date().toISOString();
+
+                // 2. Route them directly into the correct Queue tab instantly
+                if (status === 'Promise to Pay (PTP)') {
+                    cust.ptpTime = ptpTime;
+                    cust.ptpAmount = amountRec;
+                    if (typeof ptpCustomers !== 'undefined') ptpCustomers.unshift(cust);
+                } else if (outcome !== 'Answered' && outcome !== '') {
+                    cust.pendingReschedule = true;
+                    if (typeof pendingCustomers !== 'undefined') pendingCustomers.unshift(cust);
+                }
             }
-            if (document.getElementById('empty-call-state')) {
-                document.getElementById('empty-call-state').classList.remove('hidden');
-                document.getElementById('empty-call-state').classList.add('flex');
+            
+            localStorage.setItem('CALLCENTER_CUSTOMERS_CACHE', JSON.stringify(mockCustomers));
+        }
+
+        // --- UPDATE WORKSPACE METRICS ---
+        const agentIndex = agents.findIndex(a => a.name === (LOGGED_IN_AGENT || CURRENT_USER_NAME));
+        if (agentIndex > -1) {
+            agents[agentIndex].callsMade = (agents[agentIndex].callsMade || 0) + 1;
+            if (outcome === 'Answered') agents[agentIndex].connected = (agents[agentIndex].connected || 0) + 1;
+            if (status === 'Settled' || status === 'Partial payment') {
+                agents[agentIndex].conversion = (agents[agentIndex].conversion || 0) + amountRec;
             }
-      renderAgentQueue();
-      
-      updateAnalyticsUI();
-      renderShiftManager();
-      renderTeamLeaderWorkspace();
-      
-      const campaignsView = document.getElementById('view-campaigns');
-      if (campaignsView && !campaignsView.classList.contains('hidden')) {
-          renderCampaignList();
-      }
+            
+            // FIX: Instantly lock the updated stats into browser memory
+            localStorage.setItem('CALLCENTER_AGENTS_CACHE', JSON.stringify(agents));
+        }
 
-      submitBtn.innerHTML = originalText;
-      showAppAlert("Disposition saved!", "Success");
-  } catch (err) {
-      submitBtn.innerHTML = originalText;
-      showAppAlert("Failed to save disposition to database.", "Network Error");
-  }
-}
+        invalidateApiCache();
+        updateWorkspaceStats();
+        if (typeof renderWorkspace === 'function') renderWorkspace();
+        if (typeof renderAgentQueue === 'function') await renderAgentQueue();
+        currentPriorityContext = null;
+        renderPriorityReasonBanner();
+        loadQueueSummary();
+        refreshDrawerIfOpen(customerId);
+        
+        recalculateGlobalStats(); 
+        if (typeof updateAnalyticsUI === 'function') updateAnalyticsUI();
+        if (typeof renderOverviewData === 'function') renderOverviewData();
 
+        // --- AUTO-FILL NEXT CUSTOMER ---
+        if (CURRENT_USER_ROLE === 'Control Agent') {
+            requestNextCustomer(); 
+        } else {
+            const activePanel = document.getElementById('active-call-panel');
+            const emptyState = document.getElementById('empty-call-state');
+            if (activePanel) { activePanel.classList.add('hidden'); activePanel.classList.remove('flex'); }
+            if (emptyState) { emptyState.classList.remove('hidden'); emptyState.classList.add('flex'); }
+        }
+
+    } catch (error) {
+        showAppAlert(error.message, "Submission Error");
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = originalText;
+        }
+    }
+};
 // ----------------------------------------------------------------------
 // CAMPAIGNS & ALLOCATION
 // ----------------------------------------------------------------------
@@ -1687,10 +2355,14 @@ function updateWorkspaceQueueControls(campaignName) {
         const takeAccountButton = document.getElementById('take-account-button');
         const ptpButton = document.getElementById('ws-queue-tab-ptp');
         const tabs = document.getElementById('workspace-queue-tabs');
+        const nextCustomerButton = document.getElementById('next-customer-button');
+        const isControlAgent = CURRENT_USER_ROLE === 'Control Agent';
         if (takeAccountButton) takeAccountButton.classList.toggle('hidden', CURRENT_USER_ROLE !== 'Admin');
+        if (nextCustomerButton) nextCustomerButton.classList.toggle('hidden', !isControlAgent);
         if (ptpButton) ptpButton.classList.toggle('hidden', !supportsPtp);
         if (tabs) tabs.classList.toggle('grid-cols-3', supportsPtp);
         if (!supportsPtp && activeWorkspaceQueueTab === 'ptp') activeWorkspaceQueueTab = 'active';
+        if (isControlAgent) loadQueueSummary();
 }
 
 function switchWorkspaceQueueTab(tab) {
@@ -1772,13 +2444,14 @@ async function renderAgentQueue() {
     const queueDiv = document.getElementById('agent-customer-list');
     if (!queueDiv || !LOGGED_IN_AGENT) return;
     const countSpan = document.getElementById('queue-count');
-        const activeCampaign = getAgentQueueCampaign();
+    const activeCampaign = getAgentQueueCampaign();
     const campaignLabel = document.getElementById('active-queue-campaign');
     const campaign = activeCampaignRecord(activeCampaign);
     if (campaignLabel) campaignLabel.innerText = activeCampaign ? `${activeCampaign} - ${campaignTypeLabel(campaign?.type)}` : '';
     updateWorkspaceQueueControls(activeCampaign);
 
-    if (activeWorkspaceQueueTab === 'ptp') {
+    // FIX: Only fetch from DB if our local array is empty! This preserves our instant optimistic updates.
+    if (activeWorkspaceQueueTab === 'ptp' && (!ptpCustomers || ptpCustomers.length === 0)) {
         try {
             const response = await fetch(`${API_BASE}/ptps?agentName=${encodeURIComponent(LOGGED_IN_AGENT)}&campaignName=${encodeURIComponent(activeCampaign)}`);
             if (!response.ok) throw new Error(`Status ${response.status}`);
@@ -1788,7 +2461,8 @@ async function renderAgentQueue() {
             return;
         }
     }
-    if (activeWorkspaceQueueTab === 'pending') {
+    
+    if (activeWorkspaceQueueTab === 'pending' && (!pendingCustomers || pendingCustomers.length === 0)) {
         try {
             const response = await fetch(`${API_BASE}/customers?agentName=${encodeURIComponent(LOGGED_IN_AGENT)}&campaignName=${encodeURIComponent(activeCampaign)}&pending=true&limit=500`);
             if (!response.ok) throw new Error(`Status ${response.status}`);
@@ -1799,17 +2473,25 @@ async function renderAgentQueue() {
         }
     }
 
-    const myCustomers = activeWorkspaceQueueTab === 'ptp' ? ptpCustomers : activeWorkspaceQueueTab === 'pending' ? pendingCustomers : mockCustomers.filter(c => {
+    // Safely filter whichever array we are currently viewing
+    let myCustomers = [];
+    if (activeWorkspaceQueueTab === 'ptp') {
+        myCustomers = (ptpCustomers || []).filter(c => String(c.campaign).trim() === activeCampaign);
+    } else if (activeWorkspaceQueueTab === 'pending') {
+        myCustomers = (pendingCustomers || []).filter(c => String(c.campaign).trim() === activeCampaign);
+    } else {
+        myCustomers = (mockCustomers || []).filter(c => {
             const customerCampaign = String(c.campaign || c.Campaign || '').trim();
             if (customerCampaign !== activeCampaign) return false;
-      return c.agentId === LOGGED_IN_AGENT && String(c.worked).toUpperCase() !== 'TRUE' && !c.pendingReschedule;
-    });
+            return c.agentId === LOGGED_IN_AGENT && String(c.worked).toUpperCase() !== 'TRUE' && !c.pendingReschedule;
+        });
+    }
 
     if (countSpan) {
-            countSpan.innerText = activeWorkspaceQueueTab === 'pending'
-        ? `${myCustomers.length} Pending`
-                : activeWorkspaceQueueTab === 'ptp' ? `${myCustomers.length} PTP`
-        : `${myCustomers.length} Remaining`;
+        countSpan.innerText = activeWorkspaceQueueTab === 'pending'
+            ? `${myCustomers.length} Pending`
+            : activeWorkspaceQueueTab === 'ptp' ? `${myCustomers.length} PTP`
+            : `${myCustomers.length} Remaining`;
     }
 
     if (myCustomers.length === 0) {
@@ -1821,7 +2503,7 @@ async function renderAgentQueue() {
     let htmlString = '';
     myCustomers.slice(0, 100).forEach(c => {
         htmlString += `
-        <div class="bg-white/80 border border-white hover:border-brandAmber/50 hover:shadow-md p-3 rounded-lg ${activeWorkspaceQueueTab === 'ptp' ? '' : 'cursor-pointer'} transition flex flex-col gap-1" ${activeWorkspaceQueueTab === 'ptp' ? '' : `onclick="startCall(${inlineString(c.id)})"`}>
+        <div class="bg-white/80 border border-white hover:border-brandAmber/50 hover:shadow-md p-3 rounded-lg ${activeWorkspaceQueueTab === 'ptp' ? '' : 'cursor-pointer'} transition flex flex-col gap-1" ${activeWorkspaceQueueTab === 'ptp' ? '' : `onclick="startCall(${inlineString(c.id)}, true)"`}>
             <div class="flex justify-between items-center">
             <button type="button" onclick="event.stopPropagation(); openCustomerDrawer(${inlineString(c.id)})" class="font-bold text-sm text-brandDark text-left hover:text-brandAmber transition">${escapeHtml(c.name)}</button>
                 <i class="fa-solid fa-phone text-brandAmber text-xs"></i>
@@ -1842,28 +2524,40 @@ window.renderTLPending = function() {
     const tbody = document.getElementById('tl-pending-tbody');
     if (!tbody) return;
 
+    // NEW FILTER LOGIC:
+    // 1. Customer must have an outcome (meaning they have been called)
+    // 2. The outcome must NOT be "Answered"
     const pending = window.customers.filter(c => {
-        const worked = String(c.Worked || c.worked || 'FALSE').toUpperCase();
-        return worked !== 'TRUE';
+        const outcome = String(c.outcome || c.Outcome || '').trim();
+        return outcome !== '' && outcome.toLowerCase() !== 'answered';
     });
-    const columns = customerColumns(pending[0]);
+
+    // Safely get columns (fallback to default if pending is empty to prevent crashes)
+    const columns = pending.length > 0 ? customerColumns(pending[0]) : CUSTOMER_DISPLAY_COLUMNS;
+    
     const table = tbody.closest('table');
     const thead = table?.querySelector('thead');
+    
     if (thead) {
         thead.innerHTML = `<tr class="text-[11px] font-semibold uppercase tracking-wider text-brandDark/50">${columns.map(([, label]) => `<th class="px-5 py-4">${escapeHtml(label)}</th>`).join('')}</tr>`;
     }
 
     if (pending.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="${columns.length}" class="px-5 py-4 text-center text-brandDark/50">No pending callbacks.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="${columns.length}" class="px-5 py-8 text-center text-brandDark/50 italic">No pending callbacks found.</td></tr>`;
         return;
     }
 
-    // FAST RENDER: Build string first, only render top 200
+    // FAST RENDER: Build string first, only render top 200 to prevent freezing
     let htmlString = '';
     pending.slice(0, 200).forEach(c => {
+        // Inside window.renderTLPending
         htmlString += `
             <tr class="border-b border-brandDark/5 hover:bg-slate-50/50 transition">
-                ${columns.map(([key]) => `<td class="px-5 py-4 ${key === 'agentId' ? 'font-medium text-brandAmber' : 'text-brandDark/70'}">${escapeHtml(displayValue(c[key]))}</td>`).join('')}
+                ${columns.map(([key]) => {
+                    let val = c[key];
+                    if (key === 'updatedAt') val = displayDate(val); // <-- Format Date
+                    return `<td class="px-5 py-4 ${key === 'agentId' ? 'font-medium text-brandAmber' : 'text-brandDark/70'}">${escapeHtml(displayValue(val))}</td>`;
+                }).join('')}
             </tr>
         `;
     });
@@ -1907,10 +2601,13 @@ window.renderTLCustomers = function() {
     let tbodyHTML = '';
     visibleCustomers.slice(0, 200).forEach(c => {
         tbodyHTML += `<tr class="border-b border-brandDark/5 hover:bg-slate-50/50 transition">`;
-        columns.forEach(([key]) => {
-            const colorClass = key === 'agentId' ? 'font-medium text-brandAmber' : 'text-brandDark/80';
-            tbodyHTML += `<td class="px-5 py-4 whitespace-nowrap text-sm ${colorClass}">${escapeHtml(displayValue(c[key]))}</td>`;
-        });
+        // Inside window.renderTLCustomers
+            columns.forEach(([key]) => {
+                const colorClass = key === 'agentId' ? 'font-medium text-brandAmber' : 'text-brandDark/80';
+                let val = c[key];
+                if (key === 'updatedAt') val = displayDate(val); // <-- Format Date
+                tbodyHTML += `<td class="px-5 py-4 whitespace-nowrap text-sm ${colorClass}">${escapeHtml(displayValue(val))}</td>`;
+            });
         tbodyHTML += `</tr>`;
     });
 
@@ -1925,19 +2622,29 @@ window.renderTLCustomers = function() {
     tbody.innerHTML = tbodyHTML;
 };
 
-function startCall(id) {
+function startCall(id, clearPriorityContext = true) {
   activeCustomerId = id;
-  const c = mockCustomers.find(x => x.id === id);
+  window.activeCustomerId = id; // Ensure global window reference exists
+  if (clearPriorityContext) currentPriorityContext = null;
+  renderPriorityReasonBanner();
+
+  // Populate hidden input in disposition form
+  const dispInput = document.getElementById('disp-customer-id');
+  if (dispInput) {
+    dispInput.value = id;
+  }
+
+  const c = getCustomerById(id); 
   if (!c) return;
 
-    if (document.getElementById('empty-call-state')) {
-        document.getElementById('empty-call-state').classList.add('hidden');
-        document.getElementById('empty-call-state').classList.remove('flex');
-    }
-    if (document.getElementById('active-call-panel')) {
-        document.getElementById('active-call-panel').classList.remove('hidden');
-        document.getElementById('active-call-panel').classList.add('flex');
-    }
+  if (document.getElementById('empty-call-state')) {
+      document.getElementById('empty-call-state').classList.add('hidden');
+      document.getElementById('empty-call-state').classList.remove('flex');
+  }
+  if (document.getElementById('active-call-panel')) {
+      document.getElementById('active-call-panel').classList.remove('hidden');
+      document.getElementById('active-call-panel').classList.add('flex');
+  }
 
   if (document.getElementById('active-name')) document.getElementById('active-name').innerText = c.name || 'Unknown';
   if (document.getElementById('active-phone')) document.getElementById('active-phone').innerText = c.phone || '--';
@@ -1975,7 +2682,15 @@ function startCall(id) {
     };
     Object.entries(detailValues).forEach(([elementId, value]) => {
         const element = document.getElementById(elementId);
-        if (element) element.innerText = value || '--';
+        if (element) {
+            // Check if the value is empty, null, undefined, or just whitespace
+            if (!value || String(value).trim() === '' || value === '--') {
+                element.parentElement.classList.add('hidden'); // Hides the label + value wrapper
+            } else {
+                element.parentElement.classList.remove('hidden'); // Shows it if data exists
+                element.innerText = value;
+            }
+        }
     });
     const sourceUrl = sourceValue('url', 'shujaa url', 'merlin url');
     const urlElement = document.getElementById('active-url');
@@ -1997,44 +2712,68 @@ function startCall(id) {
 }
 
 function handleOutcomeChangeGlass() {
-  const statusEl = document.getElementById('disp-status');
-  const outcomeEl = document.getElementById('disp-outcome');
-  const amtContainer = document.getElementById('dynamic-amount');
-  const amtInput = document.getElementById('input-amount');
-  const responseInput = document.getElementById('disp-response');
+    const statusEl = document.getElementById('disp-status');
+    const outcomeEl = document.getElementById('disp-outcome');
+    const amtContainer = document.getElementById('dynamic-amount');
+    const amtInput = document.getElementById('disp-amount') || document.getElementById('input-amount'); 
+    const ptpTimeInput = document.getElementById('disp-ptp-time') || document.getElementById('input-ptp-time');
+    
+    const responseInput = document.getElementById('disp-response');
     const responseContainer = document.getElementById('container-customer-response');
     const businessContainer = document.getElementById('container-business-status');
     const accountContainer = document.getElementById('container-account-status');
-    const ptpTimeInput = document.getElementById('input-ptp-time');
-  const activeCustomer = mockCustomers.find(x => x.id === activeCustomerId);
+    
+    const activeCustomer = getCustomerById(activeCustomerId);
+    if (!activeCustomer) return;
+    
     const campType = customerCampaignType(activeCustomer);
 
-  const status = statusEl ? statusEl.value : '';
-  const outcome = outcomeEl ? outcomeEl.value : '';
-
+    const status = statusEl ? statusEl.value : '';
+    const outcome = outcomeEl ? outcomeEl.value : '';
+    
     const isAnswered = outcome === 'Answered';
     const isCustomerResponseCampaign = campType === 'active_no_loan' || campType === 'dormant';
     const isPtpCampaign = campType === 'defaulted' || campType === 'upcoming_dues';
+    
     responseContainer?.classList.toggle('hidden', !isAnswered || !isCustomerResponseCampaign);
     businessContainer?.classList.toggle('hidden', !isAnswered);
     accountContainer?.classList.toggle('hidden', !isAnswered || !isPtpCampaign);
+    
     if (responseInput) responseInput.required = isAnswered && isCustomerResponseCampaign;
     if (statusEl) statusEl.required = isAnswered && isPtpCampaign;
   
-  if (amtContainer && amtInput) {
-    const needsPtpDetails = isAnswered && isPtpCampaign && status === 'Promise to Pay (PTP)';
-    if (needsPtpDetails) {
-      amtContainer.classList.remove('hidden');
-            amtContainer.classList.add('flex');
-      amtInput.required = true;
-            if (ptpTimeInput) ptpTimeInput.required = true;
-    } else {
-      amtContainer.classList.add('hidden');
+    if (amtContainer) {
+        const safeStatus = status.trim().toLowerCase();
+        
+        // --- NEW SETTLED & PARTIAL PAYMENT LOGIC ---
+        if (safeStatus === 'settled') {
+            // Hide the options, but quietly set the amount to the full balance
+            amtContainer.classList.add('hidden');
             amtContainer.classList.remove('flex');
-      amtInput.required = false;
-    if (ptpTimeInput) ptpTimeInput.required = false;
+            if (amtInput) {
+                const cleanBalance = Number(String(activeCustomer.balance).replace(/[^\d.-]/g, '')) || 0;
+                amtInput.value = cleanBalance;
+                amtInput.required = false; 
+            }
+            if (ptpTimeInput) ptpTimeInput.required = false;
+            
+        } else if (safeStatus.includes('promise') || safeStatus === 'partial payment') {
+            // Show the options for PTP and Partial Payment
+            amtContainer.classList.remove('hidden');
+            amtContainer.classList.add('flex');
+            
+            if (amtInput) amtInput.required = true;
+            // Only require a future Time/Date if it is a PTP
+            if (ptpTimeInput) ptpTimeInput.required = safeStatus.includes('promise');
+            
+        } else {
+            // Hide for everything else
+            amtContainer.classList.add('hidden');
+            amtContainer.classList.remove('flex');
+            if (amtInput) amtInput.required = false;
+            if (ptpTimeInput) ptpTimeInput.required = false;
+        }
     }
-  }
 }
 
 function updateWorkspaceStats() {
@@ -2140,26 +2879,52 @@ window.switchAnalyticsTab = function(tabName) {
 
 window.renderAnalyticsResponses = function() {
     const container = document.getElementById('analytics-responses-container');
-    const filterSelect = document.getElementById('dash-response-campaign-filter');
+    const campaignFilter = document.getElementById('dash-response-campaign-filter');
+    const outcomeFilter = document.getElementById('dash-response-outcome-filter');
+    const statusFilter = document.getElementById('dash-response-status-filter');
     const countSpan = document.getElementById('dash-response-count');
+    
     if (!container) return;
 
-    if (filterSelect && filterSelect.options.length <= 1) {
+    // 1. Populate Dropdowns Dynamically
+    if (campaignFilter && campaignFilter.options.length <= 1) {
         const campaigns = Object.keys(campaignConfigs);
         campaigns.forEach(c => {
-            filterSelect.innerHTML += `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`;
+            campaignFilter.innerHTML += `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`;
         });
     }
 
-    const selectedCampaign = filterSelect ? filterSelect.value : "";
+    if (outcomeFilter && outcomeFilter.options.length <= 1) {
+        const uniqueOutcomes = [...new Set(mockCustomers.map(c => c.outcome || c.Outcome).filter(Boolean))].sort();
+        uniqueOutcomes.forEach(o => {
+            outcomeFilter.innerHTML += `<option value="${escapeHtml(o)}">${escapeHtml(o)}</option>`;
+        });
+    }
+
+    if (statusFilter && statusFilter.options.length <= 1) {
+        const uniqueStatuses = [...new Set(mockCustomers.map(c => c.status || c.Status).filter(Boolean))].sort();
+        uniqueStatuses.forEach(s => {
+            statusFilter.innerHTML += `<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`;
+        });
+    }
+
+    // 2. Capture Filter States
+    const selectedCampaign = campaignFilter ? campaignFilter.value : "";
+    const selectedOutcome = outcomeFilter ? outcomeFilter.value : "";
+    const selectedStatus = statusFilter ? statusFilter.value : "";
     
-    // FIX: Safely check for case-insensitive outcome and campaign keys
+    // 3. Apply Filters
     const workedCustomers = mockCustomers.filter(c => {
         const outcome = c.outcome || c.Outcome;
         const campaign = c.campaign || c.Campaign;
+        const status = c.status || c.Status;
         
-        if (!outcome) return false; // Skip customers who haven't been called
-        if (selectedCampaign && selectedCampaign !== "" && campaign !== selectedCampaign) return false;
+        if (!outcome) return false; // Skip un-worked accounts
+        
+        if (selectedCampaign && campaign !== selectedCampaign) return false;
+        if (selectedOutcome && outcome !== selectedOutcome) return false;
+        if (selectedStatus && status !== selectedStatus) return false;
+        
         return true;
     });
 
@@ -2170,6 +2935,7 @@ window.renderAnalyticsResponses = function() {
         return;
     }
 
+    // 4. Render Table
     const columns = CUSTOMER_DISPLAY_COLUMNS
         .filter(([key]) => key !== 'id' && key !== 'worked')
         .map(([key]) => key);
@@ -2197,39 +2963,47 @@ window.renderAnalyticsResponses = function() {
 };
 
 window.exportResponsesCSV = function() {
-    const filterSelect = document.getElementById('dash-response-campaign-filter');
-    const selectedCampaign = filterSelect ? filterSelect.value : "";
+    const campaignFilter = document.getElementById('dash-response-campaign-filter');
+    const outcomeFilter = document.getElementById('dash-response-outcome-filter');
+    const statusFilter = document.getElementById('dash-response-status-filter');
     
+    const selectedCampaign = campaignFilter ? campaignFilter.value : "";
+    const selectedOutcome = outcomeFilter ? outcomeFilter.value : "";
+    const selectedStatus = statusFilter ? statusFilter.value : "";
+    
+    // Exact same filtering logic for the CSV export
     const workedCustomers = mockCustomers.filter(c => {
         const outcome = c.outcome || c.Outcome;
         const campaign = c.campaign || c.Campaign;
+        const status = c.status || c.Status;
+        
         if (!outcome) return false;
         if (selectedCampaign && campaign !== selectedCampaign) return false;
+        if (selectedOutcome && outcome !== selectedOutcome) return false;
+        if (selectedStatus && status !== selectedStatus) return false;
+        
         return true;
     });
 
     if (workedCustomers.length === 0) {
-        showAppAlert("No data available to export.", "Export Failed");
+        showAppAlert("No data available to export based on current filters.", "Export Failed");
         return;
     }
 
-    // Get dynamic headers
     const columns = CUSTOMER_DISPLAY_COLUMNS
         .filter(([key]) => key !== 'id' && key !== 'worked')
         .map(([key]) => key);
 
-    // Build CSV String
     let csvContent = columns.join(",") + "\n";
     workedCustomers.forEach(c => {
         let row = columns.map(col => {
             let val = c[col] || "";
-            val = String(val).replace(/"/g, '""'); // Escape quotes
+            val = String(val).replace(/"/g, '""'); 
             return `"${val}"`;
         });
         csvContent += row.join(",") + "\n";
     });
 
-    // Trigger Download
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement("a");
     const url = URL.createObjectURL(blob);
@@ -2241,11 +3015,88 @@ window.exportResponsesCSV = function() {
     document.body.removeChild(link);
 };
 
-window.exportResponsesSheets = function() {
-    // If you want me to write the Python backend code to push this directly to a new tab in your Google Sheet, let me know! 
-    // For now, this triggers the CSV download as a fallback.
-    showAppAlert("Exporting as CSV. (Backend Sheets API endpoint required for direct sync).", "Exporting");
-    exportResponsesCSV();
+window.exportResponsesSheets = async function() {
+    const campaignFilter = document.getElementById('dash-response-campaign-filter');
+    const outcomeFilter = document.getElementById('dash-response-outcome-filter');
+    const statusFilter = document.getElementById('dash-response-status-filter');
+    
+    const selectedCampaign = campaignFilter ? campaignFilter.value : "";
+    const selectedOutcome = outcomeFilter ? outcomeFilter.value : "";
+    const selectedStatus = statusFilter ? statusFilter.value : "";
+    
+    // Apply filters
+    const workedCustomers = mockCustomers.filter(c => {
+        const outcome = c.outcome || c.Outcome;
+        const campaign = c.campaign || c.Campaign;
+        const status = c.status || c.Status;
+        
+        if (!outcome) return false;
+        if (selectedCampaign && campaign !== selectedCampaign) return false;
+        if (selectedOutcome && outcome !== selectedOutcome) return false;
+        if (selectedStatus && status !== selectedStatus) return false;
+        
+        return true;
+    });
+
+    if (workedCustomers.length === 0) {
+        showAppAlert("No data available to export based on current filters.", "Export Failed");
+        return;
+    }
+
+    // Grab the button to show a loading spinner
+    const btn = document.querySelector('button[onclick="exportResponsesSheets()"]');
+    const originalHtml = btn ? btn.innerHTML : '';
+    if (btn) btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Syncing...';
+
+    // Format data into a 2D array for Google Sheets
+    const columnsKeys = CUSTOMER_DISPLAY_COLUMNS.filter(([key]) => key !== 'id' && key !== 'worked').map(([key]) => key);
+    const headers = CUSTOMER_DISPLAY_COLUMNS.filter(([key]) => key !== 'id' && key !== 'worked').map(([, label]) => label);
+    
+    const sheetData = [headers]; // First row is headers
+    
+    workedCustomers.forEach(c => {
+        let row = columnsKeys.map(col => String(c[col] || ""));
+        sheetData.push(row);
+    });
+
+    // 1. Intelligently determine the campaign name
+    let finalCampaignName = selectedCampaign;
+    
+    if (!finalCampaignName && workedCustomers.length > 0) {
+        // Check if all exported data belongs to a single campaign
+        const uniqueCampaigns = [...new Set(workedCustomers.map(c => c.campaign || c.Campaign).filter(Boolean))];
+        if (uniqueCampaigns.length === 1) {
+            finalCampaignName = uniqueCampaigns[0];
+        } else {
+            finalCampaignName = "All Campaigns";
+        }
+    }
+
+    try {
+        const response = await fetch(`${API_BASE}/export/sheets`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                rows: sheetData,
+                campaignName: finalCampaignName // <--- Uses the smart name
+            })
+        });
+
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.detail || "Failed to export to Google Sheets");
+        
+        // Open the Make a Copy link in a new tab
+        if (data.sheetUrl) {
+            window.open(data.sheetUrl, '_blank');
+        }
+        
+        showAppAlert(`Success! A new window has opened prompting you to save "${data.sheetTitle}" to your Drive.`, "Export Complete");
+        
+    } catch (error) {
+        showAppAlert(error.message, "Export Failed");
+    } finally {
+        if (btn) btn.innerHTML = originalHtml;
+    }
 };
 
 // ==========================================
@@ -2514,7 +3365,8 @@ const CUSTOMER_DISPLAY_COLUMNS = [
     ['id', 'ID'], ['name', 'Customer Name'], ['phone', 'Phone'],
     ['branch', 'Branch'], ['sector', 'Sector'], ['balance', 'Balance'],
     ['campaign', 'Campaign'], ['agentId', 'Assigned Agent'],
-    ['worked', 'Worked'], ['outcome', 'Outcome'], ['status', 'Status'], ['businessStatus', 'Business Status']
+    ['worked', 'Worked'], ['outcome', 'Outcome'], ['status', 'Status'], 
+    ['businessStatus', 'Business Status'], ['updatedAt', 'Last Activity']
 ];
 
 function displayValue(value) {
@@ -2566,3 +3418,172 @@ async function claimNextCustomer() {
         showAppAlert('Could not assign an account to you. Please try again.', 'Assignment Error');
     }
 }
+
+// --- INTELLIGENT NEXT CUSTOMER QUEUE ---
+let nextCustomerRequestInFlight = false;
+let currentPriorityContext = null;
+
+function setNextCustomerButtonState(label, disabled) {
+    const button = document.getElementById('next-customer-button');
+    const labelEl = document.getElementById('next-customer-button-label');
+    if (labelEl) labelEl.innerText = label;
+    if (button) button.disabled = disabled;
+}
+
+function showEmptyQueueState(message) {
+    const emptyState = document.getElementById('empty-call-state');
+    const activePanel = document.getElementById('active-call-panel');
+    const title = document.getElementById('empty-call-state-title');
+    const subtitle = document.getElementById('empty-call-state-subtitle');
+    const refreshButton = document.getElementById('empty-call-state-refresh');
+    
+    activePanel?.classList.add('hidden');
+    activePanel?.classList.remove('flex');
+    emptyState?.classList.remove('hidden');
+    emptyState?.classList.add('flex');
+    
+    // Set a friendly, encouraging title with a green tick!
+    if (title) {
+        title.innerHTML = '<i class="fa-solid fa-circle-check text-green-500 mr-2 text-lg"></i>You\'re all caught up!';
+    }
+    
+    // Intercept the default backend message and replace it with a friendly subtitle
+    if (subtitle) {
+        const defaultBackendMsg = "No customers available";
+        subtitle.innerText = (!message || message.includes(defaultBackendMsg))
+            ? "Great job! Your queue is completely clear right now. Take a breather, or click refresh to check for new assignments." 
+            : message;
+    }
+    
+    refreshButton?.classList.remove('hidden');
+}
+
+async function requestNextCustomer() {
+    if (!LOGGED_IN_AGENT || nextCustomerRequestInFlight) return;
+    if (CURRENT_USER_ROLE !== 'Control Agent') {
+        showAppAlert('Only Control Agents have a personal Next Customer queue.', 'Permission Denied');
+        return;
+    }
+    nextCustomerRequestInFlight = true;
+    setNextCustomerButtonState('Finding next customer...', true);
+    const activeCampaign = getAgentQueueCampaign();
+    try {
+        setTimeout(() => { if (nextCustomerRequestInFlight) setNextCustomerButtonState('Analyzing queue...', true); }, 400);
+        const response = await fetch(`${API_BASE}/agent/next-customer${activeCampaign ? `?campaignName=${encodeURIComponent(activeCampaign)}` : ''}`);
+        if (!response.ok) {
+            const errorBody = await response.json().catch(() => ({}));
+            throw new Error(errorBody.detail || `Status ${response.status}`);
+        }
+        const data = await response.json();
+        if (!data.customer) {
+            currentPriorityContext = null;
+            showEmptyQueueState(data.message);
+            return;
+        }
+        setNextCustomerButtonState('Opening customer...', true);
+        currentPriorityContext = { score: data.priorityScore, reasons: data.priorityReasons || [] };
+        const existingIndex = mockCustomers.findIndex(c => c.id === data.customer.id);
+        if (existingIndex >= 0) mockCustomers[existingIndex] = data.customer;
+        else mockCustomers.unshift(data.customer);
+        window.customers = mockCustomers;
+        startCall(data.customer.id, false);
+        renderAgentQueue();
+        loadQueueSummary();
+    } catch (error) {
+        console.error('Failed to fetch next customer:', error);
+        showAppAlert('Could not find your next customer. Please try again.', 'Queue Error');
+    } finally {
+        nextCustomerRequestInFlight = false;
+        setNextCustomerButtonState('Next Customer', false);
+    }
+}
+window.requestNextCustomer = requestNextCustomer;
+
+async function skipCurrentCustomer() {
+    const id = activeCustomerId;
+    if (!id) return;
+    const reason = prompt('Skip reason (optional): Wrong number, Duplicate, Customer unavailable, Requires supervisor, Technical issue, Other') || '';
+    try {
+        const response = await fetch(`${API_BASE}/agent/skip-customer`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ customerId: id, reason })
+        });
+        if (!response.ok) {
+            const errorBody = await response.json().catch(() => ({}));
+            throw new Error(errorBody.detail || `Status ${response.status}`);
+        }
+        activeCustomerId = null;
+        window.activeCustomerId = null;
+        currentPriorityContext = null;
+        showEmptyQueueState('Customer skipped. Click Next Customer to continue.');
+        renderAgentQueue();
+        loadQueueSummary();
+    } catch (error) {
+        console.error('Failed to skip customer:', error);
+        showAppAlert('Could not skip this customer. Please try again.', 'Skip Error');
+    }
+}
+window.skipCurrentCustomer = skipCurrentCustomer;
+
+function renderPriorityReasonBanner() {
+    const banner = document.getElementById('priority-reason-banner');
+    const list = document.getElementById('priority-reason-list');
+    const scoreBadge = document.getElementById('priority-score-badge');
+    if (!banner || !list) return;
+    if (!currentPriorityContext) {
+        banner.classList.add('hidden');
+        return;
+    }
+    list.innerHTML = currentPriorityContext.reasons.map(reason => `<li><i class="fa-solid fa-check text-green-600 mr-1"></i>${escapeHtml(reason)}</li>`).join('') || '<li>Assigned to your queue</li>';
+    if (scoreBadge) scoreBadge.innerText = currentPriorityContext.score >= 75 ? 'HIGH' : currentPriorityContext.score >= 45 ? 'MEDIUM' : 'LOW';
+    banner.classList.remove('hidden');
+}
+
+async function loadQueueSummary() {
+    if (!LOGGED_IN_AGENT || CURRENT_USER_ROLE !== 'Control Agent') return;
+    try {
+        const response = await fetch(`${API_BASE}/agent/queue-summary`);
+        if (!response.ok) return;
+        const summary = await response.json();
+        const setText = (id, value) => { const el = document.getElementById(id); if (el) el.innerText = value; };
+        setText('qs-high-priority', summary.highPriority ?? 0);
+        setText('qs-follow-ups', summary.followUps ?? 0);
+        setText('qs-ptp', summary.ptpCustomers ?? 0);
+        setText('qs-new', summary.newCustomers ?? 0);
+    } catch (error) {
+        console.error('Failed to load queue summary:', error);
+    }
+}
+window.loadQueueSummary = loadQueueSummary;
+
+function displayDate(value) {
+    if (!value || value === '--') return '--';
+    try {
+        const date = new Date(value);
+        if (isNaN(date.getTime())) return value;
+        return date.toLocaleString('en-GB', { 
+            day: '2-digit', month: 'short', year: 'numeric',
+            hour: '2-digit', minute: '2-digit'
+        });
+    } catch {
+        return value;
+    }
+}
+window.fillFullBalance = function() {
+    if (!activeCustomerId) return;
+    
+    const activeCustomer = mockCustomers.find(x => x.id === activeCustomerId);
+    
+    if (activeCustomer && activeCustomer.balance) {
+        const cleanBalance = Number(String(activeCustomer.balance).replace(/[^\d.-]/g, ''));
+        
+        // FIX: Look for 'disp-amount' to match your updated HTML
+        const amtInput = document.getElementById('disp-amount');
+        if (amtInput) {
+            amtInput.value = cleanBalance;
+        }
+    } else {
+        showAppAlert("No balance available for this customer.", "Info");
+    }
+};

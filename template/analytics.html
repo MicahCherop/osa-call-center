@@ -7,7 +7,7 @@
   <meta name="theme-color" content="#f59e0b">
   <script>if (localStorage.getItem('theme') === 'dark') document.documentElement.classList.add('dark');</script>
   <title>Call Center Campaigns - Analytics</title>
-  
+  <link rel="icon" type="image/png" href="/static/icon.png">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -42,9 +42,11 @@
         <!-- Clickable Profile Section -->
         <div class="relative">
           <button onclick="toggleLogoutModal()" class="flex items-center gap-3 hover:bg-slate-50 p-1.5 rounded-lg transition text-left outline-none">
-            <div class="w-8 h-8 bg-brandDark text-white rounded-full flex items-center justify-center">
+            <!-- REPLACED AVATAR CONTAINER -->
+            <div id="header-user-avatar" class="w-8 h-8 bg-brandDark text-white rounded-full flex items-center justify-center overflow-hidden shrink-0 border border-brandDark/10 shadow-sm">
               <i class="fa-solid fa-user text-xs"></i>
             </div>
+            <!-- /REPLACED AVATAR CONTAINER -->
             <div class="hidden sm:block">
               <div id="header-user-name" class="text-sm font-medium text-brandDark">Loading...</div>
               <div id="header-user-role" class="text-xs font-normal text-brandDark/60">Role</div>
@@ -185,12 +187,28 @@
               </div>
             </div>
             
-            <div class="mb-5 max-w-xs">
-              <label class="block text-[11px] font-semibold text-brandDark/50 uppercase mb-1.5">Filter By Campaign</label>
-              <select id="dash-response-campaign-filter" onchange="renderAnalyticsResponses()" class="glass-input rounded-lg w-full px-3 py-2 text-sm font-normal">
-                <option value="">All campaigns</option>
-              </select>
-            </div>
+            <div class="mb-5 flex flex-wrap gap-4">
+              <div class="flex-1 min-w-[200px] max-w-xs">
+                <label class="block text-[11px] font-semibold text-brandDark/50 uppercase mb-1.5">Filter By Campaign</label>
+                <select id="dash-response-campaign-filter" onchange="renderAnalyticsResponses()" class="glass-input rounded-lg w-full px-3 py-2 text-sm font-normal">
+                  <option value="">All campaigns</option>
+                </select>
+              </div>
+              
+              <div class="flex-1 min-w-[200px] max-w-xs">
+                <label class="block text-[11px] font-semibold text-brandDark/50 uppercase mb-1.5">Filter By Outcome</label>
+                <select id="dash-response-outcome-filter" onchange="renderAnalyticsResponses()" class="glass-input rounded-lg w-full px-3 py-2 text-sm font-normal">
+                  <option value="">All outcomes</option>
+                </select>
+              </div>
+
+              <div class="flex-1 min-w-[200px] max-w-xs">
+                <label class="block text-[11px] font-semibold text-brandDark/50 uppercase mb-1.5">Filter By Status</label>
+                <select id="dash-response-status-filter" onchange="renderAnalyticsResponses()" class="glass-input rounded-lg w-full px-3 py-2 text-sm font-normal">
+                  <option value="">All statuses</option>
+                </select>
+              </div>
+            </div>            
             
             <!-- Dynamic Table Container -->
             <div id="analytics-responses-container" class="rounded-xl border border-brandDark/5 bg-white/40 backdrop-blur-sm overflow-hidden min-h-[40vh]">

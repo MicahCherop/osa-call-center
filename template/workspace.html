@@ -13,29 +13,69 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="/callcenter-tailwind.css">
   <link rel="stylesheet" href="/callcenter.css">
-  <link rel="icon" type="image/png" href="https://cdn.brandfetch.io/idkNTof4f-/w/400/h/400/theme/dark/icon.jpeg?c=1dxbfHSJFAPEGdCLU4o5B">
+  <link rel="icon" type="image/png" href="/static/icon.png">
 </head>
 
-<!-- FIX: flex-col added for full-width header, bg-white for clean base -->
 <body data-page="workspace" class="text-brandDark font-sans font-normal text-sm h-screen overflow-hidden flex flex-col relative bg-white">
   
-  <!-- BACKGROUND BLOBS (Softened opacity for better contrast) -->
+  <!-- BACKGROUND BLOBS -->
   <div class="absolute inset-0 z-0 overflow-hidden pointer-events-none opacity-40">
     <div class="absolute top-[-10%] left-[-10%] w-[40rem] h-[40rem] bg-amber-100 rounded-full mix-blend-multiply filter blur-3xl animate-blob"></div>
     <div class="absolute top-[20%] right-[-10%] w-[35rem] h-[35rem] bg-blue-100 rounded-full mix-blend-multiply filter blur-3xl animate-blob" style="animation-delay: 2s"></div>
     <div class="absolute bottom-[-20%] left-[20%] w-[45rem] h-[45rem] bg-indigo-100 rounded-full mix-blend-multiply filter blur-3xl animate-blob" style="animation-delay: 4s"></div>
   </div>
 
+  <!-- MY FOLLOW-UPS MODAL -->
+  <div id="followups-modal-backdrop" class="fixed inset-0 app-modal-backdrop z-50 hidden transition-opacity duration-300 opacity-0 items-center justify-center p-4" onclick="closeFollowupsModal(event)">
+    <div id="followups-modal" class="glass-panel bg-white rounded-2xl p-6 app-modal-card relative shadow-2xl flex flex-col max-h-[85vh]" style="width: 100%; max-width: 520px;" onclick="event.stopPropagation()">
+      <div class="flex justify-between items-center mb-4 border-b border-brandDark/10 pb-3">
+        <h2 class="text-base font-bold text-brandDark flex items-center gap-2"><i class="fa-solid fa-calendar-check text-brandAmber"></i> My Follow-ups</h2>
+        <button onclick="closeFollowupsModal()" class="text-brandDark/50 hover:text-red-500 transition"><i class="fa-solid fa-xmark text-lg"></i></button>
+      </div>
+      
+      <!-- SUMMARY METRICS GRID -->
+      <div class="mb-4" style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.5rem;">
+        <div class="bg-slate-50 border border-brandDark/5 rounded-xl p-2.5 text-center shadow-sm">
+          <p class="text-[10px] font-bold text-brandDark/50 uppercase tracking-wider mb-0.5">Due Today</p>
+          <p class="text-base font-bold text-brandDark" id="fu-count-today">0</p>
+        </div>
+        <div class="bg-slate-50 border border-brandDark/5 rounded-xl p-2.5 text-center shadow-sm">
+          <p class="text-[10px] font-bold text-brandDark/50 uppercase tracking-wider mb-0.5">Overdue</p>
+          <p class="text-base font-bold text-red-600" id="fu-count-overdue">0</p>
+        </div>
+        <div class="bg-slate-50 border border-brandDark/5 rounded-xl p-2.5 text-center shadow-sm">
+          <p class="text-[10px] font-bold text-brandDark/50 uppercase tracking-wider mb-0.5">Tomorrow</p>
+          <p class="text-base font-bold text-brandDark" id="fu-count-tomorrow">0</p>
+        </div>
+        <div class="bg-slate-50 border border-brandDark/5 rounded-xl p-2.5 text-center shadow-sm">
+          <p class="text-[10px] font-bold text-brandDark/50 uppercase tracking-wider mb-0.5">Completed</p>
+          <p class="text-base font-bold text-green-600" id="fu-count-completed">0</p>
+        </div>
+      </div>
+
+      <!-- TABS -->
+      <div class="mb-4 bg-brandDark/5 p-1 rounded-lg" style="display: flex; gap: 0.25rem;">
+        <button class="fu-tab active flex-1 rounded-md bg-brandAmber text-white shadow-sm text-xs font-bold py-1.5 transition" onclick="switchFollowupsTab('today', this)">Today</button>
+        <button class="fu-tab flex-1 rounded-md text-brandDark/60 text-xs font-bold py-1.5 transition" onclick="switchFollowupsTab('overdue', this)">Overdue</button>
+        <button class="fu-tab flex-1 rounded-md text-brandDark/60 text-xs font-bold py-1.5 transition" onclick="switchFollowupsTab('upcoming', this)">Upcoming</button>
+        <button class="fu-tab flex-1 rounded-md text-brandDark/60 text-xs font-bold py-1.5 transition" onclick="switchFollowupsTab('completed', this)">Completed</button>
+      </div>
+
+      <!-- ITEM LIST -->
+      <div id="followups-modal-list" class="flex-1 overflow-y-auto space-y-2 pr-1 min-h-[160px]"></div>
+    </div>
+  </div>
+
   <!-- ADD CAMPAIGN MODAL -->
-  <div id="add-campaign-modal-backdrop" class="fixed inset-0 app-modal-backdrop z-50 hidden transition-opacity duration-300 opacity-0 items-center justify-center" onclick="closeAddCampaignModal(event)">
-    <div id="add-campaign-modal" class="glass-panel w-full max-w-2xl rounded-2xl p-6 app-modal-card relative shadow-2xl flex flex-col max-h-[90vh]" onclick="event.stopPropagation()">
+  <div id="add-campaign-modal-backdrop" class="fixed inset-0 app-modal-backdrop z-50 hidden transition-opacity duration-300 opacity-0 items-center justify-center p-4" onclick="closeAddCampaignModal(event)">
+    <div id="add-campaign-modal" class="glass-panel bg-white rounded-2xl p-6 app-modal-card relative shadow-2xl flex flex-col max-h-[90vh]" style="width: 100%; max-width: 600px;" onclick="event.stopPropagation()">
       <div class="flex justify-between items-center mb-6 border-b border-brandDark/10 pb-4">
         <h2 class="text-xl font-medium flex items-center gap-2"><i class="fa-solid fa-bullhorn text-brandAmber"></i> Create New Campaign</h2>
         <button onclick="closeAddCampaignModal()" class="text-brandDark/50 hover:text-red-500 transition"><i class="fa-solid fa-xmark text-xl"></i></button>
       </div>
       <form id="add-campaign-form" onsubmit="submitAddCampaign(event)" class="overflow-y-auto pr-2 space-y-4">
-        <div class="grid grid-cols-2 gap-4">
-          <div class="col-span-2">
+        <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem;">
+          <div style="grid-column: span 2 / span 2;">
             <label class="block text-[11px] font-semibold text-brandDark/70 uppercase mb-1.5">Campaign Details *</label>
             <input type="text" id="new-campaign-name" required placeholder="e.g. DD1-DD7 Collections Campaign" class="glass-input rounded-lg w-full px-3 py-2 text-sm font-medium">
           </div>
@@ -59,8 +99,7 @@
               <option value="low">Low</option>
             </select>
           </div>
-          <!-- CSV UPLOAD ZONE -->
-          <div class="col-span-2 mt-2">
+          <div style="grid-column: span 2 / span 2;" class="mt-2">
             <label class="block text-[11px] font-semibold text-brandDark/70 uppercase mb-1.5">Upload Target Audience (CSV) *</label>
             <div class="border-2 border-dashed border-brandDark/20 rounded-xl p-6 flex flex-col items-center justify-center bg-white/40 hover:bg-white/60 transition cursor-pointer relative">
               <input type="file" id="csv-file-input" required accept=".csv" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer" onchange="document.getElementById('csv-filename').innerText = this.files[0]?.name || 'No file selected'">
@@ -77,7 +116,6 @@
         </div>
         <div class="flex justify-end gap-3 mt-6 pt-4 border-t border-brandDark/10">
           <button type="button" onclick="closeAddCampaignModal()" class="px-4 py-2 text-sm font-medium text-brandDark/70 hover:text-brandDark transition">Cancel</button>
-          <!-- FIX: Amber Button -->
           <button type="submit" class="bg-brandAmber hover:bg-amber-600 text-white font-medium px-5 py-2 rounded-lg shadow-sm transition ease-in text-sm flex items-center gap-2">
             <i class="fa-solid fa-check"></i> Save Campaign
           </button>
@@ -86,73 +124,43 @@
     </div>
   </div>
 
-  <!-- SLIDE-OUT CUSTOMER DRAWER -->
-  <div id="customer-drawer-backdrop" class="fixed inset-0 app-modal-backdrop z-40 hidden transition-opacity opacity-0" onclick="closeCustomerDrawer()"></div>
-  <div id="customer-drawer" class="fixed top-0 right-0 h-full w-full max-w-md glass-panel z-50 transform translate-x-full transition-transform duration-300 shadow-2xl flex flex-col">
-    <div class="p-6 border-b border-brandDark/5 flex justify-between items-center bg-white/60">
-      <h3 class="text-xl font-medium flex items-center gap-2"><i class="fa-solid fa-address-card text-brandAmber"></i> Customer Profile</h3>
-      <button onclick="closeCustomerDrawer()" class="text-brandDark/50 hover:text-red-500 transition"><i class="fa-solid fa-xmark text-xl"></i></button>
-    </div>
-    <div class="p-6 flex-1 overflow-y-auto">
-      <div class="flex items-center gap-4 mb-6">
-        <div class="w-14 h-14 rounded-full bg-brandAmber/10 flex items-center justify-center text-brandAmber text-xl font-medium" id="drawer-initial">--</div>
-        <div>
-          <h2 class="text-xl font-medium leading-tight" id="drawer-name">Unknown</h2>
-          <p class="text-sm font-normal text-brandDark/60" id="drawer-phone">--</p>
-        </div>
-      </div>
-      <div class="flex gap-4 border-b border-brandDark/5 mb-6">
-        <button class="drawer-tab active text-sm font-medium text-brandAmber border-b-2 border-brandAmber pb-2 px-1 transition" onclick="switchDrawerTab('overview', this)">Overview</button>
-        <button class="drawer-tab text-sm font-medium text-brandDark/50 hover:text-brandDark border-b-2 border-transparent pb-2 px-1 transition" onclick="switchDrawerTab('profile', this)">Business Profile</button>
-      </div>
-      <div class="space-y-4">
-        <!-- Overview Tab -->
-        <div id="drawer-overview" class="drawer-content space-y-4">
-          <div class="glass-card p-5 rounded-xl">
-            <h4 class="text-[11px] font-semibold text-brandDark/50 uppercase mb-3">Financial Snapshot</h4>
-            <div class="flex justify-between mb-2"><span class="font-normal text-sm text-brandDark/70">Campaign</span> <span class="font-medium text-brandDark text-right" id="drawer-campaign">--</span></div>
-            <div class="flex justify-between mb-2"><span class="font-normal text-sm text-brandDark/70">Outstanding Balance</span> <span class="font-medium text-red-600" id="drawer-balance">0</span></div>
-            <div class="flex justify-between mb-2"><span class="font-normal text-sm text-brandDark/70">Agent</span> <span class="font-medium text-brandDark" id="drawer-agent">--</span></div>
-            <div class="flex justify-between mb-2"><span class="font-normal text-sm text-brandDark/70">Outcome</span> <span class="font-medium text-brandDark" id="drawer-outcome">--</span></div>
-            <div class="flex justify-between mb-1"><span class="font-normal text-sm text-brandDark/70">Status</span> <span class="font-medium text-brandDark text-right" id="drawer-status">--</span></div>
-          </div>
-        </div>
-        <!-- Business Profile Tab -->
-        <div id="drawer-profile" class="drawer-content hidden space-y-4">
-          <div class="glass-card p-5 rounded-xl">
-            <h4 class="text-[11px] font-semibold text-brandDark/50 uppercase mb-3">Business Details</h4>
-            <div class="flex justify-between mb-2"><span class="font-normal text-sm text-brandDark/70">Sector</span> <span class="font-medium text-brandDark" id="drawer-sector">--</span></div>
-            <div class="flex justify-between mb-2"><span class="font-normal text-sm text-brandDark/70">Location / Branch</span> <span class="font-medium text-brandDark" id="drawer-branch">--</span></div>
-            <div class="flex justify-between mb-2"><span class="font-normal text-sm text-brandDark/70">Pair</span> <span class="font-medium text-brandDark" id="drawer-pair">--</span></div>
-            <div class="flex justify-between mb-2"><span class="font-normal text-sm text-brandDark/70">Business Status</span> <span class="font-medium text-brandDark" id="drawer-business">--</span></div>
-            <div class="mt-4 pt-4 border-t border-brandDark/5">
-              <div class="text-[11px] font-semibold text-brandDark/50 uppercase mb-1">Comments</div>
-              <p class="text-sm font-normal text-brandDark/70" id="drawer-comments">--</p>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- 1. FULL WIDTH HEADER -->
-  <header class="w-full glass-panel border-b border-brandDark/5 px-6 py-3 flex justify-between items-center relative z-50 shrink-0">
+  <!-- FULL WIDTH HEADER -->
+  <header class="w-full h-[57px] glass-panel border-b border-brandDark/5 px-6 py-3 flex justify-between items-center relative z-40 shrink-0">
     <h1 class="text-xl font-medium tracking-tight flex items-center gap-3 text-brandDark">
       <i class="fa-solid fa-phone-volume text-brandAmber"></i> Call Center Campaigns
     </h1>
     <div class="flex items-center gap-5 text-sm">
-      <button class="text-brandDark/60 hover:text-brandAmber transition"><i class="fa-regular fa-bell text-lg"></i></button>
+      <div class="relative">
+        <button onclick="toggleNotificationPanel()" class="text-brandDark/60 hover:text-brandAmber transition relative">
+          <i class="fa-regular fa-bell text-lg"></i>
+          <span id="notification-badge" class="hidden absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[9px] font-semibold rounded-full w-4 h-4 flex items-center justify-center">0</span>
+        </button>
+        <div id="notification-panel" class="hidden absolute right-0 mt-3 w-80 bg-white rounded-xl shadow-lg border border-brandDark/5 z-50 max-h-96 overflow-y-auto">
+          <div class="p-3 border-b border-brandDark/5 flex justify-between items-center">
+            <span class="text-sm font-medium text-brandDark">Notifications</span>
+            <button onclick="openFollowupsModal()" class="text-[11px] font-medium text-brandAmber hover:underline">My Follow-ups</button>
+          </div>
+          <div id="notification-list" class="divide-y divide-brandDark/5"></div>
+        </div>
+      </div>
+
+      <button onclick="openFollowupsModal()" class="text-brandDark/60 hover:text-brandAmber transition relative" title="My Follow-ups">
+        <i class="fa-solid fa-calendar-check text-lg"></i>
+        <span id="followups-badge" class="hidden absolute -top-1.5 -right-1.5 bg-brandAmber text-white text-[9px] font-semibold rounded-full w-4 h-4 flex items-center justify-center">0</span>
+      </button>
+
       <label class="relative inline-flex items-center cursor-pointer ml-3" title="Toggle Dark Mode">
         <input type="checkbox" class="dark-mode-toggle sr-only peer" onchange="toggleDarkMode(this.checked)">
         <div class="relative w-11 h-6 rounded-full bg-slate-300 peer-checked:bg-brandAmber"><span class="theme-icon-sun">&#9728;</span><span class="theme-icon-moon">&#9790;</span></div>
       </label>
       <div class="flex items-center gap-3 pl-4 border-l border-brandDark/10">
-        <!-- Clickable Profile Section -->
         <div class="relative">
           <button onclick="toggleLogoutModal()" class="flex items-center gap-3 hover:bg-slate-50 p-1.5 rounded-lg transition text-left outline-none">
-            <div class="w-8 h-8 bg-brandDark text-white rounded-full flex items-center justify-center">
+            <!-- REPLACED AVATAR CONTAINER -->
+            <div id="header-user-avatar" class="w-8 h-8 bg-brandDark text-white rounded-full flex items-center justify-center overflow-hidden shrink-0 border border-brandDark/10 shadow-sm">
               <i class="fa-solid fa-user text-xs"></i>
             </div>
+            <!-- /REPLACED AVATAR CONTAINER -->
             <div class="hidden sm:block">
               <div id="header-user-name" class="text-sm font-medium text-brandDark">Loading...</div>
               <div id="header-user-role" class="text-xs font-normal text-brandDark/60">Role</div>
@@ -160,7 +168,6 @@
             <i class="fa-solid fa-chevron-down text-xs text-brandDark/40 ml-1"></i>
           </button>
 
-          <!-- The Logout Modal -->
           <div id="logout-modal" class="hidden absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-lg border border-brandDark/5 z-50 overflow-hidden">
             <div class="p-4 border-b border-brandDark/5 bg-slate-50/50">
               <p class="text-xs font-normal text-brandDark/50 mb-1">Signed in as</p>
@@ -179,12 +186,11 @@
     </div>
   </header>
 
-  <!-- BOTTOM SECTION (Sidebar + Main Content) -->
+  <!-- BOTTOM SECTION (Sidebar + Main Content Wrapper) -->
   <div class="flex flex-1 overflow-hidden w-full relative z-10">
     
-      <!-- SIDEBAR -->
+    <!-- SIDEBAR -->
     <aside class="w-48 glass-panel border-r border-brandDark/5 flex flex-col py-4 shrink-0 bg-white/60">
-      <!-- NEW ACTIVE OVERVIEW TAB -->
       <a href="/overview" data-page="overview" class="flex items-center gap-3 px-5 py-3 text-sm font-medium text-brandAmber bg-brandAmber/10 border-r-2 border-brandAmber transition-colors">
         <i class="fa-solid fa-house-pulse w-5 text-center text-base"></i> Overview
       </a>
@@ -205,12 +211,10 @@
       </a>
     </aside>
 
-    <!-- 3. MAIN CONTENT -->
+    <!-- MAIN CONTENT -->
     <main class="flex-1 p-8 overflow-y-auto page-enter bg-slate-50/30">
-      <!-- VIEW 1: AGENT WORKSPACE -->
       <div id="view-workspace" class="h-full flex flex-col gap-6">
         
-        <!-- STEP 1: CLOCK IN / HEADER STATS -->
         <div class="glass-panel rounded-2xl p-6 flex justify-between items-center shrink-0">
           <div>
             <h2 class="text-xl font-medium text-brandDark">Agent Workspace</h2>
@@ -231,22 +235,30 @@
                 <div class="text-xl font-medium text-green-600" id="ws-stats-conv">Sh 0</div>
               </div>
             </div>
-            
           </div>
         </div>
 
         <!-- WORKSPACE AREA -->
         <div class="flex-1 relative flex gap-6 overflow-hidden min-h-[60vh]">
           
-          <!-- IDLE OVERLAY -->
           <div id="idle-overlay" class="absolute inset-0 z-20 glass-card rounded-2xl flex flex-col items-center justify-center transition-opacity duration-300">
             <i class="fa-solid fa-mug-hot text-5xl text-brandDark/10 mb-4"></i>
             <h3 class="text-lg font-medium text-brandDark mb-2">You are currently offline</h3>
             <p class="text-brandDark/50 font-normal text-sm mb-6">Clock in using the toggle above to access your customer queue.</p>
           </div>
 
-          <!-- LEFT: QUEUE LIST -->
+          <!-- QUEUE LIST -->
           <div id="workspace-queue" class="w-1/3 glass-card rounded-2xl p-5 flex-col h-full hidden">
+            <button id="next-customer-button" type="button" onclick="requestNextCustomer()" class="w-full mb-4 bg-brandAmber hover:bg-amber-600 text-white font-medium text-sm py-3 rounded-xl shadow-sm transition flex items-center justify-center gap-2">
+              <i class="fa-solid fa-bolt"></i>
+              <span id="next-customer-button-label">Next Customer</span>
+            </button>
+            <div id="queue-summary-strip" style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.5rem;" class="mb-4 text-[11px]">
+              <div class="bg-white/60 rounded-lg px-2.5 py-1.5 flex justify-between items-center"><span class="text-brandDark/50 font-medium">High priority</span><span id="qs-high-priority" class="font-semibold text-brandDark">0</span></div>
+              <div class="bg-white/60 rounded-lg px-2.5 py-1.5 flex justify-between items-center"><span class="text-brandDark/50 font-medium">Follow-ups</span><span id="qs-follow-ups" class="font-semibold text-brandDark">0</span></div>
+              <div class="bg-white/60 rounded-lg px-2.5 py-1.5 flex justify-between items-center"><span class="text-brandDark/50 font-medium">PTP</span><span id="qs-ptp" class="font-semibold text-brandDark">0</span></div>
+              <div class="bg-white/60 rounded-lg px-2.5 py-1.5 flex justify-between items-center"><span class="text-brandDark/50 font-medium">New</span><span id="qs-new" class="font-semibold text-brandDark">0</span></div>
+            </div>
             <div class="flex justify-between items-center mb-4 border-b border-brandDark/5 pb-3">
                <div class="flex items-center gap-2 min-w-0">
                  <h3 class="font-medium text-brandDark flex items-center gap-2"><i class="fa-solid fa-list-ul text-brandAmber"></i> Workspace Queue</h3>
@@ -256,8 +268,7 @@
                  <span class="text-[11px] font-medium bg-brandAmber/10 text-amber-700 px-2 py-1 rounded-md" id="queue-count">0 Remaining</span>
                </div>
             </div>
-            <div id="workspace-queue-tabs" class="grid grid-cols-2 gap-2 mb-4 bg-brandDark/5 p-1 rounded-lg">
-              <!-- FIX: Active tab uses Amber -->
+            <div id="workspace-queue-tabs" style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.5rem;" class="mb-4 bg-brandDark/5 p-1 rounded-lg">
               <button id="ws-queue-tab-active" onclick="switchWorkspaceQueueTab('active')" class="ws-queue-tab rounded-md bg-brandAmber text-white shadow-sm text-xs font-medium py-1.5 transition ease-in">Active</button>
               <button id="ws-queue-tab-pending" onclick="switchWorkspaceQueueTab('pending')" class="ws-queue-tab rounded-md text-brandDark/60 hover:text-brandDark text-xs font-medium py-1.5 transition ease-in">Pending</button>
               <button id="ws-queue-tab-ptp" onclick="switchWorkspaceQueueTab('ptp')" class="hidden ws-queue-tab rounded-md text-brandDark/60 hover:text-brandDark text-xs font-medium py-1.5 transition ease-in">PTP</button>
@@ -267,16 +278,16 @@
             </div>
           </div>
 
-          <!-- RIGHT: EMPTY STATE -->
-          <div id="empty-call-state" class="flex-1 glass-card rounded-2xl flex-col items-center justify-center hidden">
+          <!-- EMPTY STATE -->
+          <div id="empty-call-state" class="flex-1 glass-card rounded-2xl flex-col items-center justify-center hidden text-center px-8">
              <i class="fa-solid fa-headset text-5xl text-brandDark/10 mb-4"></i>
-             <p class="text-brandDark/50 font-normal text-sm">Select a customer from your queue to begin.</p>
+             <p id="empty-call-state-title" class="text-brandDark font-medium text-base mb-1">Select a customer from your queue to begin.</p>
+             <p id="empty-call-state-subtitle" class="text-brandDark/50 font-normal text-sm mb-4 max-w-sm"></p>
+             <button id="empty-call-state-refresh" onclick="requestNextCustomer()" class="hidden text-xs font-medium bg-brandAmber/10 text-amber-700 px-3 py-1.5 rounded-md hover:bg-brandAmber/20 transition">Refresh Queue</button>
           </div>
 
-          <!-- RIGHT: ACTIVE CALL STATE (LOCKED) -->
+          <!-- ACTIVE CALL STATE -->
           <div id="active-call-panel" class="flex-1 gap-6 hidden h-full">
-            
-            <!-- Customer info panel -->
             <div id="active-customer-info" class="flex-1 glass-card rounded-2xl p-6 flex flex-col overflow-y-auto">
               <div class="flex justify-between items-start border-b border-brandDark/5 pb-4 mb-5">
                 <div>
@@ -285,6 +296,7 @@
                     <span class="bg-red-50 text-red-600 border border-red-100 px-2 py-0.5 rounded text-[10px] font-medium flex items-center gap-1">
                       <i class="fa-solid fa-lock"></i> Locked
                     </span>
+                    <button type="button" onclick="openCustomerDrawer(activeCustomerId)" class="text-[11px] font-medium text-brandAmber hover:underline flex items-center gap-1"><i class="fa-solid fa-address-card"></i> Customer 360</button>
                   </div>
                   <p class="text-sm text-brandDark/60 font-normal" id="active-phone">--</p>
                 </div>
@@ -293,9 +305,17 @@
                   <p class="font-medium text-sm text-brandDark" id="active-campaign">--</p>
                 </div>
               </div>
-              <div class="grid grid-cols-2 gap-4 mb-5">
+              <div id="priority-reason-banner" class="hidden bg-amber-50 border border-amber-100 rounded-xl px-4 py-3 mb-5">
+                <div class="flex items-center justify-between mb-1.5">
+                  <span class="text-[11px] font-semibold uppercase text-amber-700">Why this customer?</span>
+                  <span id="priority-score-badge" class="text-[10px] font-semibold bg-brandAmber text-white px-2 py-0.5 rounded-full">--</span>
+                </div>
+                <ul id="priority-reason-list" class="text-xs text-brandDark/70 space-y-0.5"></ul>
+                <button type="button" onclick="skipCurrentCustomer()" class="mt-2 text-[11px] font-medium text-red-500 hover:text-red-600"><i class="fa-solid fa-forward"></i> Skip customer</button>
+              </div>
+              <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem;" class="mb-5">
                 <div class="bg-white/60 p-4 rounded-xl border border-brandDark/5">
-                  <p class="text-[10px] font-semibold text-brandDark/40 uppercase mb-1">Debt Amount</p>
+                  <p class="text-[10px] font-semibold text-brandDark/40 uppercase mb-1">Balance</p>
                   <p class="text-lg font-medium text-red-600" id="active-debt">--</p>
                 </div>
                 <div class="bg-white/60 p-4 rounded-xl border border-brandDark/5">
@@ -305,7 +325,7 @@
               </div>
               <div class="border-t border-brandDark/5 pt-4">
                 <h4 class="text-[10px] font-semibold text-brandDark/40 uppercase mb-3">Customer Details</h4>
-                <div class="grid grid-cols-2 gap-x-4 gap-y-2.5 text-sm">
+                <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.625rem;" class="text-sm">
                   <div><p class="text-[10px] font-semibold uppercase text-brandDark/40">URL</p><a id="active-url" class="font-normal text-brandAmber hover:underline break-all" target="_blank" rel="noopener">--</a></div>
                   <div><p class="text-[10px] font-semibold uppercase text-brandDark/40">Mobile No</p><p id="active-mobile-no" class="font-normal text-brandDark">--</p></div>
                   <div><p class="text-[10px] font-semibold uppercase text-brandDark/40">Disb Date</p><p id="active-disb-date" class="font-normal text-brandDark">--</p></div>
@@ -332,12 +352,17 @@
               </div>
             </div>
 
-            <!-- Disposition form panel -->
+            <!-- DISPOSITION FORM PANEL -->
             <div class="w-80 glass-card rounded-2xl p-5 flex flex-col overflow-y-auto">
-              <h3 class="text-base font-medium text-brandDark mb-1 flex items-center gap-2"><i class="fa-solid fa-clipboard-list text-brandAmber"></i> Log Disposition</h3>
+              <h3 class="text-base font-medium text-brandDark mb-1 flex items-center gap-2">
+                <i class="fa-solid fa-clipboard-list text-brandAmber"></i> Log Disposition
+              </h3>
               <p class="text-[11px] font-normal text-brandDark/50 mb-5">Submit to clear queue lock.</p>
 
-              <form id="disposition-form" class="flex-1 flex flex-col gap-4" onsubmit="submitDisposition(event)">
+              <form id="disposition-form" class="flex-1 flex flex-col gap-4" onsubmit="window.submitDisposition(event)">
+                
+                <input type="hidden" id="disp-customer-id" value="">
+
                 <div>
                   <label class="block text-[11px] font-semibold text-brandDark/60 uppercase mb-1.5">Call Outcome *</label>
                   <select required class="glass-input rounded-lg w-full px-3 py-2 text-sm font-normal" id="disp-outcome" onchange="handleOutcomeChangeGlass()">
@@ -350,7 +375,7 @@
                   </select>
                 </div>
 
-                <!-- DYNAMIC CONDITIONAL: Customer Response -->
+                <!-- Customer Response -->
                 <div id="container-customer-response" class="hidden">
                   <label class="block text-[11px] font-semibold text-brandDark/60 uppercase mb-1.5">Customer Response *</label>
                   <div class="flex gap-2">
@@ -364,7 +389,7 @@
                   </div>
                 </div>
 
-                <!-- DYNAMIC CONDITIONAL: Account Status -->
+                <!-- Account Status -->
                 <div id="container-account-status" class="hidden">
                   <label class="block text-[11px] font-semibold text-brandDark/60 uppercase mb-1.5">Account Status *</label>
                   <div class="flex gap-2">
@@ -373,8 +398,8 @@
                       <option value="Promise to Pay (PTP)">Promise to Pay (PTP)</option>
                       <option value="Refusal to pay">Refusal to pay</option>
                       <option value="Settled">Settled</option>
+                      <option value="Partial Payment">Partial Payment</option>
                     </select>
-                    <!-- FIX: Amber button -->
                     <button type="button" onclick="addCustomOption('disp-status')" class="bg-brandAmber/10 hover:bg-brandAmber/20 text-brandAmber px-3 rounded-lg font-medium transition text-lg leading-none flex items-center justify-center ease-in">+</button>
                   </div>
                 </div>
@@ -383,37 +408,47 @@
                 <div id="container-business-status" class="hidden">
                   <label class="block text-[11px] font-semibold text-brandDark/60 uppercase mb-1.5">Business Status</label>
                   <div class="flex gap-2">
-                    <select class="glass-input rounded-lg flex-1 px-3 py-2 text-sm font-normal" id="disp-business">
+                    <select class="glass-input rounded-lg flex-1 px-3 py-2 text-sm font-normal" id="disp-business-status">
                       <option value="">Select status...</option>
                       <option value="Operational">Operational</option>
                       <option value="Closed business">Closed business</option>
                       <option value="Relocated">Relocated</option>
                     </select>
-                    <!-- FIX: Amber button -->
-                    <button type="button" onclick="addCustomOption('disp-business')" class="bg-brandAmber/10 hover:bg-brandAmber/20 text-brandAmber px-3 rounded-lg font-medium transition text-lg leading-none flex items-center justify-center ease-in">+</button>
+                    <button type="button" onclick="addCustomOption('disp-business-status')" class="bg-brandAmber/10 hover:bg-brandAmber/20 text-brandAmber px-3 rounded-lg font-medium transition text-lg leading-none flex items-center justify-center ease-in">+</button>
                   </div>
                 </div>
 
-                <!-- DYNAMIC: Amount recovered -->
+                <!-- Amount / PTP Time -->
                 <div id="dynamic-amount" class="hidden flex-col gap-3 bg-brandAmber/5 p-3 rounded-xl border border-brandAmber/10">
                   <div>
-                    <label class="block text-[11px] font-semibold text-brandDark/60 uppercase mb-1.5">Amount (Sh) *</label>
-                    <input type="number" id="input-amount" placeholder="e.g. 5000" class="glass-input rounded-lg w-full px-3 py-2 text-sm font-normal">
+                    <div class="flex justify-between items-center mb-1.5">
+                      <label class="block text-[11px] font-semibold text-brandDark/60 uppercase">Amount (Sh) *</label>
+                      <button type="button" onclick="fillFullBalance()" class="text-[10px] bg-brandAmber/20 text-brandAmber font-bold px-2 py-0.5 rounded hover:bg-brandAmber hover:text-white transition ease-in shadow-sm">
+                        Full Balance
+                      </button>
+                    </div>
+                    <input type="number" id="disp-amount" placeholder="e.g. 5000" class="glass-input rounded-lg w-full px-3 py-2 text-sm font-normal">
                   </div>
                   <div>
                     <label class="block text-[11px] font-semibold text-brandDark/60 uppercase mb-1.5">PTP Time *</label>
-                    <input type="datetime-local" id="input-ptp-time" class="glass-input rounded-lg w-full px-3 py-2 text-sm font-normal">
+                    <input type="datetime-local" id="disp-ptp-time" class="glass-input rounded-lg w-full px-3 py-2 text-sm font-normal">
                   </div>
-                </div>
+                  <div>
+                    <label class="block text-[11px] font-semibold text-brandDark/60 uppercase mb-1.5">Payment Method (optional)</label>
+                    <input type="text" id="disp-ptp-payment-method" placeholder="e.g. M-Pesa, Bank" class="glass-input rounded-lg w-full px-3 py-2 text-sm font-normal">
+                  </div>
+                </div>              
 
                 <div class="flex-1 mt-1">
                   <label class="block text-[11px] font-semibold text-brandDark/60 uppercase mb-1.5">Comments</label>
                   <textarea id="disp-comments" placeholder="Summarize call..." class="glass-input rounded-lg w-full h-16 px-3 py-2 text-sm font-normal resize-none"></textarea>
                 </div>
 
-                <!-- FIX: Amber Button -->
-                <button type="submit" class="w-full bg-brandAmber hover:bg-amber-600 text-white font-medium px-4 py-2.5 rounded-lg shadow-sm transition ease-in mt-auto flex items-center justify-center gap-2">
-                  <i class="fa-solid fa-check-double"></i> Submit
+                <button 
+                  type="submit" 
+                  id="btn-submit-disposition" 
+                  class="bg-brandAmber hover:bg-amber-600 text-white font-medium px-4 py-2.5 rounded-lg shadow-sm transition ease-in text-sm w-full mt-2">
+                  Save Disposition
                 </button>
               </form>
             </div>
@@ -422,6 +457,140 @@
         </div>
       </div>
     </main>
+
+    <!-- SLIDE-OUT CUSTOMER 360 DRAWER (INSIDE FLEX CONTENT WRAPPER: NEVER OVERLAYS HEADER) -->
+    <div id="customer-drawer-backdrop" class="absolute inset-0 app-modal-backdrop z-40 hidden transition-opacity opacity-0" onclick="closeCustomerDrawer()"></div>
+    <div id="customer-drawer" class="absolute top-0 right-0 h-full w-full max-w-2xl glass-panel z-50 transform translate-x-full transition-transform duration-300 shadow-2xl flex flex-col bg-white">
+      <div class="p-6 border-b border-brandDark/5 bg-white shrink-0">
+        <div class="flex justify-between items-start mb-4">
+          <div class="flex items-center gap-4">
+            <div class="w-14 h-14 rounded-full bg-brandAmber/10 flex items-center justify-center text-brandAmber text-xl font-bold" id="drawer-initial">--</div>
+            <div>
+              <h2 class="text-xl font-bold leading-tight text-brandDark" id="drawer-name">Unknown</h2>
+              <p class="text-xs font-semibold text-brandDark/50">Customer ID: <span id="drawer-customer-id">--</span></p>
+              <p class="text-sm font-semibold text-brandDark/60" id="drawer-phone">--</p>
+            </div>
+          </div>
+          <button onclick="closeCustomerDrawer()" class="text-brandDark/50 hover:text-red-500 transition"><i class="fa-solid fa-xmark text-xl"></i></button>
+        </div>
+        <div class="flex flex-wrap gap-2 mb-3" id="drawer-tags-list"></div>
+        <div id="drawer-followup-banner" class="hidden bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mb-3">
+          <div class="flex justify-between items-center mb-1">
+            <span class="text-[11px] font-bold uppercase text-amber-700" id="drawer-followup-title">Follow-up Due</span>
+            <span id="drawer-followup-state" class="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">--</span>
+          </div>
+          <div class="text-xs font-medium text-brandDark/70 mb-1">Reason: <span id="drawer-followup-reason">--</span></div>
+          <div class="text-xs font-medium text-brandDark/70 mb-2" id="drawer-followup-ptp-line"></div>
+          <div class="flex gap-2">
+            <button type="button" onclick="drawerCallCustomer()" class="text-[11px] font-bold bg-brandAmber text-white px-3 py-1.5 rounded-md shadow-sm">Call</button>
+            <button type="button" onclick="promptCompleteFollowup()" class="text-[11px] font-bold bg-green-600 text-white px-3 py-1.5 rounded-md shadow-sm">Complete Follow-up</button>
+            <button type="button" onclick="promptRescheduleFollowup()" class="text-[11px] font-bold bg-white border border-brandDark/10 text-brandDark px-3 py-1.5 rounded-md hover:bg-slate-50 transition">Reschedule</button>
+          </div>
+        </div>
+        <div class="flex gap-2">
+          <button type="button" onclick="drawerCallCustomer()" class="text-xs font-bold bg-brandAmber text-white px-4 py-2 rounded-lg flex items-center gap-2 shadow-sm"><i class="fa-solid fa-phone"></i> Call</button>
+          <button type="button" onclick="requestNextCustomer()" class="text-xs font-bold bg-white border border-brandDark/10 hover:bg-slate-50 text-brandDark px-4 py-2 rounded-lg flex items-center gap-2 transition"><i class="fa-solid fa-bolt text-brandAmber"></i> Next Customer</button>
+        </div>
+      </div>
+
+      <!-- SUMMARY CARDS -->
+      <div class="px-6 py-5 border-b border-brandDark/10 shrink-0 bg-slate-50" id="drawer-summary-cards" style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.75rem;">
+        <div class="bg-white rounded-xl shadow-sm border border-brandDark/5 p-3">
+          <p class="text-[10px] font-bold text-brandDark/50 uppercase tracking-wider mb-1">Outstanding</p>
+          <p class="text-sm font-bold text-red-600" id="drawer-sum-outstanding">--</p>
+        </div>
+        <div class="bg-white rounded-xl shadow-sm border border-brandDark/5 p-3">
+          <p class="text-[10px] font-bold text-brandDark/50 uppercase tracking-wider mb-1">Days Overdue</p>
+          <p class="text-sm font-bold text-brandDark" id="drawer-sum-overdue">--</p>
+        </div>
+        <div class="bg-white rounded-xl shadow-sm border border-brandDark/5 p-3">
+          <p class="text-[10px] font-bold text-brandDark/50 uppercase tracking-wider mb-1">Last Contact</p>
+          <p class="text-sm font-bold text-brandDark" id="drawer-sum-last-contact">--</p>
+        </div>
+        <div class="bg-white rounded-xl shadow-sm border border-brandDark/5 p-3">
+          <p class="text-[10px] font-bold text-brandDark/50 uppercase tracking-wider mb-1">Total Calls</p>
+          <p class="text-sm font-bold text-brandDark" id="drawer-sum-total-calls">--</p>
+        </div>
+        <div class="bg-white rounded-xl shadow-sm border border-brandDark/5 p-3">
+          <p class="text-[10px] font-bold text-brandDark/50 uppercase tracking-wider mb-1">Answered</p>
+          <p class="text-sm font-bold text-brandDark" id="drawer-sum-answered">--</p>
+        </div>
+        <div class="bg-white rounded-xl shadow-sm border border-brandDark/5 p-3">
+          <p class="text-[10px] font-bold text-brandDark/50 uppercase tracking-wider mb-1">Contact Rate</p>
+          <p class="text-sm font-bold text-brandDark" id="drawer-sum-contact-rate">--</p>
+        </div>
+      </div>
+
+      <!-- TABS -->
+      <div class="flex gap-6 border-b border-brandDark/10 px-6 pt-3 bg-white overflow-x-auto shrink-0">
+        <button class="drawer-tab active text-sm font-bold text-brandAmber border-b-2 border-brandAmber pb-2 px-1 transition whitespace-nowrap" onclick="switchDrawerTab('overview', this)">Overview</button>
+        <button class="drawer-tab text-sm font-semibold text-brandDark/50 hover:text-brandDark border-b-2 border-transparent pb-2 px-1 transition whitespace-nowrap" onclick="switchDrawerTab('history', this)">Contact History</button>
+        <button class="drawer-tab text-sm font-semibold text-brandDark/50 hover:text-brandDark border-b-2 border-transparent pb-2 px-1 transition whitespace-nowrap" onclick="switchDrawerTab('ptp', this)">PTP</button>
+        <button class="drawer-tab text-sm font-semibold text-brandDark/50 hover:text-brandDark border-b-2 border-transparent pb-2 px-1 transition whitespace-nowrap" onclick="switchDrawerTab('followups', this)">Follow-ups</button>
+        <button class="drawer-tab text-sm font-semibold text-brandDark/50 hover:text-brandDark border-b-2 border-transparent pb-2 px-1 transition whitespace-nowrap" onclick="switchDrawerTab('notes', this)">Notes</button>
+      </div>
+
+      <!-- TAB CONTENTS -->
+      <div class="p-6 flex-1 overflow-y-auto bg-slate-50/50">
+        <div id="drawer-load-error" class="hidden bg-red-50 border border-red-100 text-red-600 text-sm rounded-lg px-4 py-3 mb-4 font-medium"></div>
+
+        <!-- Overview Tab -->
+        <div id="drawer-overview" class="drawer-content space-y-4">
+          <div class="bg-white border border-brandDark/10 p-5 rounded-xl shadow-sm">
+            <h4 class="text-[11px] font-bold text-brandDark/50 uppercase tracking-wider mb-4 border-b border-brandDark/5 pb-3">Account Information</h4>
+            <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem;" class="text-sm font-medium text-brandDark" id="drawer-account-grid">
+                <!-- JS Injects fields here -->
+            </div>
+          </div>
+        </div>
+
+        <!-- Contact History Tab -->
+        <div id="drawer-history" class="drawer-content hidden space-y-3">
+          <div id="drawer-history-empty" class="hidden text-center text-brandDark/50 text-sm py-8 font-medium">
+            <i class="fa-solid fa-comment-slash text-3xl mb-2 block"></i>
+            No previous contact history<br><span class="text-xs font-normal">This customer has not been contacted yet.</span>
+          </div>
+          <div id="drawer-history-list" class="space-y-3"></div>
+          <button id="drawer-history-more" onclick="loadMoreContactHistory()" class="hidden w-full text-xs font-bold text-brandAmber py-2 hover:underline">Load more</button>
+        </div>
+
+        <!-- PTP Tab -->
+        <div id="drawer-ptp" class="drawer-content hidden space-y-4">
+          <div id="drawer-ptp-empty" class="hidden text-center text-brandDark/50 text-sm py-8 font-medium">
+            <i class="fa-solid fa-hand-holding-dollar text-3xl mb-2 block"></i>
+            No Promise-to-Pay history
+          </div>
+          <div id="drawer-ptp-content" class="hidden">
+            <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.5rem;" class="mb-4">
+              <div class="bg-white shadow-sm border border-brandDark/5 rounded-lg px-3 py-2"><p class="text-[10px] font-bold text-brandDark/40 uppercase tracking-wider">Promised</p><p class="text-sm font-bold text-brandDark" id="drawer-ptp-promised">--</p></div>
+              <div class="bg-white shadow-sm border border-brandDark/5 rounded-lg px-3 py-2"><p class="text-[10px] font-bold text-brandDark/40 uppercase tracking-wider">Paid</p><p class="text-sm font-bold text-green-600" id="drawer-ptp-paid">--</p></div>
+              <div class="bg-white shadow-sm border border-brandDark/5 rounded-lg px-3 py-2"><p class="text-[10px] font-bold text-brandDark/40 uppercase tracking-wider">Outstanding</p><p class="text-sm font-bold text-red-600" id="drawer-ptp-outstanding">--</p></div>
+            </div>
+            <div id="drawer-ptp-list" class="space-y-2"></div>
+          </div>
+        </div>
+
+        <!-- Follow-ups Tab -->
+        <div id="drawer-followups" class="drawer-content hidden space-y-3">
+          <div id="drawer-followups-empty" class="hidden text-center text-brandDark/50 text-sm py-8 font-medium">
+            <i class="fa-solid fa-calendar-check text-3xl mb-2 block"></i>
+            No follow-ups scheduled
+          </div>
+          <div id="drawer-followups-list" class="space-y-2"></div>
+        </div>
+
+        <!-- Notes Tab -->
+        <div id="drawer-notes" class="drawer-content hidden space-y-4">
+          <form onsubmit="submitDrawerNote(event)" class="flex gap-2">
+            <input type="text" id="drawer-note-input" placeholder="Add a note about this customer..." class="glass-input rounded-lg flex-1 px-3 py-2 text-sm font-medium border border-brandDark/10 shadow-sm">
+            <button type="submit" class="bg-brandAmber text-white px-4 rounded-lg text-sm font-bold shadow-sm">Add</button>
+          </form>
+          <div id="drawer-notes-empty" class="hidden text-center text-brandDark/50 text-sm py-8 font-medium">No agent notes yet.</div>
+          <div id="drawer-notes-list" class="space-y-3"></div>
+        </div>
+      </div>
+    </div>
+
   </div>
   
   <script src="/callcenter.js"></script>

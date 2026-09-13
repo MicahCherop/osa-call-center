@@ -8,7 +8,7 @@
   <script>if (localStorage.getItem('theme') === 'dark') document.documentElement.classList.add('dark');</script>
   <title>Call Center Campaigns - Overview</title>
   
-  <link rel="icon" type="image/png" href="https://cdn.brandfetch.io/idkNTof4f-/w/400/h/400/theme/dark/icon.jpeg?c=1dxbfHSJFAPEGdCLU4o5B">
+  <link rel="icon" type="image/png" href="/static/icon.png">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <link rel="stylesheet" href="/callcenter-tailwind.css">
   <link rel="stylesheet" href="/callcenter.css">
@@ -38,9 +38,11 @@
       <div class="flex items-center gap-3 pl-4 border-l border-brandDark/10">
         <div class="relative">
           <button onclick="toggleLogoutModal()" class="flex items-center gap-3 hover:bg-slate-50 p-1.5 rounded-lg transition text-left outline-none">
-            <div class="w-8 h-8 bg-brandDark text-white rounded-full flex items-center justify-center">
+            <!-- REPLACED AVATAR CONTAINER -->
+            <div id="header-user-avatar" class="w-8 h-8 bg-brandDark text-white rounded-full flex items-center justify-center overflow-hidden shrink-0 border border-brandDark/10 shadow-sm">
               <i class="fa-solid fa-user text-xs"></i>
             </div>
+            <!-- /REPLACED AVATAR CONTAINER -->
             <div class="hidden sm:block">
               <div id="header-user-name" class="text-sm font-medium text-brandDark">Loading...</div>
               <div id="header-user-role" class="text-xs font-normal text-brandDark/60">Role</div>
@@ -166,7 +168,7 @@
             </div>
             <div>
               <h4 class="text-base font-medium text-red-900 mb-1 dark:text-red-400">Unassigned Customers</h4>
-              <p class="text-sm text-red-700/80 mb-3 dark:text-red-300/80">There are <span id="ov-unassigned-count" class="font-bold text-lg">0</span> pending callbacks in the system with no agent assigned.</p>
+              <p class="text-sm text-red-700/80 mb-3 dark:text-red-300/80">There are <span id="ov-unassigned-count" class="font-bold text-lg">0</span> pending unassigned customers in the system with no agent assigned.</p>
               <button onclick="window.location.href='/teamleader'" class="text-xs font-medium bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded transition">Assign Now</button>
             </div>
           </div>

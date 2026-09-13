@@ -3,3 +3,9 @@ uvicorn
 pydantic
 python-dotenv
 supabase
+gspread
+google-auth
+google-auth-oauthlib
+google-auth-httplib2
+pytest
+httpx

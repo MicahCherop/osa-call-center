@@ -13,7 +13,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="icon" href="data:,">
   <link rel="stylesheet" href="/callcenter-tailwind.css">
-  <link rel="icon" type="image/png" href="https://cdn.brandfetch.io/idkNTof4f-/w/400/h/400/theme/dark/icon.jpeg?c=1dxbfHSJFAPEGdCLU4o5B">
+  <link rel="icon" type="image/png" href="/static/icon.png">
   <link rel="stylesheet" href="/callcenter.css">
 </head>
 
@@ -151,14 +151,16 @@
         <!-- Clickable Profile Section -->
         <div class="relative">
           <button onclick="toggleLogoutModal()" class="flex items-center gap-3 hover:bg-slate-50 p-1.5 rounded-lg transition text-left outline-none">
-            <div class="w-8 h-8 bg-brandDark text-white rounded-full flex items-center justify-center">
+            <!-- REPLACED AVATAR CONTAINER -->
+            <div id="header-user-avatar" class="w-8 h-8 bg-brandDark text-white rounded-full flex items-center justify-center overflow-hidden shrink-0 border border-brandDark/10 shadow-sm">
               <i class="fa-solid fa-user text-xs"></i>
             </div>
+            <!-- /REPLACED AVATAR CONTAINER -->
             <div class="hidden sm:block">
-              <div id="header-user-name" class="text-sm font-medium text-slate-800">Loading...</div>
-              <div id="header-user-role" class="text-[11px] font-normal text-slate-500">Role</div>
+              <div id="header-user-name" class="text-sm font-medium text-brandDark">Loading...</div>
+              <div id="header-user-role" class="text-xs font-normal text-brandDark/60">Role</div>
             </div>
-            <i class="fa-solid fa-chevron-down text-xs text-slate-400 ml-1"></i>
+            <i class="fa-solid fa-chevron-down text-xs text-brandDark/40 ml-1"></i>
           </button>
 
           <!-- The Logout Modal -->
